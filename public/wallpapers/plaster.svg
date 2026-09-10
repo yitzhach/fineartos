@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" width="1600" height="1000">
+  <!-- Studio Plaster. A troweled wall lit from the upper left: broad tonal
+       fields first, then a low-opacity grain so wide screens do not band.
+       The noise stays under 8% — above that it stops reading as plaster and
+       starts reading as a dirty screen. -->
+  <defs>
+    <linearGradient id="ground" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#3a352e"/>
+      <stop offset="0.45" stop-color="#2a261f"/>
+      <stop offset="1" stop-color="#16140f"/>
+    </linearGradient>
+    <radialGradient id="key" cx="0.22" cy="0.08" r="0.9">
+      <stop offset="0" stop-color="#e8c9a4" stop-opacity="0.34"/>
+      <stop offset="0.4" stop-color="#a5825f" stop-opacity="0.13"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="fill" cx="0.9" cy="0.62" r="0.6">
+      <stop offset="0" stop-color="#7d8493" stop-opacity="0.17"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="0.5" cy="0.45" r="0.78">
+      <stop offset="0.55" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.42"/>
+    </radialGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" seed="7"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.07"/></feComponentTransfer>
+    </filter>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#ground)"/>
+  <!-- Two broad sweeps of the trowel, drawn as shapes rather than noise. -->
+  <g opacity="0.5">
+    <ellipse cx="430" cy="230" rx="760" ry="330" fill="#4a4137" opacity="0.42" transform="rotate(-13 430 230)"/>
+    <ellipse cx="1180" cy="760" rx="700" ry="290" fill="#221f1a" opacity="0.55" transform="rotate(-8 1180 760)"/>
+    <ellipse cx="980" cy="330" rx="520" ry="200" fill="#544a3d" opacity="0.24" transform="rotate(9 980 330)"/>
+  </g>
+  <rect width="1600" height="1000" fill="url(#key)"/>
+  <rect width="1600" height="1000" fill="url(#fill)"/>
+  <rect width="1600" height="1000" fill="url(#vignette)"/>
+  <rect width="1600" height="1000" filter="url(#grain)"/>
+</svg>

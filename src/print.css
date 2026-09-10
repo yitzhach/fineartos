@@ -111,7 +111,8 @@
   html, body, #root { height: auto; overflow: visible; background: #fff; }
 
   /* Everything that is not the client document is removed from the sheet. */
-  .systembar, .dock, .toolbar, .titlebar, .desktop-icons, .no-print { display: none !important; }
+  .systembar, .dock, .toolbar, .titlebar, .desktop-icons, .desktop-surface,
+  .send-strip, .no-print { display: none !important; }
 
   .workspace, .desktop, .window, .window-body {
     position: static !important;
@@ -144,6 +145,24 @@
   .client-doc table.quote tr { break-inside: avoid; }
   .client-doc .doc-totals { break-inside: avoid; }
   .client-doc .doc-head { break-after: avoid; }
+
+  /* The invoice prints as the whole sheet too: the on-screen card's shadow,
+     border and outer padding come off, and the paper provides the margin. */
+  .invoice-sheet {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 11pt;
+  }
+  .inv-head { break-after: avoid; }
+  .inv-lines thead { display: table-header-group; }
+  .inv-lines tr { break-inside: avoid; }
+  .inv-totals, .inv-pay { break-inside: avoid; }
   .client-doc .refs img { break-inside: avoid; }
 
   /* A long terms block may run over pages, but not leave a lone line behind. */

@@ -5,9 +5,13 @@
  */
 
 import type { CommissionDocument } from '../commission/types';
+import type { Invoice } from '../invoice/types';
+import type { Project } from '../project/project';
 import {
   STORE_DOCUMENTS,
   STORE_IMAGES,
+  STORE_INVOICES,
+  STORE_PROJECTS,
   STORE_QUEUE,
   type PendingWrite,
   type StoredImage,
@@ -35,6 +39,23 @@ export interface StoredDocument {
   saveState: SaveState;
   /** Set when a remote edit could not be merged. Never overwritten silently. */
   conflict: { remote: CommissionDocument; detectedAt: string } | null;
+}
+
+/**
+ * Folders and invoices are wrapped in a row carrying the workspace id, the
+ * same shape documents use, so `listByWorkspace` scoping works identically and
+ * a record from another workspace reads as absent rather than as data.
+ */
+interface ProjectRow {
+  id: string;
+  workspaceId: string;
+  project: Project;
+}
+
+interface InvoiceRow {
+  id: string;
+  workspaceId: string;
+  invoice: Invoice;
 }
 
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -98,6 +119,65 @@ export class Repository {
     const row = await this.load(id);
     if (!row) return;
     await this.save({ ...row.document, state: 'archived' }, row.saveState !== 'saved-local');
+  }
+
+  // --- Project folders ----------------------------------------------------
+  //
+  // Folders and invoices are local records. They are not queued for cloud
+  // sync: no adapter is configured, and queueing a write nothing can send
+  // would put rows in the queue that can only ever fail.
+
+  async listProjects(): Promise<Project[]> {
+    const rows = await listByWorkspace<ProjectRow>(STORE_PROJECTS, this.workspaceId);
+    return rows
+      .map((row) => row.project)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  async loadProject(id: string): Promise<Project | null> {
+    const row = await get<ProjectRow>(STORE_PROJECTS, id);
+    if (!row || row.workspaceId !== this.workspaceId) return null;
+    return row.project;
+  }
+
+  async saveProject(project: Project): Promise<void> {
+    await put(STORE_PROJECTS, { id: project.id, workspaceId: this.workspaceId, project });
+  }
+
+  /**
+   * Removes the folder only. Every document and invoice that was inside it
+   * still exists and goes back to the desktop — a folder is a container, and
+   * emptying the container is not the same as burning what was in it.
+   */
+  async deleteProject(id: string): Promise<void> {
+    const existing = await this.loadProject(id);
+    if (!existing) return;
+    await remove(STORE_PROJECTS, id);
+  }
+
+  // --- Invoices -----------------------------------------------------------
+
+  async listInvoices(): Promise<Invoice[]> {
+    const rows = await listByWorkspace<InvoiceRow>(STORE_INVOICES, this.workspaceId);
+    return rows
+      .map((row) => row.invoice)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  async loadInvoice(id: string): Promise<Invoice | null> {
+    const row = await get<InvoiceRow>(STORE_INVOICES, id);
+    if (!row || row.workspaceId !== this.workspaceId) return null;
+    return row.invoice;
+  }
+
+  async saveInvoice(invoice: Invoice): Promise<void> {
+    await put(STORE_INVOICES, { id: invoice.id, workspaceId: this.workspaceId, invoice });
+  }
+
+  async deleteInvoice(id: string): Promise<void> {
+    const existing = await this.loadInvoice(id);
+    if (!existing) return;
+    await remove(STORE_INVOICES, id);
   }
 
   // --- Images -------------------------------------------------------------

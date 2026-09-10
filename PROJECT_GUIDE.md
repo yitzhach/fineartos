@@ -1,8 +1,15 @@
 # Artist OS — project guide
 
-One desktop-style workspace containing one working tool: **Commission
-Documents**. An artist can create a commission document, save it, reopen it,
-edit it and print a polished client PDF, with or without a network.
+One desktop-style workspace for running an art business. Two working tools:
+**Commission Documents** and **Invoices**. An artist can create a commission,
+file it into a project folder on the desktop, bill it with one or more
+invoices, and hand the client a polished PDF, JPEG or self-contained HTML
+file — with or without a network.
+
+`FUTURE_BUILD.md` records the three requested features that need a backend
+(emailing from the app, Square integration, the client portal) and what each
+would actually cost. None of them is built, and nothing in the app implies
+they exist.
 
 This is the single guide for the project. `COMMISSION_PHASE_1.md` is the
 original brief and is kept for reference.
@@ -32,7 +39,13 @@ not where it expects.
 
 | Area | Where | Notes |
 | --- | --- | --- |
-| OS shell | `src/os/` | System bar, dock, one draggable document window |
+| OS shell | `src/os/` | System bar, magnifying dock, one draggable window, desktop, settings |
+| Desktop icons | `src/os/Desktop.tsx` | Click selects, double-click opens. Thumbnails from the first reference image |
+| Drag-and-drop images | `src/os/ImageDrop.tsx` | One well used for references, the logo and the wallpaper |
+| Project folders | `src/project/` | A real record holding document and invoice ids |
+| Invoices | `src/invoice/` | Child records of a commission; many per project |
+| Invoice output | `src/invoice/render.ts` | Self-contained HTML and a canvas drawing, both from the model |
+| Wallpapers | `public/wallpapers/` | Three SVGs, ~2KB each, precached by the service worker |
 | Module registry | `src/os/registry.ts` | Future tools register name, icon, entry point |
 | Commission model | `src/commission/types.ts` | Money is integer minor units throughout |
 | Calculations | `src/commission/calc.ts` | The one shared calculation function |
@@ -95,9 +108,34 @@ through `Repository`, which is constructed with a workspace id and treats a
 row from another workspace as absent. Adding sign-in later does not mean
 revisiting storage.
 
-**The wallpaper is a CSS treatment, not an image.** It works offline, ships no
-asset, and is never the design screenshot. A solid background is one click
-away in the system bar.
+**The wallpaper is a bundled SVG, or the artist's own image.** Three ship with
+the app — Studio Plaster, Dusk and Linen — drawn as SVG rather than photographs
+so they are about 2KB each, sharp at any resolution, and precached for offline.
+The artist can drop in their own photo instead; it lives in IndexedDB like every
+other image, and only its id is in localStorage. A solid background is still one
+click away. On a first run the default follows the theme, because a dark
+wallpaper under a light system bar reads as a bug rather than a choice.
+
+**An invoice is a child record, never a mode of a commission.** Generating one
+copies the client, the lines and the payment details as they stand at that
+moment. Editing the commission afterwards cannot reach back into an invoice
+the client already has — the same rule issuing already applied to terms,
+applied to money. A project can hold as many invoices as it needs, which is
+how a deposit invoice and a final invoice come off one commission.
+
+**Payment details are text the artist typed.** A Square link is a link they
+pasted from their own Square dashboard; the client pays Square directly and
+Artist OS never sees the money. The invoice prints only the methods actually
+filled in, and says plainly when none are.
+
+**A folder is a container, and emptying it is not deleting.** Taking an item
+out of a project folder puts it back on the desktop. Deleting the folder
+leaves everything that was inside it alone.
+
+**Exports are rendered from the model, not screenshotted.** The HTML file and
+the JPEG are two renderers over the same `Totals`, so neither can disagree
+with the editor, and neither can accidentally capture app chrome or a
+half-scrolled window.
 
 ## Where this lives
 
@@ -184,10 +222,27 @@ must be before anything is called production-ready.
 one. It does not: at the starting commit the repository contained only
 `README.md` and `COMMISSION_PHASE_1.md`. Nothing was migrated or displaced.
 
-**The live deployment is unconfirmed.** See "Deployment history" above.
+**The live deployment is still unconfirmed from inside an agent session.**
+Two sessions in a row have been unable to reach `*.workers.dev` — the sandbox
+network policy answers 403 to the CONNECT, which is not evidence about the
+site either way. What *has* been verified: the Worker exists and was modified
+45 seconds after the last push, `workers_dev: true` is in `wrangler.jsonc`,
+and the exact `dist/` that deploys renders correctly in a real Chromium with
+zero console errors. If the URL is broken it is hosting configuration, not the
+app. Someone outside the sandbox still needs to open it.
 
 **The Artist OS design reference image was not available** in the build
 session. The visual direction follows the written description in the brief.
+
+## What is not built, and says so
+
+- **No email is sent from the app.** The invoice offers a `mailto:` link that
+  opens the artist's own mail client with the client and subject filled in;
+  the file is attached by the artist. The preview says this outright.
+- **No payment is processed.** See `FUTURE_BUILD.md`.
+- **No client portal.** See `FUTURE_BUILD.md`.
+- **Dragging an icon into a folder** is not wired up; filing happens through
+  the Save button and the folder window.
 
 ## Next phase
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Background, Theme } from '../lib/prefs';
+import type { Theme } from '../lib/prefs';
 
 interface Props {
   studioName: string;
@@ -10,8 +10,7 @@ interface Props {
   statusState: string;
   theme: Theme;
   onToggleTheme: () => void;
-  background: Background;
-  onToggleBackground: () => void;
+  onOpenSettings: () => void;
   initials: string;
 }
 
@@ -99,15 +98,6 @@ export function SystemBar(props: Props) {
       <button
         className="btn"
         data-variant="quiet"
-        onClick={props.onToggleBackground}
-        title="Switch between the wallpaper and a solid background"
-      >
-        {props.background === 'wallpaper' ? 'Solid' : 'Wallpaper'}
-      </button>
-
-      <button
-        className="btn"
-        data-variant="quiet"
         onClick={props.onToggleTheme}
         aria-label={`Switch to ${props.theme === 'dark' ? 'light' : 'dark'} mode`}
       >
@@ -143,6 +133,16 @@ export function SystemBar(props: Props) {
           <p className="faint" style={{ margin: 0, fontSize: 12 }}>
             No account is connected. This build stores work on this device only.
           </p>
+          <button
+            className="btn"
+            style={{ marginTop: 10, width: '100%' }}
+            onClick={() => {
+              setOpen(null);
+              props.onOpenSettings();
+            }}
+          >
+            Settings
+          </button>
         </div>
       )}
     </div>

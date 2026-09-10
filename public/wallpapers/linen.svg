@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" width="1600" height="1000">
+  <!-- Linen. Primed canvas in daylight — the one to pair with the light theme. -->
+  <defs>
+    <linearGradient id="cloth" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#f6f0e6"/>
+      <stop offset="0.55" stop-color="#ece3d4"/>
+      <stop offset="1" stop-color="#dcd0bc"/>
+    </linearGradient>
+    <radialGradient id="daylight" cx="0.26" cy="0.12" r="0.85">
+      <stop offset="0" stop-color="#fffdf8" stop-opacity="0.85"/>
+      <stop offset="0.5" stop-color="#fffdf8" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="shade" cx="0.88" cy="0.9" r="0.66">
+      <stop offset="0" stop-color="#8d7b60" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+    <!-- A real weave: two crossed line grids, not noise. -->
+    <pattern id="weave" width="6" height="6" patternUnits="userSpaceOnUse">
+      <rect width="6" height="6" fill="none"/>
+      <path d="M0 1.5 H6" stroke="#8a7d66" stroke-opacity="0.07" stroke-width="1"/>
+      <path d="M1.5 0 V6" stroke="#8a7d66" stroke-opacity="0.05" stroke-width="1"/>
+    </pattern>
+    <filter id="grain3" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="5"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.045"/></feComponentTransfer>
+    </filter>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#cloth)"/>
+  <g opacity="0.35">
+    <ellipse cx="1200" cy="760" rx="760" ry="260" fill="#cfc2aa" opacity="0.5" transform="rotate(-7 1200 760)"/>
+    <ellipse cx="360" cy="260" rx="640" ry="240" fill="#fffaf0" opacity="0.55" transform="rotate(-11 360 260)"/>
+  </g>
+  <rect width="1600" height="1000" fill="url(#daylight)"/>
+  <rect width="1600" height="1000" fill="url(#shade)"/>
+  <rect width="1600" height="1000" fill="url(#weave)"/>
+  <rect width="1600" height="1000" filter="url(#grain3)"/>
+</svg>

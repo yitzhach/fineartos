@@ -3,6 +3,8 @@ import { loadLayout, saveLayout, type WindowLayout } from '../lib/prefs';
 
 interface Props {
   title: string;
+  /** Small grey text beside the title, e.g. the client's name. */
+  subtitle?: string | null;
   toolbar: ReactNode;
   children: ReactNode;
   onClose: () => void;
@@ -15,7 +17,7 @@ interface Props {
  * Below 860px the stylesheet lays this out as a static full-width panel and
  * dragging is disabled, so a phone never has to move a window to read it.
  */
-export function AppWindow({ title, toolbar, children, onClose }: Props) {
+export function AppWindow({ title, subtitle, toolbar, children, onClose }: Props) {
   const [layout, setLayout] = useState<WindowLayout>(loadLayout);
   const dragOffset = useRef<{ x: number; y: number } | null>(null);
   const isCompact = () => window.matchMedia('(max-width: 860px)').matches;
@@ -47,6 +49,8 @@ export function AppWindow({ title, toolbar, children, onClose }: Props) {
     dragOffset.current = { x: event.clientX - layout.x, y: event.clientY - layout.y };
   };
 
+  const toggleMaximized = () => setLayout((c) => ({ ...c, maximized: !c.maximized }));
+
   return (
     <div
       className="window"
@@ -55,9 +59,37 @@ export function AppWindow({ title, toolbar, children, onClose }: Props) {
       role="dialog"
       aria-label={title}
     >
-      <div className="titlebar" data-locked={layout.locked} onPointerDown={startDrag}>
-        <span className="title">{title}</span>
+      <div
+        className="titlebar"
+        data-locked={layout.locked}
+        onPointerDown={startDrag}
+        onDoubleClick={toggleMaximized}
+      >
+        {/* Every light does what its shape promises. There is no minimise-to-
+            nowhere: the middle light closes the window like the first, and says
+            so, rather than pretending a tray exists. */}
+        <div className="lights">
+          <button className="light close" onClick={onClose} aria-label="Close window" title="Close">
+            <span aria-hidden="true">✕</span>
+          </button>
+          <button
+            className="light zoom"
+            onClick={toggleMaximized}
+            aria-label={layout.maximized ? 'Restore window size' : 'Fill the screen'}
+            aria-pressed={layout.maximized}
+            title={layout.maximized ? 'Restore' : 'Fill the screen'}
+          >
+            <span aria-hidden="true">{layout.maximized ? '↙' : '↗'}</span>
+          </button>
+        </div>
+
+        <div className="title-group">
+          <span className="title">{title}</span>
+          {subtitle && <span className="subtitle">{subtitle}</span>}
+        </div>
+
         <div className="spacer" style={{ flex: 1 }} />
+
         <button
           className="btn"
           data-variant="quiet"
@@ -66,17 +98,6 @@ export function AppWindow({ title, toolbar, children, onClose }: Props) {
           title={layout.locked ? 'Unlock the window position' : 'Lock the window position'}
         >
           {layout.locked ? 'Locked' : 'Lock'}
-        </button>
-        <button
-          className="btn"
-          data-variant="quiet"
-          onClick={() => setLayout((c) => ({ ...c, maximized: !c.maximized }))}
-          aria-pressed={layout.maximized}
-        >
-          {layout.maximized ? 'Restore' : 'Maximize'}
-        </button>
-        <button className="btn" data-variant="quiet" onClick={onClose} aria-label="Close window">
-          ✕
         </button>
       </div>
 

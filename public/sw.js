@@ -10,11 +10,22 @@
  * online, because a browser makes no promise to run anything while it is shut.
  */
 
-const CACHE = 'artist-os-shell-v1';
+const CACHE = 'artist-os-shell-v2';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(['/', '/index.html', '/manifest.webmanifest'])),
+    caches.open(CACHE).then((cache) =>
+      cache.addAll([
+        '/',
+        '/index.html',
+        '/manifest.webmanifest',
+        // The bundled wallpapers are part of the shell: a desktop that loses
+        // its background offline would look broken rather than offline.
+        '/wallpapers/plaster.svg',
+        '/wallpapers/dusk.svg',
+        '/wallpapers/linen.svg',
+      ]),
+    ),
   );
   self.skipWaiting();
 });

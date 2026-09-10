@@ -1,3 +1,4 @@
+import { ImageDrop } from '../../os/ImageDrop';
 import { calculateTotals, formatMoney, lineTotal, parseMoney, validateQuote } from '../calc';
 import { emptyLineItem, newId } from '../document';
 import type { CommissionDocument, LineItem, Payment } from '../types';
@@ -6,7 +7,7 @@ interface Props {
   doc: CommissionDocument;
   onChange: (changes: Partial<CommissionDocument>) => void;
   imageUrls: Record<string, string>;
-  onAddImage: (file: File) => void;
+  onAddImages: (files: File[]) => void;
   onRemoveImage: (id: string) => void;
   imageError: string | null;
 }
@@ -20,7 +21,7 @@ function moneyInput(value: number): string {
   return (value / 100).toFixed(2);
 }
 
-export function Editor({ doc, onChange, imageUrls, onAddImage, onRemoveImage, imageError }: Props) {
+export function Editor({ doc, onChange, imageUrls, onAddImages, onRemoveImage, imageError }: Props) {
   const totals = calculateTotals(doc.quote, doc.payments, doc.deposit);
   const issues = validateQuote(doc.quote, doc.payments, doc.deposit);
   const currency = doc.quote.currency;
@@ -294,40 +295,34 @@ export function Editor({ doc, onChange, imageUrls, onAddImage, onRemoveImage, im
         </div>
 
         <div className="field">
-          <label htmlFor="art-images">Reference images</label>
-          <input
-            id="art-images"
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) onAddImage(file);
-              e.target.value = '';
-            }}
-          />
-          <span className="hint">PNG, JPEG or WebP, up to 8 MB. Stored on this device.</span>
-          {imageError && <span className="hint" style={{ color: 'var(--danger)' }}>{imageError}</span>}
-        </div>
-        {doc.artwork.referenceImageIds.length > 0 && (
-          <div className="refs" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-            {doc.artwork.referenceImageIds.map((id) => (
-              <div key={id} style={{ textAlign: 'center' }}>
+          <label id="art-images-label">Reference images</label>
+          {/* The first image becomes the project's thumbnail on the desktop,
+              so the order these are added in is meaningful. */}
+          <ImageDrop
+            onFiles={onAddImages}
+            error={imageError}
+            label="Drop reference images here"
+            hint="or click to choose · PNG, JPEG, WebP · up to 8 MB each"
+          >
+            {doc.artwork.referenceImageIds.map((id, index) => (
+              <figure className="ref-image" key={id}>
                 {imageUrls[id] ? (
-                  <img
-                    src={imageUrls[id]}
-                    alt="Reference"
-                    style={{ maxWidth: 130, maxHeight: 130, borderRadius: 6, display: 'block' }}
-                  />
+                  <img src={imageUrls[id]} alt={`Reference ${index + 1}`} />
                 ) : (
-                  <span className="hint">Image not on this device</span>
+                  <span className="missing">Not on this device</span>
                 )}
-                <button className="btn" data-variant="quiet" onClick={() => onRemoveImage(id)}>
-                  Remove
+                {index === 0 && <figcaption>Thumbnail</figcaption>}
+                <button
+                  className="remove"
+                  aria-label={`Remove reference image ${index + 1}`}
+                  onClick={() => onRemoveImage(id)}
+                >
+                  ✕
                 </button>
-              </div>
+              </figure>
             ))}
-          </div>
-        )}
+          </ImageDrop>
+        </div>
       </fieldset>
 
       <fieldset className="section">
