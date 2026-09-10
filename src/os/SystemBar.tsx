@@ -1,0 +1,150 @@
+import { useEffect, useRef, useState } from 'react';
+import type { Background, Theme } from '../lib/prefs';
+
+interface Props {
+  studioName: string;
+  search: string;
+  onSearch: (value: string) => void;
+  /** Verbatim status text from the persistence layer. Never embellished here. */
+  statusText: string;
+  statusState: string;
+  theme: Theme;
+  onToggleTheme: () => void;
+  background: Background;
+  onToggleBackground: () => void;
+  initials: string;
+}
+
+function MiniCalendar({ today }: { today: Date }) {
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const first = new Date(year, month, 1).getDay();
+  const days = new Date(year, month + 1, 0).getDate();
+  const cells: (number | null)[] = [
+    ...Array.from({ length: first }, () => null),
+    ...Array.from({ length: days }, (_, i) => i + 1),
+  ];
+  const weeks: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+
+  return (
+    <div className="popover" role="dialog" aria-label="Calendar">
+      <h4>{today.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</h4>
+      <table className="cal">
+        <thead>
+          <tr>
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+              <th key={i} scope="col">{d}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {weeks.map((week, wi) => (
+            <tr key={wi}>
+              {week.map((day, di) => (
+                <td key={di} data-today={day === today.getDate() ? 'true' : 'false'}>
+                  {day ?? ''}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function SystemBar(props: Props) {
+  const [now, setNow] = useState(() => new Date());
+  const [open, setOpen] = useState<'clock' | 'profile' | null>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => {
+      if (!barRef.current?.contains(event.target as Node)) setOpen(null);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
+  return (
+    <div className="systembar" ref={barRef}>
+      <span className="brand">Artist OS</span>
+      <span className="studio">{props.studioName || 'Studio name not set'}</span>
+
+      <div className="spacer" />
+
+      <div className="search">
+        <label className="sr-only" htmlFor="doc-search">Search documents</label>
+        <input
+          id="doc-search"
+          type="text"
+          placeholder="Search client, title or number"
+          value={props.search}
+          onChange={(e) => props.onSearch(e.target.value)}
+        />
+      </div>
+
+      <span className="status-pill" title={props.statusText}>
+        <span className="status-dot" data-state={props.statusState} aria-hidden="true" />
+        {props.statusText}
+      </span>
+
+      <button
+        className="btn"
+        data-variant="quiet"
+        onClick={props.onToggleBackground}
+        title="Switch between the wallpaper and a solid background"
+      >
+        {props.background === 'wallpaper' ? 'Solid' : 'Wallpaper'}
+      </button>
+
+      <button
+        className="btn"
+        data-variant="quiet"
+        onClick={props.onToggleTheme}
+        aria-label={`Switch to ${props.theme === 'dark' ? 'light' : 'dark'} mode`}
+      >
+        {props.theme === 'dark' ? '☾' : '☀'}
+      </button>
+
+      <button
+        className="btn clock"
+        data-variant="quiet"
+        onClick={() => setOpen(open === 'clock' ? null : 'clock')}
+        aria-expanded={open === 'clock'}
+      >
+        {now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+      </button>
+
+      <button
+        className="avatar"
+        onClick={() => setOpen(open === 'profile' ? null : 'profile')}
+        aria-expanded={open === 'profile'}
+        aria-label="Profile and settings"
+      >
+        {props.initials || '—'}
+      </button>
+
+      {open === 'clock' && <MiniCalendar today={now} />}
+      {open === 'profile' && (
+        <div className="popover" role="dialog" aria-label="Profile">
+          <h4>{props.studioName || 'Studio name not set'}</h4>
+          <p className="faint" style={{ margin: '0 0 10px', fontSize: 12 }}>
+            Studio details are saved as defaults for new documents. Edit them in the
+            Studio section of any document.
+          </p>
+          <p className="faint" style={{ margin: 0, fontSize: 12 }}>
+            No account is connected. This build stores work on this device only.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}

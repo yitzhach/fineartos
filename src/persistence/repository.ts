@@ -1,0 +1,161 @@
+/**
+ * The app's only door to stored documents. The UI never touches IndexedDB
+ * directly, so the workspace scoping and the save-state reporting below are
+ * impossible to bypass by accident.
+ */
+
+import type { CommissionDocument } from '../commission/types';
+import {
+  STORE_DOCUMENTS,
+  STORE_IMAGES,
+  STORE_QUEUE,
+  type PendingWrite,
+  type StoredImage,
+  get,
+  listByWorkspace,
+  put,
+  remove,
+} from './db';
+
+/**
+ * What the UI is allowed to claim about a document.
+ *
+ * 'saved-local' means exactly that: on this device. Being online is not
+ * evidence of a sync, so nothing may report 'synced' until the cloud adapter
+ * has confirmed the write.
+ */
+export type SaveState = 'saved-local' | 'pending-sync' | 'synced' | 'save-failed';
+
+export interface StoredDocument {
+  id: string;
+  workspaceId: string;
+  /** Incremented locally on each save; used for conflict detection. */
+  revision: number;
+  document: CommissionDocument;
+  saveState: SaveState;
+  /** Set when a remote edit could not be merged. Never overwritten silently. */
+  conflict: { remote: CommissionDocument; detectedAt: string } | null;
+}
+
+export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+export const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+
+export class Repository {
+  constructor(private readonly workspaceId: string) {}
+
+  async list(): Promise<StoredDocument[]> {
+    const rows = await listByWorkspace<StoredDocument>(STORE_DOCUMENTS, this.workspaceId);
+    return rows.sort((a, b) => b.document.updatedAt.localeCompare(a.document.updatedAt));
+  }
+
+  async load(id: string): Promise<StoredDocument | null> {
+    const row = await get<StoredDocument>(STORE_DOCUMENTS, id);
+    // A row from another workspace is treated as absent, not returned.
+    if (!row || row.workspaceId !== this.workspaceId) return null;
+    return row;
+  }
+
+  /**
+   * Writes locally and queues the cloud write. Returns the row with the state
+   * the UI may display — 'pending-sync' when a cloud target is configured,
+   * 'saved-local' when it is not, and never 'synced' from here.
+   */
+  async save(document: CommissionDocument, cloudConfigured: boolean): Promise<StoredDocument> {
+    const existing = await this.load(document.id);
+    const row: StoredDocument = {
+      id: document.id,
+      workspaceId: this.workspaceId,
+      revision: (existing?.revision ?? 0) + 1,
+      document,
+      saveState: cloudConfigured ? 'pending-sync' : 'saved-local',
+      conflict: existing?.conflict ?? null,
+    };
+    await put(STORE_DOCUMENTS, row);
+    if (cloudConfigured) await this.enqueue(document.id, row.revision, 'upsertDocument');
+    return row;
+  }
+
+  async markSaveState(id: string, saveState: SaveState): Promise<void> {
+    const row = await this.load(id);
+    if (!row) return;
+    await put(STORE_DOCUMENTS, { ...row, saveState });
+  }
+
+  /**
+   * Records a remote version that disagrees with the local one. Both copies
+   * are kept for the artist to resolve; neither is discarded here.
+   */
+  async recordConflict(id: string, remote: CommissionDocument): Promise<void> {
+    const row = await this.load(id);
+    if (!row) return;
+    await put(STORE_DOCUMENTS, {
+      ...row,
+      conflict: { remote, detectedAt: new Date().toISOString() },
+    });
+  }
+
+  async archive(id: string): Promise<void> {
+    const row = await this.load(id);
+    if (!row) return;
+    await this.save({ ...row.document, state: 'archived' }, row.saveState !== 'saved-local');
+  }
+
+  // --- Images -------------------------------------------------------------
+
+  async putImage(id: string, blob: Blob): Promise<StoredImage> {
+    if (!ALLOWED_IMAGE_TYPES.includes(blob.type)) {
+      throw new Error(`Unsupported image type: ${blob.type || 'unknown'}`);
+    }
+    if (blob.size > MAX_IMAGE_BYTES) {
+      throw new Error(`Image is larger than ${MAX_IMAGE_BYTES / 1024 / 1024} MB.`);
+    }
+    const image: StoredImage = {
+      id,
+      workspaceId: this.workspaceId,
+      blob,
+      mimeType: blob.type,
+      byteSize: blob.size,
+      createdAt: new Date().toISOString(),
+    };
+    await put(STORE_IMAGES, image);
+    return image;
+  }
+
+  async getImage(id: string): Promise<StoredImage | null> {
+    const image = await get<StoredImage>(STORE_IMAGES, id);
+    if (!image || image.workspaceId !== this.workspaceId) return null;
+    return image;
+  }
+
+  // --- Pending write queue ------------------------------------------------
+
+  private async enqueue(targetId: string, revision: number, op: PendingWrite['op']): Promise<void> {
+    // The id is derived from the target and op, so re-saving the same document
+    // replaces its queued write instead of stacking a second one.
+    const write: PendingWrite = {
+      id: `${this.workspaceId}:${op}:${targetId}`,
+      workspaceId: this.workspaceId,
+      op,
+      targetId,
+      revision,
+      queuedAt: new Date().toISOString(),
+      attempts: 0,
+      lastError: null,
+    };
+    await put(STORE_QUEUE, write);
+  }
+
+  async pendingWrites(): Promise<PendingWrite[]> {
+    return listByWorkspace<PendingWrite>(STORE_QUEUE, this.workspaceId);
+  }
+
+  async clearPendingWrite(id: string): Promise<void> {
+    await remove(STORE_QUEUE, id);
+  }
+
+  async recordWriteFailure(id: string, message: string): Promise<void> {
+    const write = await get<PendingWrite>(STORE_QUEUE, id);
+    if (!write || write.workspaceId !== this.workspaceId) return;
+    await put(STORE_QUEUE, { ...write, attempts: write.attempts + 1, lastError: message });
+  }
+}

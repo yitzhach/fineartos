@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fineartos",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    // The app is one page; anything else should still land on it rather than
+    // a Cloudflare 404. The service worker and manifest are real files in
+    // dist/, so they are served as themselves.
+    "not_found_handling": "single-page-application"
+  }
+}
