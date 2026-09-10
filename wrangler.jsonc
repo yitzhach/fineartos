@@ -2,6 +2,12 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "fineartos",
   "compatibility_date": "2026-09-01",
+
+  // Serve the Worker at fineartos.<subdomain>.workers.dev. Without this the
+  // deploy succeeds but the URL does not resolve at all, which reads as a
+  // broken build when nothing is actually wrong with the build.
+  "workers_dev": true,
+
   "assets": {
     "directory": "./dist",
     // The app is one page; anything else should still land on it rather than
