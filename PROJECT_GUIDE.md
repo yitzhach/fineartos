@@ -99,6 +99,63 @@ revisiting storage.
 asset, and is never the design screenshot. A solid background is one click
 away in the system bar.
 
+## Where this lives
+
+| | |
+| --- | --- |
+| Primary repo | `yitzhach/fineartos` (public), branch `main` — this is what deploys |
+| Mirror | `yitzhach/commission` (private), branch `claude/commissions-repo-setup-imhxss` — same code, where the build started |
+| Cloudflare Worker | `fineartos` |
+| URL | https://fineartos.bobdylan2000.workers.dev |
+
+**Do not deploy over the Worker named `commission`.** It is a separate,
+pre-existing Worker in the same account and is not part of this project.
+
+## Deploying
+
+Cloudflare Workers Builds is connected to `yitzhach/fineartos` and deploys
+`main` on push. The app is static assets only — no server in the read path.
+
+Required Cloudflare build setting:
+
+| Setting | Value |
+| --- | --- |
+| Deploy command | `npm run deploy` |
+| Branch | `main` |
+
+`npm run deploy` is `npm run build && wrangler deploy`. This matters: a deploy
+command of plain `npx wrangler deploy` fails with *"The directory specified by
+the assets.directory field does not exist"*, because nothing built `dist/`
+first.
+
+`wrangler.jsonc` carries the rest, including `workers_dev: true`. Without that
+the deploy succeeds but the URL does not resolve at all, which reads as a
+broken build when the build is fine. Keep it in the config rather than relying
+on the dashboard toggle.
+
+Deploy by hand from a machine that is logged in:
+
+```bash
+npx wrangler deploy --dry-run   # validates config, no auth needed
+npm run deploy
+```
+
+### Deployment history, and what is unverified
+
+The first Git build failed twice, for two different reasons: the repo was
+still empty when Cloudflare first cloned it, then the deploy command ran
+wrangler without building. Both are fixed.
+
+**Whether the site currently serves correctly has not been confirmed by
+anyone.** The agent session that built this could not reach `*.workers.dev` —
+the sandbox network policy answers 403 to the CONNECT, which surfaces as
+`HTTP 000` and is not evidence about the site either way. The Cloudflare API
+did show the Worker modified at 2026-09-10 19:45 UTC, after the fixes, which
+is consistent with a successful deploy but does not prove the page renders.
+
+First job in a new session: open the URL in a real browser and confirm what
+loads.
+
 ## Blockers and what is not verified
 
 **Cloud sync is not configured, and is therefore unverified.** No Supabase or
@@ -120,6 +177,8 @@ must be before anything is called production-ready.
 **The repository had no Cloudflare Worker.** The brief said `main` connects to
 one. It does not: at the starting commit the repository contained only
 `README.md` and `COMMISSION_PHASE_1.md`. Nothing was migrated or displaced.
+
+**The live deployment is unconfirmed.** See "Deployment history" above.
 
 **The Artist OS design reference image was not available** in the build
 session. The visual direction follows the written description in the brief.
