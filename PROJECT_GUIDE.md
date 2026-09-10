@@ -104,12 +104,18 @@ away in the system bar.
 | | |
 | --- | --- |
 | Primary repo | `yitzhach/fineartos` (public), branch `main` — this is what deploys |
-| Mirror | `yitzhach/commission` (private), branch `claude/commissions-repo-setup-imhxss` — same code, where the build started |
+| Baseline | `yitzhach/commission` (private), branch `claude/commissions-repo-setup-imhxss` — frozen on purpose, see below |
 | Cloudflare Worker | `fineartos` |
 | URL | https://fineartos.bobdylan2000.workers.dev |
 
 **Do not deploy over the Worker named `commission`.** It is a separate,
 pre-existing Worker in the same account and is not part of this project.
+
+**Leave the `commission` repo behind on purpose.** It holds this app as it
+stood at the first three commits and is kept as a fixed point for A/B
+comparison and testing against `fineartos`. It will drift further behind, and
+that is the point — do not sync, rebase or "catch it up". Comparing the two
+is only meaningful while one of them stops moving.
 
 ## Deploying
 
