@@ -11,6 +11,7 @@ import {
   iconAt,
   resolveLayout,
   snapToGrid,
+  trashSlot,
   type DesktopLayout,
   type Viewport,
 } from './desktopLayout';
@@ -35,7 +36,17 @@ interface Props {
   onNew: () => void;
   onNewFolder: () => void;
   onTidy: () => void;
+  /** How many things are in the Trash, so the icon can look full. */
+  trashCount: number;
+  /** Moves something to the Trash. Nothing is deleted by this. */
+  onTrash: (id: string) => void;
+  onOpenTrash: () => void;
+  /** Reports the surface's own size, so Tidy up arranges to the same grid. */
+  onViewport: (viewport: Viewport) => void;
 }
+
+/** The id the Trash goes by while working out what a drop landed on. */
+const TRASH_ID = '__trash';
 
 /**
  * The desktop: icons you can pick up and put where you like.
@@ -49,11 +60,42 @@ interface Props {
  * years. Dropping one icon onto a folder files it there.
  */
 export function Desktop(props: Props) {
-  const { items, imageUrls, viewport } = props;
+  const { items, imageUrls } = props;
   const surfaceRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * The layout is worked out against the surface the icons are drawn into,
+   * which is shorter than the window: the system bar sits above it. Measuring
+   * rather than assuming keeps the bottom row clear of the dock at any size.
+   */
+  const [measured, setMeasured] = useState<Viewport | null>(null);
+  const viewport = measured ?? props.viewport;
+  const { onViewport } = props;
+
+  useEffect(() => {
+    const surface = surfaceRef.current;
+    if (!surface || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      const size = {
+        width: Math.round(entry.contentRect.width),
+        height: Math.round(entry.contentRect.height),
+      };
+      setMeasured((current) =>
+        current && current.width === size.width && current.height === size.height ? current : size,
+      );
+      onViewport(size);
+    });
+    observer.observe(surface);
+    return () => observer.disconnect();
+  }, [onViewport]);
 
   const ids = items.map((item) => item.id);
   const resolved = resolveLayout(ids, props.layout, viewport);
+  const trash = trashSlot(viewport);
+  // The Trash takes part in hit-testing but not in the layout: it cannot be
+  // moved, and nothing is ever placed on top of it.
+  const targets = { ...resolved, [TRASH_ID]: trash };
 
   // While dragging, this icon follows the pointer instead of its stored spot.
   const [drag, setDrag] = useState<{
@@ -69,15 +111,17 @@ export function Desktop(props: Props) {
   // A folder cannot go into a folder: nesting projects is not something this
   // app models, and a folder that swallowed another would lose it.
   const dragIsFolder = items.some((i) => i.id === drag?.id && i.kind === 'project');
-  const overFolder =
-    drag && drag.moved && !dragIsFolder
-      ? iconAt(resolved, { x: drag.x + CELL_WIDTH / 2, y: drag.y + CELL_HEIGHT / 2 }, drag.id)
+  const hovering =
+    drag && drag.moved
+      ? iconAt(targets, { x: drag.x + CELL_WIDTH / 2, y: drag.y + CELL_HEIGHT / 2 }, drag.id)
       : null;
+  const overTrash = hovering === TRASH_ID;
+  const overFolder = dragIsFolder || overTrash ? null : hovering;
   const overIsFolder =
     overFolder !== null && items.some((i) => i.id === overFolder && i.kind === 'project');
 
   /** The "New commission" tile sits after whatever the artist has arranged. */
-  const newTile = firstFreeSlot(resolved, viewport);
+  const newTile = firstFreeSlot(targets, viewport);
 
   useEffect(() => {
     if (!drag) return undefined;
@@ -103,11 +147,13 @@ export function Desktop(props: Props) {
         // A click that never moved is a selection, not a drag.
         if (current.moved) {
           const centre = { x: current.x + CELL_WIDTH / 2, y: current.y + CELL_HEIGHT / 2 };
-          const target = iconAt(resolved, centre, current.id);
+          const target = iconAt(targets, centre, current.id);
           const targetIsFolder = items.some((i) => i.id === target && i.kind === 'project');
           const sourceIsFolder = items.some((i) => i.id === current.id && i.kind === 'project');
 
-          if (target && targetIsFolder && !sourceIsFolder) {
+          if (target === TRASH_ID) {
+            props.onTrash(current.id);
+          } else if (target && targetIsFolder && !sourceIsFolder) {
             props.onFileInto(target, current.id);
           } else {
             props.onMove(current.id, clampToDesktop(snapToGrid(current.x, current.y), viewport));
@@ -123,10 +169,10 @@ export function Desktop(props: Props) {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
     };
-    // `resolved` and `items` are read inside `up`; re-binding on each change
+    // `targets` and `items` are read inside `up`; re-binding on each change
     // keeps the drop decision working off current data rather than a snapshot
     // taken when the drag began.
-  }, [drag?.id, resolved, items, viewport, props]);
+  }, [drag?.id, targets, items, viewport, props]);
 
   return (
     <div
@@ -140,6 +186,19 @@ export function Desktop(props: Props) {
         </button>
         <button className="btn" data-variant="quiet" onClick={(e) => { e.stopPropagation(); props.onTidy(); }}>
           Tidy up
+        </button>
+        {/* The keyboard and small-screen route to the Trash, for anyone not
+            dragging. Disabled rather than hidden, so its place is learnable. */}
+        <button
+          className="btn"
+          data-variant="quiet"
+          disabled={props.selectedId === null}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (props.selectedId) props.onTrash(props.selectedId);
+          }}
+        >
+          Move to Trash
         </button>
       </div>
 
@@ -160,6 +219,7 @@ export function Desktop(props: Props) {
             selected={props.selectedId === item.id}
             onSelect={props.onSelect}
             onOpen={props.onOpen}
+            onTrash={props.onTrash}
             onDragStart={(event) => {
               const surface = surfaceRef.current?.getBoundingClientRect();
               const spot = resolved[item.id];
@@ -176,6 +236,30 @@ export function Desktop(props: Props) {
           />
         );
       })}
+
+      {/* Bottom right, where it has been on every desktop since 1984. */}
+      <button
+        className="desktop-icon trash"
+        data-drop-target={overTrash}
+        data-full={props.trashCount > 0}
+        style={{ left: trash.x, top: trash.y }}
+        onClick={(e) => e.stopPropagation()}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          props.onOpenTrash();
+        }}
+        title="Trash — drag things here, double-click to open"
+      >
+        <span className="thumb trash-can" aria-hidden="true">
+          <span className="can" />
+        </span>
+        <span className="label">Trash</span>
+        {props.trashCount > 0 && (
+          <span className="caption">
+            {props.trashCount} {props.trashCount === 1 ? 'item' : 'items'}
+          </span>
+        )}
+      </button>
 
       {/* Always last, so it sits after whatever the artist has arranged. */}
       <button
@@ -204,6 +288,7 @@ function Icon({
   selected,
   onSelect,
   onOpen,
+  onTrash,
   onDragStart,
 }: {
   item: DesktopItem;
@@ -214,6 +299,7 @@ function Icon({
   selected: boolean;
   onSelect: (id: string) => void;
   onOpen: (item: DesktopItem) => void;
+  onTrash: (id: string) => void;
   onDragStart: (event: React.PointerEvent) => void;
 }) {
   const { name, caption, thumbId, badge } = describe(item);
@@ -242,8 +328,14 @@ function Icon({
           e.preventDefault();
           onOpen(item);
         }
+        // Delete moves to the Trash; it does not delete. Emptying the Trash
+        // is the only thing in this app that destroys a record.
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          e.preventDefault();
+          onTrash(item.id);
+        }
       }}
-      title={`${name} — double-click to open, drag to move`}
+      title={`${name} — double-click to open, drag to move, Delete to bin`}
     >
       <span className={`thumb ${item.kind}`} aria-hidden="true">
         {url ? (

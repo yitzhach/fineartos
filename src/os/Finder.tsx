@@ -34,6 +34,8 @@ interface Props {
   onFileInto: (folderId: string, itemId: string) => void;
   onTakeOut: (itemId: string) => void;
   onNewFolder: () => void;
+  /** Moves the record to the Trash. Deletes nothing. */
+  onTrash: (id: string) => void;
   onRenameFolder: (folderId: string, name: string) => void;
 }
 
@@ -202,6 +204,13 @@ export function Finder(props: Props) {
               </select>
             </label>
             )}
+            <button
+              className="btn"
+              data-variant="danger"
+              onClick={() => props.onTrash(selectedRow.id)}
+            >
+              Move to Trash
+            </button>
           </div>
         )}
       </div>

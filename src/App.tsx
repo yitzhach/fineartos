@@ -6,9 +6,23 @@ import { Dock } from './os/Dock';
 import { Frame } from './os/Frame';
 import { Desktop, type DesktopItem } from './os/Desktop';
 import { Finder } from './os/Finder';
+import { TrashWindow } from './os/TrashWindow';
+import {
+  countPhrase,
+  deletionTargets,
+  findEntry,
+  orphanImageIds,
+  removeEntry,
+  summarise,
+  trashItem,
+  trashedIds,
+  type Trash,
+  type TrashEntry,
+} from './os/trash';
 import {
   autoArrange,
   pruneLayout,
+  trashSlot,
   type DesktopLayout,
 } from './os/desktopLayout';
 import { Settings } from './os/Settings';
@@ -97,12 +111,14 @@ import {
   loadTheme,
   loadWallpaper,
   loadDesktopLayout,
+  loadTrash,
   loadWallpaperLibrary,
   savePaymentInstructions,
   saveStudioDefaults,
   saveTheme,
   saveWallpaper,
   saveDesktopLayout,
+  saveTrash,
   saveWallpaperLibrary,
   type PaymentInstructions,
   type StudioDefaults,
@@ -133,6 +149,8 @@ registerModule({ id: 'home', name: 'Home', icon: '⌂', available: true });
 registerModule({ id: 'commissions', name: 'Projects', icon: '✎', available: true });
 registerModule({ id: 'invoices', name: 'Invoices', icon: '❑', available: true });
 registerModule({ id: 'finder', name: 'Finder', icon: '❐', available: true });
+// Last in the dock, the way the Trash is always last.
+registerModule({ id: 'trash', name: 'Trash', icon: '♺', available: true });
 
 export default function App() {
   const repo = useMemo(() => new Repository(WORKSPACE_ID), []);
@@ -152,6 +170,13 @@ export default function App() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [desktopLayout, setDesktopLayout] = useState<DesktopLayout>(loadDesktopLayout);
+  const [trash, setTrash] = useState<Trash>(loadTrash);
+  /**
+   * The desktop surface's own size, reported by Desktop. Smaller than the
+   * window — the system bar is above it — and it is what the icon grid is
+   * laid out against, so Tidy up must use the same number.
+   */
+  const desktopViewportRef = useRef(viewport);
   const [projectTabs, setProjectTabs] = useState<Record<string, ProjectTab>>({});
   const [invoicePreview, setInvoicePreview] = useState<Record<string, boolean>>({});
 
@@ -175,6 +200,7 @@ export default function App() {
   useEffect(() => saveWallpaper(wallpaper), [wallpaper]);
   useEffect(() => saveWallpaperLibrary(wallpaperLibrary), [wallpaperLibrary]);
   useEffect(() => saveDesktopLayout(desktopLayout), [desktopLayout]);
+  useEffect(() => saveTrash(trash), [trash]);
   useEffect(() => saveStudioDefaults(studio), [studio]);
   useEffect(() => savePaymentInstructions(payment), [payment]);
 
@@ -201,15 +227,26 @@ export default function App() {
 
   // --- Data ---------------------------------------------------------------
 
+  // Read by `refresh`, which must see the current Trash rather than whatever
+  // it was when the callback was made.
+  const trashRef = useRef(trash);
+  useEffect(() => {
+    trashRef.current = trash;
+  }, [trash]);
+
   const refresh = useCallback(async () => {
     const [documentRows, projectRows, invoiceRows] = await Promise.all([
       repo.list(),
       repo.listProjects(),
       repo.listInvoices(),
     ]);
-    setRows(documentRows);
-    setProjects(projectRows);
-    setInvoices(invoiceRows);
+    // Everything in the Trash is hidden from the desktop, the Finder and the
+    // lists. The records themselves are untouched in storage — that is what
+    // makes Put back instant and lossless.
+    const hidden = trashedIds(trashRef.current);
+    setRows(documentRows.filter((row) => !hidden.has(row.id)));
+    setProjects(projectRows.filter((project) => !hidden.has(project.id)));
+    setInvoices(invoiceRows.filter((invoice) => !hidden.has(invoice.id)));
     setLoaded(true);
   }, [repo]);
 
@@ -661,7 +698,10 @@ export default function App() {
   };
 
   const handleTidy = () => {
-    setDesktopLayout(autoArrange(desktopItems.map((item) => item.id), viewportRef.current));
+    const surface = desktopViewportRef.current;
+    setDesktopLayout(
+      autoArrange(desktopItems.map((item) => item.id), surface, [trashSlot(surface)]),
+    );
     setMessage('Desktop tidied up.');
   };
 
@@ -705,6 +745,128 @@ export default function App() {
     setMessage(`Filed into “${folder.name}”.`);
   };
 
+  // --- Trash ---------------------------------------------------------------
+
+  /**
+   * Moving something to the Trash hides it; it never deletes it. The record
+   * stays in IndexedDB exactly as it was, which is why Put back is instant.
+   */
+  const applyTrash = async (next: Trash) => {
+    trashRef.current = next;
+    setTrash(next);
+    await refresh();
+  };
+
+  const handleTrash = async (itemId: string) => {
+    const project = projects.find((p) => p.id === itemId);
+    const doc = docById(itemId);
+    const invoice = invoices.find((i) => i.id === itemId);
+    if (!project && !doc && !invoice) return;
+
+    const entry: TrashEntry = project
+      ? {
+          id: project.id,
+          kind: 'project',
+          name: project.name,
+          deletedAt: new Date().toISOString(),
+          // The contents go in with the folder and come back out with it.
+          contains: [...project.documentIds, ...project.invoiceIds],
+          fromFolderId: null,
+        }
+      : {
+          id: itemId,
+          kind: doc ? 'document' : 'invoice',
+          name: doc
+            ? doc.title.trim() || doc.documentNumber
+            : invoice?.invoiceNumber ?? 'Invoice',
+          deletedAt: new Date().toISOString(),
+          contains: [],
+          fromFolderId: projectContaining(itemId)?.id ?? null,
+        };
+
+    await applyTrash(trashItem(trashRef.current, entry));
+    if (selectedId === itemId) setSelectedId(null);
+    setMessage(
+      entry.contains.length > 0
+        ? `“${entry.name}” and the ${countPhrase(entry.contains.length)} inside it went to the Trash. Nothing has been deleted.`
+        : `“${entry.name}” went to the Trash. Nothing has been deleted.`,
+    );
+  };
+
+  const handlePutBack = async (itemId: string) => {
+    const entry = findEntry(trashRef.current, itemId);
+    if (!entry) return;
+    await applyTrash(removeEntry(trashRef.current, itemId));
+    setMessage(
+      entry.fromFolderId
+        ? `“${entry.name}” is back in its folder.`
+        : `“${entry.name}” is back on the desktop.`,
+    );
+  };
+
+  /**
+   * The only code in the app that destroys anything. Both callers ask the
+   * artist a second question first, in TrashWindow.
+   */
+  const destroy = async (entries: TrashEntry[]) => {
+    const ids = entries.flatMap(deletionTargets);
+    const removedImages: string[] = [];
+
+    for (const id of ids) {
+      const stored = await repo.load(id);
+      if (stored) {
+        removedImages.push(...stored.document.artwork.referenceImageIds);
+        await repo.deleteDocument(id);
+        continue;
+      }
+      if (await repo.loadInvoice(id)) {
+        await repo.deleteInvoice(id);
+        continue;
+      }
+      if (await repo.loadProject(id)) await repo.deleteProject(id);
+    }
+
+    // A photograph another commission still uses is never taken with it, and
+    // neither is one being used as a desktop picture.
+    const remaining = await repo.list();
+    const stillUsed = new Set<string>([
+      ...remaining.flatMap((row) => row.document.artwork.referenceImageIds),
+      ...wallpaperLibrary.map((picture) => picture.imageId),
+    ]);
+    for (const imageId of orphanImageIds(removedImages, stillUsed)) {
+      await repo.deleteImage(imageId);
+    }
+
+    // Windows onto something that no longer exists would show a tombstone.
+    setWindows((current) =>
+      current.filter((w) => {
+        const kind = w.kind;
+        if (kind.type === 'commission') return !ids.includes(kind.docId);
+        if (kind.type === 'invoice') return !ids.includes(kind.invoiceId);
+        if (kind.type === 'folder') return !ids.includes(kind.projectId);
+        return true;
+      }),
+    );
+
+    const keep = trashRef.current.filter((e) => !entries.some((gone) => gone.id === e.id));
+    await applyTrash(keep);
+  };
+
+  const handleDeleteForever = async (itemId: string) => {
+    const entry = findEntry(trashRef.current, itemId);
+    if (!entry) return;
+    await destroy([entry]);
+    setMessage(`“${entry.name}” has been deleted for good.`);
+  };
+
+  const handleEmptyTrash = async () => {
+    const going = trashRef.current;
+    if (going.length === 0) return;
+    const { records } = summarise(going);
+    await destroy(going);
+    setMessage(`Trash emptied. ${countPhrase(records, 'record')} deleted for good.`);
+  };
+
   const handleTakeOut = async (itemId: string) => {
     const folder = projectContaining(itemId);
     if (!folder) return;
@@ -737,6 +899,9 @@ export default function App() {
       open({ type: 'invoice', invoiceId: id }, `Invoice ${invoice.invoiceNumber}`, invoice.client.name || null);
     }
   };
+
+  const openTrashWindow = () =>
+    open({ type: 'tool', tool: 'trash' }, 'Trash', 'Nothing here is deleted yet');
 
   const openDesktopItem = (item: DesktopItem) => {
     if (item.kind === 'project') {
@@ -875,6 +1040,14 @@ export default function App() {
 
     if (kind.type === 'settings') {
       return <span className="faint" style={{ fontSize: 12 }}>Changes are saved as you make them.</span>;
+    }
+
+    if (kind.type === 'tool' && kind.tool === 'trash') {
+      return (
+        <span className="faint" style={{ fontSize: 12 }}>
+          Put back returns an item untouched. Only Empty Trash deletes anything.
+        </span>
+      );
     }
 
     if (kind.type === 'tool' && kind.tool === 'finder') {
@@ -1036,6 +1209,17 @@ export default function App() {
       );
     }
 
+    if (kind.type === 'tool' && kind.tool === 'trash') {
+      return (
+        <TrashWindow
+          trash={trash}
+          onPutBack={(id) => void handlePutBack(id)}
+          onDeleteForever={(id) => void handleDeleteForever(id)}
+          onEmpty={() => void handleEmptyTrash()}
+        />
+      );
+    }
+
     if (kind.type === 'tool' && kind.tool === 'finder') {
       return (
         <Finder
@@ -1057,6 +1241,7 @@ export default function App() {
           onFileInto={(folderId, itemId) => void handleFileInto(folderId, itemId)}
           onTakeOut={(itemId) => void handleTakeOut(itemId)}
           onNewFolder={() => void handleNewFolder()}
+          onTrash={(id) => void handleTrash(id)}
           onRenameFolder={(folderId, name) => {
             const project = projects.find((p) => p.id === folderId);
             if (project) void saveProjectRecord(renameProject(project, name));
@@ -1120,6 +1305,12 @@ export default function App() {
           onNew={handleNew}
           onNewFolder={() => void handleNewFolder()}
           onTidy={handleTidy}
+          trashCount={trash.length}
+          onTrash={(id) => void handleTrash(id)}
+          onOpenTrash={openTrashWindow}
+          onViewport={(size) => {
+            desktopViewportRef.current = size;
+          }}
         />
 
         {windows
@@ -1189,7 +1380,9 @@ export default function App() {
               ? { kind: { type: 'tool' as const, tool: 'invoices-list' }, title: 'Invoices', subtitle: 'All invoices' }
               : id === 'commissions'
                 ? { kind: { type: 'list' as const }, title: 'Projects', subtitle: 'All commissions' }
-                : id === 'finder'
+                : id === 'trash'
+                  ? { kind: { type: 'tool' as const, tool: 'trash' }, title: 'Trash', subtitle: 'Nothing here is deleted yet' }
+                  : id === 'finder'
                   ? { kind: { type: 'tool' as const, tool: 'finder' }, title: 'Finder', subtitle: 'Everything in the studio' }
                   : { kind: { type: 'tool' as const, tool: id }, title: MOCK_TOOL_NAMES[id] ?? id, subtitle: 'Preview' };
           setWindows((c) => toggleWindow(c, spec, viewportRef.current).windows);

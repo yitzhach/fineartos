@@ -26,10 +26,15 @@ export type DesktopLayout = Record<string, IconPosition>;
 export const CELL_WIDTH = 116;
 export const CELL_HEIGHT = 116;
 
-/** Clear of the system bar at the top and the dock at the bottom. */
+/**
+ * Clear of the edges. Everything here is measured against the desktop surface,
+ * not the window: the surface starts below the system bar and ends above the
+ * dock, which is why Desktop measures its own box rather than assuming. The
+ * bottom margin is only an icon's label plus air.
+ */
 export const MARGIN_TOP = 16;
 export const MARGIN_LEFT = 16;
-export const MARGIN_BOTTOM = 110;
+export const MARGIN_BOTTOM = 40;
 
 export interface Viewport {
   width: number;
@@ -68,6 +73,22 @@ export function slotPosition(index: number, viewport: Viewport): IconPosition {
     x: MARGIN_LEFT + column * CELL_WIDTH,
     y: MARGIN_TOP + row * CELL_HEIGHT,
   };
+}
+
+/**
+ * Where the Trash sits: bottom right, always, like every desktop since 1984.
+ * It is not part of the layout the artist arranges — it cannot be moved, and
+ * nothing else is placed on top of it.
+ */
+export function trashSlot(viewport: Viewport): IconPosition {
+  return {
+    x: Math.max(MARGIN_LEFT, viewport.width - CELL_WIDTH - MARGIN_LEFT),
+    y: Math.max(MARGIN_TOP, viewport.height - CELL_HEIGHT - MARGIN_BOTTOM),
+  };
+}
+
+function samePlace(a: IconPosition, b: IconPosition): boolean {
+  return a.x === b.x && a.y === b.y;
 }
 
 function occupies(layout: DesktopLayout, position: IconPosition, ignoreId?: string): boolean {
@@ -128,11 +149,19 @@ export function resolveLayout(
  * this deliberately overrides hand-placed icons — it is what the artist asked
  * for when they chose Tidy up.
  */
-export function autoArrange(ids: string[], viewport: Viewport): DesktopLayout {
+export function autoArrange(
+  ids: string[],
+  viewport: Viewport,
+  blocked: IconPosition[] = [],
+): DesktopLayout {
   const layout: DesktopLayout = {};
-  ids.forEach((id, index) => {
-    layout[id] = slotPosition(index, viewport);
-  });
+  let slot = 0;
+  for (const id of ids) {
+    // Steps over the Trash rather than stacking an icon on top of it.
+    while (blocked.some((taken) => samePlace(taken, slotPosition(slot, viewport)))) slot += 1;
+    layout[id] = slotPosition(slot, viewport);
+    slot += 1;
+  }
   return layout;
 }
 

@@ -9,6 +9,7 @@
  */
 
 import type { DesktopLayout } from '../os/desktopLayout';
+import type { Trash } from '../os/trash';
 import type { CustomWallpaper, WallpaperFit } from './wallpapers';
 
 export type Theme = 'light' | 'dark';
@@ -123,6 +124,7 @@ const KEYS = {
   payment: 'artistOS.paymentInstructions',
   wallpaperLibrary: 'artistOS.wallpaperLibrary',
   desktopLayout: 'artistOS.desktopLayout',
+  trash: 'artistOS.trash',
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -196,6 +198,14 @@ export const saveLayout = (value: WindowLayout): void => write(KEYS.layout, valu
 export const loadDesktopLayout = (): DesktopLayout => read<DesktopLayout>(KEYS.desktopLayout, {});
 export const saveDesktopLayout = (value: DesktopLayout): void =>
   write(KEYS.desktopLayout, value);
+
+/**
+ * What is in the Trash. Only the list of what is hidden lives here — the
+ * records themselves stay in IndexedDB untouched, which is what makes putting
+ * something back a matter of forgetting a line rather than restoring data.
+ */
+export const loadTrash = (): Trash => read<Trash>(KEYS.trash, []);
+export const saveTrash = (value: Trash): void => write(KEYS.trash, value);
 
 export interface StudioDefaults {
   name: string;

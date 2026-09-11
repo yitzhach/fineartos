@@ -152,6 +152,16 @@ it is the gate on all three.
 Both are asked for and neither is built. They are written down here rather
 than half-started, because each needs a decision that has not been made.
 
+### The Trash, once there is a cloud
+
+Today the Trash is a list in this browser: the records stay in IndexedDB and
+are simply hidden. When records sync, a deletion has to sync too, and that
+raises a question worth answering deliberately rather than by accident —
+whether emptying the Trash on the laptop should destroy the record on the
+phone straight away, or whether the Trash itself should sync so the same
+second chance exists on both. The second is more work and much harder to
+regret.
+
 ### Desktop and folders saved to Cloudflare
 
 Today a project, its invoices and its icon positions live in this browser:

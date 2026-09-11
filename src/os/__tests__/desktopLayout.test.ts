@@ -13,6 +13,7 @@ import {
   rowsPerColumn,
   slotPosition,
   snapToGrid,
+  trashSlot,
   type DesktopLayout,
 } from '../desktopLayout';
 
@@ -140,5 +141,34 @@ describe('iconAt', () => {
 
   it('counts the whole cell, not just its centre', () => {
     expect(iconAt(layout, { x: 200 + CELL_WIDTH - 1, y: 200 }, 'file')).toBe('folder');
+  });
+});
+
+describe('trashSlot', () => {
+  it('sits in the bottom right, clear of the dock', () => {
+    const slot = trashSlot(VIEW);
+    expect(slot.x + CELL_WIDTH).toBeLessThanOrEqual(VIEW.width);
+    expect(slot.y).toBeLessThan(VIEW.height - CELL_HEIGHT);
+  });
+
+  it('stays on screen on a phone', () => {
+    const slot = trashSlot({ width: 390, height: 700 });
+    expect(slot.x).toBeGreaterThanOrEqual(MARGIN_LEFT);
+    expect(slot.y).toBeGreaterThanOrEqual(MARGIN_TOP);
+  });
+
+  it('is somewhere auto-arrange will not put an icon', () => {
+    const slot = trashSlot(VIEW);
+    const arranged = autoArrange(['a', 'b', 'c'], VIEW, [slot]);
+    for (const position of Object.values(arranged)) {
+      expect(position).not.toEqual(slot);
+    }
+  });
+
+  it('steps over the blocked slot instead of dropping an icon', () => {
+    const blocked = slotPosition(1, VIEW);
+    const arranged = autoArrange(['a', 'b'], VIEW, [blocked]);
+    expect(arranged.a).toEqual(slotPosition(0, VIEW));
+    expect(arranged.b).toEqual(slotPosition(2, VIEW));
   });
 });

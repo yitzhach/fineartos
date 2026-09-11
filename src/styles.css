@@ -2078,3 +2078,142 @@ fieldset.section > legend {
 /* The view switch sits beside the search box, never wrapping under it. */
 .fnd-bar .chip-row { flex: 0 0 auto; display: flex; gap: 6px; }
 .fnd-bar .chip-row .btn { padding: 7px 12px; }
+
+/* --- The Trash ---------------------------------------------------------- */
+
+/* Pinned bottom right and never moved, so it is always where the hand expects.
+   It is drawn rather than an image file: a lid, a body, and two ridges. */
+.desktop-icon.trash { cursor: pointer; }
+
+.desktop-icon .thumb.trash-can {
+  display: grid;
+  place-items: end center;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.desktop-icon .thumb.trash-can .can {
+  position: relative;
+  width: 40px;
+  height: 44px;
+  border: 2px solid var(--ink-soft);
+  border-top-width: 0;
+  border-radius: 3px 3px 8px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  /* The ridges down the front of the can. */
+  background-image: linear-gradient(
+    90deg,
+    transparent 32%, currentColor 32%, currentColor 34%,
+    transparent 34%, transparent 66%, currentColor 66%, currentColor 68%, transparent 68%
+  );
+  color: rgba(255, 255, 255, 0.14);
+}
+
+/* The lid, and the handle above it. */
+.desktop-icon .thumb.trash-can .can::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  right: -5px;
+  top: -7px;
+  height: 5px;
+  border-radius: 2px;
+  background: var(--ink-soft);
+}
+.desktop-icon .thumb.trash-can .can::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: -12px;
+  width: 16px;
+  height: 5px;
+  border: 2px solid var(--ink-soft);
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+}
+
+/* Full: heavier lines, and the lid sits ajar. */
+.desktop-icon.trash[data-full='true'] .can,
+.desktop-icon.trash[data-full='true'] .can::before,
+.desktop-icon.trash[data-full='true'] .can::after { border-color: var(--ink); }
+.desktop-icon.trash[data-full='true'] .can::before {
+  background: var(--ink);
+  transform: rotate(-7deg);
+}
+
+.desktop-icon.trash[data-drop-target='true'] {
+  background: rgba(208, 134, 116, 0.16);
+  border-color: var(--danger);
+}
+.desktop-icon.trash[data-drop-target='true'] .can,
+.desktop-icon.trash[data-drop-target='true'] .can::before,
+.desktop-icon.trash[data-drop-target='true'] .can::after { border-color: var(--danger); }
+.desktop-icon.trash[data-drop-target='true'] .can::before {
+  background: var(--danger);
+  transform: translateY(-4px) rotate(-14deg);
+}
+
+.desktop-tools .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* The Trash window. */
+.trash-window { display: flex; flex-direction: column; gap: 12px; }
+
+.trash-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.trash-head .hint { margin: 0; flex: 1 1 220px; }
+
+.trash-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+
+.trash-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--raised);
+}
+
+.trash-face {
+  width: 30px;
+  height: 26px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.trash-face.project { border-radius: 3px 8px 3px 3px; background: rgba(230, 217, 193, 0.16); }
+
+.trash-what { flex: 1 1 200px; min-width: 0; }
+.trash-name { display: block; font-weight: 600; }
+.trash-detail { display: block; color: var(--ink-soft); font-size: 12px; }
+
+/* The second ask. Full width, so it cannot be missed, and the safe button
+   comes first in the order a hand reads. */
+.trash-confirm {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  background: rgba(208, 134, 116, 0.1);
+}
+.trash-confirm > div { flex: 1 1 240px; }
+.trash-confirm strong { display: block; }
+.trash-confirm .btn[data-variant='danger'] {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #2a1713;
+  font-weight: 600;
+}
