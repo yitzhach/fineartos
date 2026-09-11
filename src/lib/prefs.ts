@@ -13,7 +13,19 @@ import type { CustomWallpaper, WallpaperFit } from './wallpapers';
 export type Theme = 'light' | 'dark';
 
 /** The wallpapers that ship with the app. `custom` means the artist's own. */
-export type WallpaperId = 'obsidian' | 'plaster' | 'dusk' | 'linen' | 'solid' | 'custom';
+export type WallpaperId =
+  | 'obsidian'
+  | 'graphite'
+  | 'slate'
+  | 'indigo'
+  | 'dusk'
+  | 'plaster'
+  | 'sandstone'
+  | 'linen'
+  | 'gesso'
+  | 'mist'
+  | 'solid'
+  | 'custom';
 
 export interface BundledWallpaper {
   id: Exclude<WallpaperId, 'custom' | 'solid'>;
@@ -24,11 +36,22 @@ export interface BundledWallpaper {
   suits: Theme;
 }
 
+/**
+ * Ten pictures that ship with the app, ordered dark to light so the picker
+ * reads as a range rather than a jumble. All drawn as SVG — a few kilobytes
+ * each, sharp at any resolution, and cached for offline.
+ */
 export const BUNDLED_WALLPAPERS: BundledWallpaper[] = [
   { id: 'obsidian', name: 'Obsidian', src: '/wallpapers/obsidian.svg', suits: 'dark' },
-  { id: 'plaster', name: 'Studio Plaster', src: '/wallpapers/plaster.svg', suits: 'dark' },
+  { id: 'graphite', name: 'Graphite', src: '/wallpapers/graphite.svg', suits: 'dark' },
+  { id: 'slate', name: 'Slate', src: '/wallpapers/slate.svg', suits: 'dark' },
+  { id: 'indigo', name: 'Indigo', src: '/wallpapers/indigo.svg', suits: 'dark' },
   { id: 'dusk', name: 'Dusk', src: '/wallpapers/dusk.svg', suits: 'dark' },
+  { id: 'plaster', name: 'Studio Plaster', src: '/wallpapers/plaster.svg', suits: 'dark' },
+  { id: 'sandstone', name: 'Sandstone', src: '/wallpapers/sandstone.svg', suits: 'dark' },
   { id: 'linen', name: 'Linen', src: '/wallpapers/linen.svg', suits: 'light' },
+  { id: 'gesso', name: 'Gesso', src: '/wallpapers/gesso.svg', suits: 'light' },
+  { id: 'mist', name: 'Mist', src: '/wallpapers/mist.svg', suits: 'light' },
 ];
 
 export interface WallpaperChoice {

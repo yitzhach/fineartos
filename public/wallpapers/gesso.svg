@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" width="1600" height="1000">
+  <!-- Gesso. Primed board in raking light: warm white, a soft shadow low right. -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0" stop-color="#fbf7ef"/><stop offset="0.6" stop-color="#f0e9dc"/><stop offset="1" stop-color="#ddd2c0"/>
+    </linearGradient>
+    <radialGradient id="gl" cx="0.24" cy="0.14" r="0.8">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="gs" cx="0.85" cy="0.9" r="0.7">
+      <stop offset="0" stop-color="#9a8a72" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="gn" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" seed="4"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.05"/></feComponentTransfer>
+    </filter>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#g)"/>
+  <g opacity="0.4">
+    <ellipse cx="1180" cy="820" rx="760" ry="260" fill="#c8bba4" opacity="0.5" transform="rotate(-6 1180 820)"/>
+    <ellipse cx="380" cy="230" rx="620" ry="230" fill="#fffdf8" opacity="0.6" transform="rotate(-10 380 230)"/>
+  </g>
+  <rect width="1600" height="1000" fill="url(#gl)"/>
+  <rect width="1600" height="1000" filter="url(#gn)"/>
+</svg>

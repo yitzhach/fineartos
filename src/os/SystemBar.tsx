@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Theme } from '../lib/prefs';
+import { useFullscreen } from './fullscreen';
 
 interface Props {
   studioName: string;
@@ -54,6 +55,7 @@ function MiniCalendar({ today }: { today: Date }) {
 }
 
 export function SystemBar(props: Props) {
+  const fullscreen = useFullscreen();
   const [now, setNow] = useState(() => new Date());
   const [open, setOpen] = useState<'clock' | 'profile' | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -103,6 +105,25 @@ export function SystemBar(props: Props) {
       >
         {props.theme === 'dark' ? '☾' : '☀'}
       </button>
+
+      {/* Left out entirely where the browser has no element fullscreen API —
+          iPhone Safari, chiefly. A button that does nothing is worse than
+          no button. */}
+      {fullscreen.supported && (
+        <button
+          className="btn"
+          data-variant="quiet"
+          onClick={() => void fullscreen.toggle()}
+          aria-pressed={fullscreen.active}
+          aria-label={fullscreen.active ? 'Leave fullscreen' : 'Go fullscreen'}
+          title={
+            fullscreen.error ??
+            (fullscreen.active ? 'Leave fullscreen (or press Esc)' : 'Go fullscreen')
+          }
+        >
+          {fullscreen.active ? '⤡' : '⤢'}
+        </button>
+      )}
 
       <button
         className="btn clock"

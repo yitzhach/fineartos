@@ -185,6 +185,18 @@ Deleting the picture that is currently on the desktop falls back to a bundled
 one. Leaving the desktop pointing at an image that no longer exists would be a
 blank screen with no explanation.
 
+**Ten pictures ship with the app**, ordered dark to light so the picker reads
+as a range: Obsidian, Graphite, Slate, Indigo, Dusk, Studio Plaster,
+Sandstone, Linen, Gesso, Mist. All drawn as SVG — a few kilobytes each, sharp
+at any resolution, precached for offline.
+
+**Fullscreen is in the system bar**, and is left out entirely on browsers with
+no element fullscreen API (iPhone Safari, chiefly) rather than shown as a
+button that does nothing. The state is read from `fullscreenchange` rather
+than remembered, because the browser can leave fullscreen without asking —
+Escape, the window manager, a tab switch. A refusal is reported on the button
+instead of failing silently.
+
 **The bundled wallpapers are SVGs.** Four ship with
 the app — Obsidian (the default), Studio Plaster, Dusk and Linen — drawn as SVG rather than photographs
 so they are about 2KB each, sharp at any resolution, and precached for offline.
