@@ -1,0 +1,30 @@
+// The staged cloud backend. NOT what deploys today.
+//
+// wrangler.jsonc (the default config) deploys the app as static assets with no
+// server in the read path, and that is what is live. This file is the opt-in
+// version that also runs worker/index.ts for /api/*, and it is kept separate on
+// purpose: a mistake in here cannot take the working site down.
+//
+// Before this can be deployed:
+//   1. Apply migrations/001_commissions.sql to a Supabase project.
+//   2. wrangler secret put SUPABASE_URL / SUPABASE_ANON_KEY
+//   3. Create a PRIVATE R2 bucket and uncomment the binding below.
+//   4. Build a sign-in flow so the client can obtain a token.
+//
+// Deploy with: npx wrangler deploy --config wrangler.cloud.jsonc
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fineartos-cloud",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "build": { "command": "npm run build" },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // The Worker answers /api/* itself; everything else is a static file.
+    "run_worker_first": ["/api/*"]
+  }
+  // A private bucket, never public: reference images are client work.
+  // "r2_buckets": [{ "binding": "IMAGES", "bucket_name": "fineartos-images" }]
+}

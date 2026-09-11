@@ -21,6 +21,7 @@
  */
 
 import { createDocument, newId } from '../commission/document';
+import { createMilestone } from '../commission/milestones';
 import type { CommissionDocument } from '../commission/types';
 import { addDocumentToProject, createProject, setProjectCover, type Project } from '../project/project';
 
@@ -79,6 +80,14 @@ export function buildDemo(now = new Date()): DemoContent {
     schedule: {
       targetCompletionDate: iso(addMonths(now, 2)),
       deliveryNotes: 'Delivered and hung by the studio.',
+      // Two done, three ahead — enough to show what the list is for.
+      milestones: [
+        { ...createMilestone('Concept approved', iso(addDays(now, -14))), done: true },
+        { ...createMilestone('Materials purchased', iso(addDays(now, -7))), done: true },
+        createMilestone('Work in progress', iso(addDays(now, 7))),
+        createMilestone('Final review', iso(addMonths(now, 1))),
+        createMilestone('Delivery', iso(addMonths(now, 2))),
+      ],
     },
     quote: {
       currency: 'USD',
@@ -103,6 +112,12 @@ export function buildDemo(now = new Date()): DemoContent {
   project = setProjectCover(project, null, now);
 
   return { document, project };
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
 }
 
 function addMonths(date: Date, months: number): Date {

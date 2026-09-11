@@ -44,9 +44,27 @@ export interface Artwork {
   referenceImageIds: string[];
 }
 
+/**
+ * A step in making the work. Real, editable, and part of the document —
+ * a stage with a date the artist set, and whether it is done.
+ */
+export interface Milestone {
+  id: string;
+  label: string;
+  /** yyyy-mm-dd, or null when the date is not decided yet. */
+  date: string | null;
+  done: boolean;
+}
+
 export interface Schedule {
   targetCompletionDate: string | null;
   deliveryNotes: string | null;
+  /**
+   * Optional: a document written by an older build has no milestones, and
+   * reads back as undefined. Everything here treats that as an empty list
+   * rather than crashing, which is why it is not required.
+   */
+  milestones?: Milestone[];
 }
 
 export type LineKind = 'artwork' | 'delivery' | 'installation';

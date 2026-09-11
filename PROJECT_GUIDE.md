@@ -39,7 +39,13 @@ not where it expects.
 
 | Area | Where | Notes |
 | --- | --- | --- |
-| OS shell | `src/os/` | System bar, magnifying dock, one draggable window, desktop, settings |
+| Window manager | `src/os/windows.ts` | Stacking, focus, move, resize, minimise, zoom — DOM-free and tested |
+| Window chrome | `src/os/Frame.tsx` | Titlebar, lights, drag and resize; a full-screen sheet on a phone |
+| OS shell | `src/os/` | System bar, magnifying dock, desktop, rail, inspector, settings |
+| Project window | `src/commission/ui/ProjectWindow.tsx` | Tabbed: overview, details, document, files, milestones, invoices, notes |
+| Milestones | `src/commission/milestones.ts` | Real production stages, not a mock |
+| Mock tools | `src/os/mock/` | Labelled previews of the tools not built yet |
+| Staged backend | `worker/`, `migrations/`, `src/persistence/workerCloud.ts` | Ported from the commission baseline. Not switched on |
 | Commission overview | `src/commission/ui/Overview.tsx` | The at-a-glance screen: stats, facts, money, activity, next step |
 | Demo record | `src/lib/demo.ts` | Seeded once on a first run, labelled, removable |
 | Build stamp | `src/os/BuildStamp.tsx` | Commit and build time, bottom left of the desktop |
@@ -118,6 +124,33 @@ the stamp, "am I looking at the build I just pushed?" is answered by reading it
 rather than by guessing. The commit comes from `WORKERS_CI_COMMIT_SHA` in CI
 and from git locally, and every lookup falls back rather than failing the
 build.
+
+**Windows are real windows.** They stack, overlap, take focus, move, resize,
+minimise to a tray and zoom. All of that is pure functions in
+`src/os/windows.ts` with 31 tests, so the rules can be checked without a
+browser; `Frame.tsx` only draws the result. Opening a window onto something
+already open focuses it rather than making a second copy — two windows onto
+one invoice could disagree.
+
+**On a phone a window is a sheet.** Under 860px the same window *state*
+renders full-screen, one at a time, with the tray and dock for switching, and
+the rail and inspector hidden. Dragging overlapping windows with a thumb is
+miserable; the state does not change, only the presentation. Between 861 and
+1180px the inspector folds away and the rail collapses to icons.
+
+**Mock tools are labelled, not disguised.** The tools that are not built show
+their layout behind a Preview banner that says nothing saves, calculates or
+sends. They show *structure*, not invented content — the calendar has real
+dates and no events, the client list has placeholder rows. Filling them with
+plausible names would make the screenshots better and the app a liar.
+
+**The cloud backend is ported but off.** `worker/`, `migrations/` and
+`src/persistence/workerCloud.ts` come from the commission baseline, where the
+Worker, the schema and the row-level security were already written. Turning it
+on needs a Supabase project, two Worker secrets, a private R2 bucket and a
+sign-in flow. Until then `App.tsx` uses `unavailableCloud` and the status bar
+says so. It is deployed by `wrangler.cloud.jsonc`, kept separate so a mistake
+in it cannot take the working static site down.
 
 **The app opens into work, not an empty desktop.** A first run seeds one
 commission marked `isDemo`, with its artwork drawn on a canvas rather than
