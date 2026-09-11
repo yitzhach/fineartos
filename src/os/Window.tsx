@@ -1,11 +1,22 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { loadLayout, saveLayout, type WindowLayout } from '../lib/prefs';
 
+export interface SidebarItem {
+  id: string;
+  name: string;
+  icon: string;
+  /** Absent means the section exists but is not built yet. */
+  onSelect?: () => void;
+}
+
 interface Props {
   title: string;
   /** Small grey text beside the title, e.g. the client's name. */
   subtitle?: string | null;
   toolbar: ReactNode;
+  /** Optional in-window navigation down the left edge. */
+  sidebar?: SidebarItem[];
+  activeSidebarId?: string;
   children: ReactNode;
   onClose: () => void;
 }
@@ -17,7 +28,15 @@ interface Props {
  * Below 860px the stylesheet lays this out as a static full-width panel and
  * dragging is disabled, so a phone never has to move a window to read it.
  */
-export function AppWindow({ title, subtitle, toolbar, children, onClose }: Props) {
+export function AppWindow({
+  title,
+  subtitle,
+  toolbar,
+  sidebar,
+  activeSidebarId,
+  children,
+  onClose,
+}: Props) {
   const [layout, setLayout] = useState<WindowLayout>(loadLayout);
   const dragOffset = useRef<{ x: number; y: number } | null>(null);
   const isCompact = () => window.matchMedia('(max-width: 860px)').matches;
@@ -102,7 +121,27 @@ export function AppWindow({ title, subtitle, toolbar, children, onClose }: Props
       </div>
 
       <div className="toolbar">{toolbar}</div>
-      <div className="window-body">{children}</div>
+
+      <div className="window-main">
+        {sidebar && sidebar.length > 0 && (
+          <nav className="window-nav" aria-label="Sections">
+            {sidebar.map((item) => (
+              <button
+                key={item.id}
+                className="nav-item"
+                aria-current={activeSidebarId === item.id}
+                disabled={!item.onSelect}
+                onClick={item.onSelect}
+                title={item.onSelect ? item.name : `${item.name} — coming later`}
+              >
+                <span className="nav-icon" aria-hidden="true">{item.icon}</span>
+                <span className="nav-name">{item.name}</span>
+              </button>
+            ))}
+          </nav>
+        )}
+        <div className="window-body">{children}</div>
+      </div>
     </div>
   );
 }

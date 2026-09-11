@@ -85,19 +85,13 @@ function DockItem({
       title={module.available ? module.name : `${module.name} — coming later`}
       style={{ '--dock-scale': scale } as React.CSSProperties}
     >
-      {/* The label rides above the tile on hover, like a dock tooltip, so the
-          dock stays compact without becoming a row of mystery glyphs. */}
-      <span className="tip" aria-hidden="true">
-        {module.name}
-        {!module.available && <em> · coming later</em>}
-      </span>
       <span className="tile">
         <span className="glyph" aria-hidden="true">{module.icon}</span>
       </span>
-      <span className="sr-only">
-        {module.name}
-        {!module.available && ' — coming later'}
-      </span>
+      {/* Labels are always visible, the way a desktop dock shows them. A row
+          of unexplained glyphs is not a dock, it is a puzzle. */}
+      <span className="name">{module.name}</span>
+      {!module.available && <span className="later">coming later</span>}
       <span className="dot" data-on={active} aria-hidden="true" />
     </button>
   );

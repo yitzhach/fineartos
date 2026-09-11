@@ -115,6 +115,16 @@ export class Repository {
     });
   }
 
+  /**
+   * Deletes a document outright. Used by the "remove demo" action; ordinary
+   * work is archived rather than destroyed, which is what `archive` is for.
+   */
+  async deleteDocument(id: string): Promise<void> {
+    const row = await this.load(id);
+    if (!row) return;
+    await remove(STORE_DOCUMENTS, id);
+  }
+
   async archive(id: string): Promise<void> {
     const row = await this.load(id);
     if (!row) return;

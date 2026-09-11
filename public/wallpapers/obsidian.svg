@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" width="1600" height="1000">
+  <!-- Obsidian. Dark polished stone with a light source off the upper right:
+       broad sweeping bands like cut marble, a rim of warm light along the
+       curve, and a deep vignette so window chrome floats above it.
+
+       Drawn, not photographed — about 3KB, sharp at any resolution, offline.
+       The bands are real paths rather than noise, which is what gives it
+       structure instead of the muddy blur a turbulence filter produces. -->
+  <defs>
+    <linearGradient id="stone" x1="0.1" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#22201e"/>
+      <stop offset="0.45" stop-color="#171512"/>
+      <stop offset="1" stop-color="#0e0d0b"/>
+    </linearGradient>
+
+    <!-- The sphere's terminator, catching light along its upper-left edge. -->
+    <radialGradient id="orb" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0.72" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="0.88" stop-color="#3a332c" stop-opacity="0.55"/>
+      <stop offset="0.97" stop-color="#6d6156" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="band" x1="0" y1="0" x2="1" y2="0.4">
+      <stop offset="0" stop-color="#4a4239" stop-opacity="0"/>
+      <stop offset="0.42" stop-color="#6b6055" stop-opacity="0.34"/>
+      <stop offset="0.62" stop-color="#8c7f6f" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#2a2622" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="band2" x1="0" y1="0" x2="0.9" y2="0.6">
+      <stop offset="0" stop-color="#1a1815" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#5c5348" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#121110" stop-opacity="0"/>
+    </linearGradient>
+
+    <radialGradient id="keylight" cx="0.86" cy="0.1" r="0.72">
+      <stop offset="0" stop-color="#c8ae8c" stop-opacity="0.20"/>
+      <stop offset="0.45" stop-color="#7a6a56" stop-opacity="0.07"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="vignette" cx="0.5" cy="0.42" r="0.82">
+      <stop offset="0.45" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.62"/>
+    </radialGradient>
+
+    <filter id="soften" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="26"/>
+    </filter>
+    <filter id="soften2" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="48"/>
+    </filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" seed="13"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.045"/></feComponentTransfer>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#stone)"/>
+
+  <!-- Sweeping bands of stone, low and wide across the lower two thirds. -->
+  <g filter="url(#soften)">
+    <path d="M-200 760 C 260 560, 700 700, 1100 520 S 1520 300, 1820 340 L 1820 1100 L -200 1100 Z"
+          fill="url(#band2)"/>
+    <path d="M-200 880 C 320 700, 760 830, 1180 660 S 1560 460, 1820 500 L 1820 1100 L -200 1100 Z"
+          fill="url(#band)" opacity="0.8"/>
+  </g>
+  <g filter="url(#soften2)" opacity="0.7">
+    <path d="M-200 620 C 300 470, 640 600, 1040 430 S 1480 210, 1820 250"
+          fill="none" stroke="#8a7c6b" stroke-opacity="0.16" stroke-width="46"/>
+  </g>
+
+  <!-- The body in the upper right, mostly in shadow. -->
+  <circle cx="1370" cy="70" r="560" fill="url(#orb)"/>
+
+  <rect width="1600" height="1000" fill="url(#keylight)"/>
+  <rect width="1600" height="1000" fill="url(#vignette)"/>
+  <rect width="1600" height="1000" filter="url(#grain)"/>
+</svg>

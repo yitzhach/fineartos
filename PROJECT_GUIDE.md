@@ -40,6 +40,8 @@ not where it expects.
 | Area | Where | Notes |
 | --- | --- | --- |
 | OS shell | `src/os/` | System bar, magnifying dock, one draggable window, desktop, settings |
+| Commission overview | `src/commission/ui/Overview.tsx` | The at-a-glance screen: stats, facts, money, activity, next step |
+| Demo record | `src/lib/demo.ts` | Seeded once on a first run, labelled, removable |
 | Desktop icons | `src/os/Desktop.tsx` | Click selects, double-click opens. Thumbnails from the first reference image |
 | Drag-and-drop images | `src/os/ImageDrop.tsx` | One well used for references, the logo and the wallpaper |
 | Project folders | `src/project/` | A real record holding document and invoice ids |
@@ -108,8 +110,20 @@ through `Repository`, which is constructed with a workspace id and treats a
 row from another workspace as absent. Adding sign-in later does not mean
 revisiting storage.
 
-**The wallpaper is a bundled SVG, or the artist's own image.** Three ship with
-the app — Studio Plaster, Dusk and Linen — drawn as SVG rather than photographs
+**The app opens into work, not an empty desktop.** A first run seeds one
+commission marked `isDemo`, with its artwork drawn on a canvas rather than
+shipped as a stock photograph. It is labelled DEMO wherever it appears and
+removable in a click; the seeded flag means it stays removed. Later launches
+reopen whatever was touched last. The desktop stays visible behind the window
+rather than being a screen you navigate away from.
+
+**The overview invents nothing.** Its activity list is read off timestamps the
+record already carries — there is no activity log in the app — and the "next
+step" is worked out from what is genuinely missing. A dashboard that shows
+made-up numbers is worse than no dashboard, because it is believed.
+
+**The wallpaper is a bundled SVG, or the artist's own image.** Four ship with
+the app — Obsidian (the default), Studio Plaster, Dusk and Linen — drawn as SVG rather than photographs
 so they are about 2KB each, sharp at any resolution, and precached for offline.
 The artist can drop in their own photo instead; it lives in IndexedDB like every
 other image, and only its id is in localStorage. A solid background is still one

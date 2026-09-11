@@ -11,7 +11,7 @@
 export type Theme = 'light' | 'dark';
 
 /** The wallpapers that ship with the app. `custom` means the artist's own. */
-export type WallpaperId = 'plaster' | 'dusk' | 'linen' | 'solid' | 'custom';
+export type WallpaperId = 'obsidian' | 'plaster' | 'dusk' | 'linen' | 'solid' | 'custom';
 
 export interface BundledWallpaper {
   id: Exclude<WallpaperId, 'custom' | 'solid'>;
@@ -23,6 +23,7 @@ export interface BundledWallpaper {
 }
 
 export const BUNDLED_WALLPAPERS: BundledWallpaper[] = [
+  { id: 'obsidian', name: 'Obsidian', src: '/wallpapers/obsidian.svg', suits: 'dark' },
   { id: 'plaster', name: 'Studio Plaster', src: '/wallpapers/plaster.svg', suits: 'dark' },
   { id: 'dusk', name: 'Dusk', src: '/wallpapers/dusk.svg', suits: 'dark' },
   { id: 'linen', name: 'Linen', src: '/wallpapers/linen.svg', suits: 'light' },
@@ -128,13 +129,15 @@ export function saveTheme(theme: Theme): void {
  */
 export const loadWallpaper = (): WallpaperChoice =>
   read<WallpaperChoice>(KEYS.wallpaper, {
-    id: loadTheme() === 'light' ? 'linen' : 'plaster',
+    id: loadTheme() === 'light' ? 'linen' : 'obsidian',
     customImageId: null,
   });
 export const saveWallpaper = (value: WallpaperChoice): void => write(KEYS.wallpaper, value);
 
 export const loadLayout = (): WindowLayout =>
-  read<WindowLayout>(KEYS.layout, { x: 96, y: 72, maximized: false, locked: false });
+  // Opens to the right of the desktop icons rather than on top of them, so a
+  // first launch shows both the work and the workspace around it.
+  read<WindowLayout>(KEYS.layout, { x: 208, y: 54, maximized: false, locked: false });
 export const saveLayout = (value: WindowLayout): void => write(KEYS.layout, value);
 
 export interface StudioDefaults {

@@ -19,6 +19,7 @@ import {
 } from './commission/document';
 import type { CommissionDocument } from './commission/types';
 import { Editor } from './commission/ui/Editor';
+import { Overview } from './commission/ui/Overview';
 import { ClientPreview } from './commission/ui/ClientPreview';
 import { DocumentList } from './commission/ui/DocumentList';
 import {
@@ -30,6 +31,7 @@ import {
   recordInvoicePayment,
 } from './invoice/invoice';
 import type { Invoice } from './invoice/types';
+import type { SidebarItem } from './os/Window';
 import { InvoiceEditor } from './invoice/ui/InvoiceEditor';
 import { InvoiceView } from './invoice/ui/InvoiceView';
 import {
@@ -52,6 +54,7 @@ import {
   type Project,
 } from './project/project';
 import { FolderWindow } from './project/ui/FolderWindow';
+import { buildDemo, demoAlreadySeeded, drawDemoArtwork, markDemoSeeded } from './lib/demo';
 import { Repository, type StoredDocument } from './persistence/repository';
 import { describeSaveState, drainQueue, unavailableCloud } from './persistence/sync';
 import { exportDocument, importDocumentFromText } from './persistence/portable';
@@ -82,6 +85,7 @@ const cloud = unavailableCloud;
 
 type View =
   | 'desktop'
+  | 'overview'
   | 'editor'
   | 'preview'
   | 'list'
@@ -146,12 +150,60 @@ export default function App() {
 
   useEffect(() => {
     void (async () => {
+      // First run only: seed one clearly-labelled demo commission so the app
+      // opens showing what it does rather than an empty desktop. Seeded once
+      // and never again, so deleting it makes it stay deleted.
+      if (!demoAlreadySeeded()) {
+        const existing = await repo.list();
+        if (existing.length === 0) {
+          const demo = buildDemo();
+          let document = demo.document;
+          let project = demo.project;
+
+          // The demo's one image, drawn here rather than shipped. If the
+          // browser cannot produce it, the demo just has no image.
+          const artwork = await drawDemoArtwork();
+          if (artwork) {
+            const imageId = newId();
+            try {
+              await repo.putImage(imageId, artwork);
+              document = {
+                ...document,
+                artwork: { ...document.artwork, referenceImageIds: [imageId] },
+              };
+              project = { ...project, coverImageId: imageId };
+            } catch {
+              // An image the store refuses is not worth failing the seed over.
+            }
+          }
+
+          await repo.save(document, cloud.configured);
+          await repo.saveProject(project);
+          setOpenId(document.id);
+          setView('overview');
+        }
+        markDemoSeeded();
+      }
+
       await refresh();
       // Nothing here claims a sync: with no adapter configured the drain is a
       // no-op, and the status bar says cloud sync is unconfigured.
       await drainQueue(repo, WORKSPACE_ID, cloud);
     })();
   }, [refresh, repo]);
+
+  // On a later launch, open the most recently touched commission rather than
+  // a bare desktop. Only once, and never over a window the artist has opened.
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current || rows.length === 0 || view !== 'desktop' || openId) return;
+    restored.current = true;
+    const newest = rows[0];
+    if (newest) {
+      setOpenId(newest.id);
+      setView('overview');
+    }
+  }, [rows, view, openId]);
 
   useEffect(() => {
     const onOnline = () => void drainQueue(repo, WORKSPACE_ID, cloud).then(refresh);
@@ -182,7 +234,11 @@ export default function App() {
 
     return () => {
       cancelled = true;
-      created.forEach((url) => URL.revokeObjectURL(url));
+      // Revoked a beat later, not immediately: React can still paint one frame
+      // with the old src, and a revoked blob URL in an <img> is a console
+      // error and a flash of broken image.
+      const stale = [...created];
+      setTimeout(() => stale.forEach((url) => URL.revokeObjectURL(url)), 1000);
     };
   }, [openDoc, repo]);
 
@@ -219,7 +275,8 @@ export default function App() {
     })();
     return () => {
       cancelled = true;
-      created.forEach((url) => URL.revokeObjectURL(url));
+      const stale = [...created];
+      setTimeout(() => stale.forEach((url) => URL.revokeObjectURL(url)), 1000);
     };
   }, [thumbIds, repo]);
 
@@ -277,7 +334,7 @@ export default function App() {
     doc = { ...doc, studio: { ...doc.studio, ...studio } };
     await save(doc);
     setOpenId(doc.id);
-    setView('editor');
+    setView('overview');
   };
 
   const handleChange = async (changes: Partial<CommissionDocument>) => {
@@ -344,6 +401,24 @@ export default function App() {
         referenceImageIds: openDoc.artwork.referenceImageIds.filter((x) => x !== id),
       },
     });
+  };
+
+  /**
+   * Removes the seeded demo and the folder it came in. The seeded flag is
+   * already set, so it stays gone.
+   */
+  const handleRemoveDemo = async (id: string) => {
+    const folder = projects.find((p) => p.documentIds.includes(id));
+    if (folder && folder.documentIds.length === 1 && folder.invoiceIds.length === 0) {
+      await repo.deleteProject(folder.id);
+    } else if (folder) {
+      await repo.saveProject(removeFromProject(folder, id));
+    }
+    await repo.deleteDocument(id);
+    setOpenId(null);
+    setView('desktop');
+    await refresh();
+    setMessage('Demo removed.');
   };
 
   // --- Folders ------------------------------------------------------------
@@ -486,7 +561,7 @@ export default function App() {
       setView('folder');
     } else if (item.kind === 'document') {
       setOpenId(item.id);
-      setView('editor');
+      setView('overview');
     } else {
       setOpenInvoiceId(item.id);
       setView('invoice');
@@ -541,6 +616,39 @@ export default function App() {
     setOpenInvoiceId(null);
     setShowIssued(false);
   };
+
+  // --- In-window navigation -----------------------------------------------
+
+  /** Invoices generated from the commission that is currently open. */
+  const invoicesForOpenDoc = openDoc
+    ? invoices.filter((invoice) => invoice.sourceDocumentId === openDoc.id)
+    : [];
+
+  // The sections named in the brief. The four that are built navigate; the
+  // rest are shown subdued and labelled rather than hidden, so the shape of
+  // the finished workflow is visible without pretending it exists.
+  const commissionSidebar: SidebarItem[] = [
+    { id: 'overview', name: 'Overview', icon: '⌂', onSelect: () => setView('overview') },
+    { id: 'editor', name: 'Details', icon: '✎', onSelect: () => setView('editor') },
+    { id: 'preview', name: 'Document', icon: '▤', onSelect: () => setView('preview') },
+    {
+      id: 'invoices',
+      name: 'Invoices',
+      icon: '❑',
+      onSelect: () => {
+        const first = invoicesForOpenDoc[0];
+        if (first) {
+          setOpenInvoiceId(first.id);
+          setView('invoice');
+        } else if (openDoc) {
+          void makeInvoice(openDoc, null);
+        }
+      },
+    },
+    { id: 'concepts', name: 'Concepts', icon: '◇' },
+    { id: 'production', name: 'Production', icon: '◈' },
+    { id: 'delivery', name: 'Delivery', icon: '⊞' },
+  ];
 
   // --- Toolbars -----------------------------------------------------------
 
@@ -664,7 +772,9 @@ export default function App() {
       />
 
       <main className="desktop">
-        {view === 'desktop' && (
+        {/* The desktop is always there, with windows floating over it — the
+            way a desktop behaves. It is not a screen you navigate away from. */}
+        {(
           <Desktop
             items={desktopItems}
             imageUrls={thumbUrls}
@@ -679,6 +789,12 @@ export default function App() {
           <AppWindow
             title={windowTitle(view, openDoc, openProject, openInvoice)}
             subtitle={windowSubtitle(view, openDoc, openInvoice)}
+            sidebar={
+              view === 'overview' || view === 'editor' || view === 'preview'
+                ? commissionSidebar
+                : undefined
+            }
+            activeSidebarId={view}
             toolbar={
               view === 'settings' ? (
                 <span className="faint" style={{ fontSize: 12 }}>
@@ -731,7 +847,7 @@ export default function App() {
                 invoices={invoices.filter((invoice) => openProject.invoiceIds.includes(invoice.id))}
                 onOpenDocument={(id) => {
                   setOpenId(id);
-                  setView('editor');
+                  setView('overview');
                 }}
                 onOpenInvoice={(id) => {
                   setOpenInvoiceId(id);
@@ -771,6 +887,22 @@ export default function App() {
                   }
                 />
               </>
+            )}
+
+            {view === 'overview' && openDoc && (
+              <Overview
+                doc={openDoc}
+                invoices={invoicesForOpenDoc}
+                imageUrls={imageUrls}
+                onEdit={() => setView('editor')}
+                onPreview={() => setView('preview')}
+                onNewInvoice={() => void makeInvoice(openDoc, null)}
+                onOpenInvoice={(id) => {
+                  setOpenInvoiceId(id);
+                  setView('invoice');
+                }}
+                onRemoveDemo={openDoc.isDemo ? () => void handleRemoveDemo(openDoc.id) : undefined}
+              />
             )}
 
             {view === 'editor' && openDoc && (
@@ -828,8 +960,15 @@ export default function App() {
               void makeInvoice(null, null);
             }
           } else {
-            setOpenId(null);
-            setView('list');
+            // Land on the commission you were last in, not a list of them.
+            // The list is still a click away in the toolbar.
+            const current = openId ?? rows[0]?.id ?? null;
+            if (current) {
+              setOpenId(current);
+              setView('overview');
+            } else {
+              setView('list');
+            }
           }
         }}
       />
@@ -866,7 +1005,7 @@ function windowTitle(
     case 'list':
       return 'Commissions';
     default:
-      return doc ? `Commission ${doc.documentNumber}` : 'Commissions';
+      return doc ? 'Commission Studio' : 'Commissions';
   }
 }
 
@@ -876,6 +1015,8 @@ function windowSubtitle(
   invoice: Invoice | null,
 ): string | null {
   if (view === 'invoice' || view === 'invoice-preview') return invoice?.client.name || null;
-  if (view === 'editor' || view === 'preview') return doc?.title || doc?.client.name || null;
+  if (view === 'overview' || view === 'editor' || view === 'preview') {
+    return doc?.documentNumber ?? null;
+  }
   return null;
 }
