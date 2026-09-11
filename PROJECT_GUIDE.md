@@ -179,9 +179,25 @@ directory specified by the assets.directory field does not exist"* because
 wrangler ran before anything produced `dist/`. With the build in the config,
 any wrangler command builds first, and no dashboard setting can lose it.
 
-The second row is worth remembering when a push to a branch appears to
-"deploy" and the live URL does not change: that is correct behaviour, not a
-failure. Only `main` releases.
+There is a second safety net in `package.json`:
+
+```json
+"postinstall": "npm run build"
+```
+
+Cloudflare always runs `npm clean-install`, and npm always runs `postinstall`
+after it. So `dist/` exists before wrangler is invoked at all, whatever
+command the dashboard is set to. Belt and braces, because this specific
+failure has now cost three builds. The cost is that a local `npm install`
+also builds; that is a second or two, and worth it.
+
+**Retrying a failed build re-runs the old commit.** A fix pushed after the
+failure is not in it. Push a new commit, or trigger a fresh build on the
+branch head — do not hit Retry and conclude the fix did not work.
+
+The branch/command distinction above is worth remembering when a push to a
+branch appears to "deploy" and the live URL does not change: that is correct
+behaviour, not a failure. Only `main` releases.
 
 `workers_dev: true` is the other load-bearing line: without it the deploy
 succeeds but the URL does not resolve at all.
