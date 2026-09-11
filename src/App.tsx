@@ -6,6 +6,7 @@ import { Dock } from './os/Dock';
 import { AppWindow } from './os/Window';
 import { Desktop, type DesktopItem } from './os/Desktop';
 import { Settings } from './os/Settings';
+import { BuildStamp } from './os/BuildStamp';
 import { registerModule, registerPlannedModules } from './os/registry';
 import {
   applyEdit,
@@ -943,6 +944,8 @@ export default function App() {
           </AppWindow>
         )}
       </main>
+
+      <BuildStamp />
 
       <Dock
         activeId={dockIdFor(view)}

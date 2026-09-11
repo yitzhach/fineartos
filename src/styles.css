@@ -946,6 +946,42 @@ fieldset.section > legend {
   color: #8a8072;
 }
 
+/* --- Build stamp -------------------------------------------------------- */
+/* Sits over the wallpaper, bottom left, out of the way of the dock. Quiet
+   enough to ignore and specific enough to answer "which build is this?". */
+
+.build-stamp {
+  position: absolute;
+  left: 20px;
+  bottom: 18px;
+  z-index: 15;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  font-variant-numeric: tabular-nums;
+}
+:root[data-theme='light'] .build-stamp { text-shadow: none; }
+
+.build-stamp .wordmark {
+  font-family: var(--serif);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.build-stamp .sep { opacity: 0.5; }
+
+/* The dock is centred and the stamp is absolute, so they only meet on a
+   narrow screen. There, the stamp steps out of the way. */
+@media (max-width: 720px) {
+  .build-stamp { left: 14px; bottom: auto; top: 48px; }
+}
+
 /* --- Dock --------------------------------------------------------------- */
 
 .dock {

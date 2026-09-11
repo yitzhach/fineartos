@@ -42,6 +42,7 @@ not where it expects.
 | OS shell | `src/os/` | System bar, magnifying dock, one draggable window, desktop, settings |
 | Commission overview | `src/commission/ui/Overview.tsx` | The at-a-glance screen: stats, facts, money, activity, next step |
 | Demo record | `src/lib/demo.ts` | Seeded once on a first run, labelled, removable |
+| Build stamp | `src/os/BuildStamp.tsx` | Commit and build time, bottom left of the desktop |
 | Desktop icons | `src/os/Desktop.tsx` | Click selects, double-click opens. Thumbnails from the first reference image |
 | Drag-and-drop images | `src/os/ImageDrop.tsx` | One well used for references, the logo and the wallpaper |
 | Project folders | `src/project/` | A real record holding document and invoice ids |
@@ -109,6 +110,14 @@ file whole.
 through `Repository`, which is constructed with a workspace id and treats a
 row from another workspace as absent. Adding sign-in later does not mean
 revisiting storage.
+
+**The build is stamped on screen.** The commit and build time sit at the
+bottom left of the desktop, baked in by `vite.config.ts`. This is here because
+a stale cached page and a failed deploy look identical from the outside: with
+the stamp, "am I looking at the build I just pushed?" is answered by reading it
+rather than by guessing. The commit comes from `WORKERS_CI_COMMIT_SHA` in CI
+and from git locally, and every lookup falls back rather than failing the
+build.
 
 **The app opens into work, not an empty desktop.** A first run seeds one
 commission marked `isDemo`, with its artwork drawn on a canvas rather than
