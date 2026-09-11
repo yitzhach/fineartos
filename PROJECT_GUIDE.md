@@ -45,6 +45,7 @@ not where it expects.
 | Project window | `src/commission/ui/ProjectWindow.tsx` | Tabbed: overview, details, document, files, milestones, invoices, notes |
 | Milestones | `src/commission/milestones.ts` | Real production stages, not a mock |
 | Mock tools | `src/os/mock/` | Labelled previews of the tools not built yet |
+| Wallpaper library | `src/lib/wallpapers.ts`, `src/os/WallpaperPicker.tsx` | The artist's own desktop pictures: upload, switch, fit, dim, delete |
 | Staged backend | `worker/`, `migrations/`, `src/persistence/workerCloud.ts` | Ported from the commission baseline. Not switched on |
 | Commission overview | `src/commission/ui/Overview.tsx` | The at-a-glance screen: stats, facts, money, activity, next step |
 | Demo record | `src/lib/demo.ts` | Seeded once on a first run, labelled, removable |
@@ -164,7 +165,27 @@ record already carries — there is no activity log in the app — and the "next
 step" is worked out from what is genuinely missing. A dashboard that shows
 made-up numbers is worse than no dashboard, because it is believed.
 
-**The wallpaper is a bundled SVG, or the artist's own image.** Four ship with
+**Desktop pictures are a library, not a slot.** The artist uploads as many as
+they like, switches between them and deletes the ones they are done with. Only
+the small records live in localStorage; the images are blobs in IndexedDB like
+every other image in the app.
+
+Uploads are resized to 2560px on the longest edge and re-encoded as JPEG. A
+photograph off a phone is 4000px and several megabytes, which is more than a
+background needs and enough to make the image store refuse it outright. The
+picker says the picture was resized rather than doing it quietly.
+
+Fit and dim exist because a photograph is not a designed background: a bright
+one makes white icon labels unreadable, and a portrait one cropped to fill
+loses its subject. The dim is a separate layer under the content rather than a
+filter on the workspace — a filter would have darkened the windows and the
+dock along with the picture.
+
+Deleting the picture that is currently on the desktop falls back to a bundled
+one. Leaving the desktop pointing at an image that no longer exists would be a
+blank screen with no explanation.
+
+**The bundled wallpapers are SVGs.** Four ship with
 the app — Obsidian (the default), Studio Plaster, Dusk and Linen — drawn as SVG rather than photographs
 so they are about 2KB each, sharp at any resolution, and precached for offline.
 The artist can drop in their own photo instead; it lives in IndexedDB like every

@@ -3,10 +3,12 @@
  * payment defaults. Documents never go in localStorage; they live in
  * IndexedDB via the repository.
  *
- * The artist's own wallpaper is the one apparent exception but not a real
- * one: localStorage holds only the *id* of the image, and the image itself is
- * a blob in IndexedDB like every other image in the app.
+ * The artist's own wallpapers are the one apparent exception but not a real
+ * one: localStorage holds only the small records that point at them, and the
+ * images themselves are blobs in IndexedDB like every other image in the app.
  */
+
+import type { CustomWallpaper, WallpaperFit } from './wallpapers';
 
 export type Theme = 'light' | 'dark';
 
@@ -31,8 +33,19 @@ export const BUNDLED_WALLPAPERS: BundledWallpaper[] = [
 
 export interface WallpaperChoice {
   id: WallpaperId;
-  /** Image id in the IndexedDB image store. Only meaningful when id is 'custom'. */
+  /**
+   * Which of the artist's own pictures is on the desktop. Only meaningful
+   * when id is 'custom', and it names a record in the wallpaper library.
+   */
   customImageId: string | null;
+  /** How the picture is fitted. Ignored by the bundled ones, which all tile. */
+  fit?: WallpaperFit;
+  /**
+   * How much to darken the picture, 0–70%. A bright holiday photo makes white
+   * icon labels unreadable; this is the dial that fixes it without the artist
+   * having to edit the picture.
+   */
+  dim?: number;
 }
 
 export interface WindowLayout {
@@ -84,6 +97,7 @@ const KEYS = {
   layout: 'artistOS.windowLayout',
   studio: 'artistOS.studioDefaults',
   payment: 'artistOS.paymentInstructions',
+  wallpaperLibrary: 'artistOS.wallpaperLibrary',
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -133,6 +147,15 @@ export const loadWallpaper = (): WallpaperChoice =>
     customImageId: null,
   });
 export const saveWallpaper = (value: WallpaperChoice): void => write(KEYS.wallpaper, value);
+
+/**
+ * The artist's own pictures. Only the records live here — each one points at
+ * a blob in IndexedDB, which is where the actual image is.
+ */
+export const loadWallpaperLibrary = (): CustomWallpaper[] =>
+  read<CustomWallpaper[]>(KEYS.wallpaperLibrary, []);
+export const saveWallpaperLibrary = (value: CustomWallpaper[]): void =>
+  write(KEYS.wallpaperLibrary, value);
 
 export const loadLayout = (): WindowLayout =>
   // Opens to the right of the desktop icons rather than on top of them, so a

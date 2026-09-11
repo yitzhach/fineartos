@@ -211,6 +211,16 @@ export class Repository {
     return image;
   }
 
+  /**
+   * Deletes an image blob. Used when a wallpaper is removed from the library;
+   * documents keep their images until the document itself goes.
+   */
+  async deleteImage(id: string): Promise<void> {
+    const image = await this.getImage(id);
+    if (!image) return;
+    await remove(STORE_IMAGES, id);
+  }
+
   async getImage(id: string): Promise<StoredImage | null> {
     const image = await get<StoredImage>(STORE_IMAGES, id);
     if (!image || image.workspaceId !== this.workspaceId) return null;

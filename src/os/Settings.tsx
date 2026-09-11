@@ -1,11 +1,11 @@
 import {
-  BUNDLED_WALLPAPERS,
   hasAnyPaymentMethod,
   type PaymentInstructions,
   type StudioDefaults,
   type WallpaperChoice,
 } from '../lib/prefs';
-import { ImageDrop } from './ImageDrop';
+import type { CustomWallpaper } from '../lib/wallpapers';
+import { WallpaperPicker } from './WallpaperPicker';
 
 interface Props {
   studio: StudioDefaults;
@@ -14,8 +14,13 @@ interface Props {
   onPayment: (value: PaymentInstructions) => void;
   wallpaper: WallpaperChoice;
   onWallpaper: (value: WallpaperChoice) => void;
-  onCustomWallpaper: (file: File) => void;
-  customWallpaperUrl: string | null;
+  wallpaperLibrary: CustomWallpaper[];
+  wallpaperUrls: Record<string, string>;
+  onUploadWallpapers: (files: File[]) => void;
+  onRemoveWallpaper: (imageId: string) => void;
+  onRenameWallpaper: (imageId: string, name: string) => void;
+  wallpaperBusy: boolean;
+  wallpaperError: string | null;
 }
 
 const nullable = (value: string): string | null => (value.trim() === '' ? null : value);
@@ -29,7 +34,7 @@ const nullable = (value: string): string | null => (value.trim() === '' ? null :
  * payment in the app would actually require.
  */
 export function Settings(props: Props) {
-  const { studio, payment, wallpaper } = props;
+  const { studio, payment } = props;
   const setPayment = (changes: Partial<PaymentInstructions>) =>
     props.onPayment({ ...payment, ...changes });
 
@@ -169,53 +174,18 @@ export function Settings(props: Props) {
       </fieldset>
 
       <fieldset className="section">
-        <legend>Desktop</legend>
-        <div className="wallpapers">
-          {BUNDLED_WALLPAPERS.map((option) => (
-            <button
-              key={option.id}
-              className="wallpaper-swatch"
-              data-selected={wallpaper.id === option.id}
-              onClick={() => props.onWallpaper({ ...wallpaper, id: option.id })}
-            >
-              <img src={option.src} alt="" />
-              <span>{option.name}</span>
-            </button>
-          ))}
-
-          <button
-            className="wallpaper-swatch"
-            data-selected={wallpaper.id === 'solid'}
-            onClick={() => props.onWallpaper({ ...wallpaper, id: 'solid' })}
-          >
-            <span className="solid-swatch" aria-hidden="true" />
-            <span>Solid colour</span>
-          </button>
-
-          {props.customWallpaperUrl && (
-            <button
-              className="wallpaper-swatch"
-              data-selected={wallpaper.id === 'custom'}
-              onClick={() => props.onWallpaper({ ...wallpaper, id: 'custom' })}
-            >
-              <img src={props.customWallpaperUrl} alt="" />
-              <span>Your image</span>
-            </button>
-          )}
-        </div>
-
-        <div className="field" style={{ marginTop: 14 }}>
-          <label>Use your own image</label>
-          <ImageDrop
-            multiple={false}
-            label="Drop a photo here to use as your desktop"
-            hint="It stays on this device, like every other image in the app"
-            onFiles={(files) => {
-              const first = files[0];
-              if (first) props.onCustomWallpaper(first);
-            }}
-          />
-        </div>
+        <legend>Desktop picture</legend>
+        <WallpaperPicker
+          wallpaper={props.wallpaper}
+          onWallpaper={props.onWallpaper}
+          library={props.wallpaperLibrary}
+          customUrls={props.wallpaperUrls}
+          onUpload={props.onUploadWallpapers}
+          onRemove={props.onRemoveWallpaper}
+          onRename={props.onRenameWallpaper}
+          busy={props.wallpaperBusy}
+          error={props.wallpaperError}
+        />
       </fieldset>
     </div>
   );

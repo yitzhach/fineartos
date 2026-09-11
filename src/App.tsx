@@ -73,6 +73,13 @@ import {
 } from './project/project';
 import { FolderWindow } from './project/ui/FolderWindow';
 import { buildDemo, demoAlreadySeeded, drawDemoArtwork, markDemoSeeded } from './lib/demo';
+import {
+  addWallpaper,
+  prepareWallpaper,
+  removeWallpaper,
+  renameWallpaper,
+  type CustomWallpaper,
+} from './lib/wallpapers';
 import { Repository, type StoredDocument } from './persistence/repository';
 import { describeSaveState, drainQueue, unavailableCloud } from './persistence/sync';
 import { exportDocument, importDocumentFromText } from './persistence/portable';
@@ -82,10 +89,12 @@ import {
   loadStudioDefaults,
   loadTheme,
   loadWallpaper,
+  loadWallpaperLibrary,
   savePaymentInstructions,
   saveStudioDefaults,
   saveTheme,
   saveWallpaper,
+  saveWallpaperLibrary,
   type PaymentInstructions,
   type StudioDefaults,
   type Theme,
@@ -141,13 +150,17 @@ export default function App() {
   const [payment, setPayment] = useState<PaymentInstructions>(loadPaymentInstructions);
 
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
-  const [wallpaperUrl, setWallpaperUrl] = useState<string | null>(null);
+  const [wallpaperLibrary, setWallpaperLibrary] = useState<CustomWallpaper[]>(loadWallpaperLibrary);
+  const [wallpaperUrls, setWallpaperUrls] = useState<Record<string, string>>({});
+  const [wallpaperBusy, setWallpaperBusy] = useState(false);
+  const [wallpaperError, setWallpaperError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => saveTheme(theme), [theme]);
   useEffect(() => saveWallpaper(wallpaper), [wallpaper]);
+  useEffect(() => saveWallpaperLibrary(wallpaperLibrary), [wallpaperLibrary]);
   useEffect(() => saveStudioDefaults(studio), [studio]);
   useEffect(() => savePaymentInstructions(payment), [payment]);
 
@@ -280,26 +293,35 @@ export default function App() {
     };
   }, [neededImageIds, repo]);
 
+  // Object URLs for every picture in the library, so the picker can show
+  // thumbnails and the desktop can show the chosen one from the same map.
+  const libraryIds = useMemo(
+    () => wallpaperLibrary.map((w) => w.imageId).sort().join(','),
+    [wallpaperLibrary],
+  );
+
   useEffect(() => {
-    const id = wallpaper.customImageId;
-    if (!id) {
-      setWallpaperUrl(null);
-      return;
-    }
+    const ids = libraryIds ? libraryIds.split(',') : [];
     let cancelled = false;
-    let created: string | null = null;
+    const created: string[] = [];
     void (async () => {
-      const image = await repo.getImage(id);
-      if (image && !cancelled) {
-        created = URL.createObjectURL(image.blob);
-        setWallpaperUrl(created);
+      const map: Record<string, string> = {};
+      for (const id of ids) {
+        const image = await repo.getImage(id);
+        if (image) {
+          const url = URL.createObjectURL(image.blob);
+          created.push(url);
+          map[id] = url;
+        }
       }
+      if (!cancelled) setWallpaperUrls(map);
     })();
     return () => {
       cancelled = true;
-      if (created) URL.revokeObjectURL(created);
+      const stale = [...created];
+      setTimeout(() => stale.forEach((url) => URL.revokeObjectURL(url)), 1000);
     };
-  }, [wallpaper.customImageId, repo]);
+  }, [libraryIds, repo]);
 
   // --- Saving -------------------------------------------------------------
 
@@ -534,13 +556,66 @@ export default function App() {
     );
   };
 
-  const handleCustomWallpaper = async (file: File) => {
+  /**
+   * Adds pictures to the wallpaper library. Each one is resized and
+   * re-encoded before it is stored, and the last one added becomes the
+   * desktop — which is what someone who just dropped a picture in expects.
+   *
+   * A file that cannot be read is named rather than silently skipped, and the
+   * ones that did work are still added.
+   */
+  const handleUploadWallpapers = async (files: File[]) => {
+    setWallpaperError(null);
+    setWallpaperBusy(true);
+    const failures: string[] = [];
+    let added: CustomWallpaper | null = null;
+    let resizedAny = false;
+
     try {
-      const id = newId();
-      await repo.putImage(id, file);
-      setWallpaper({ id: 'custom', customImageId: id });
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      for (const file of files) {
+        try {
+          const prepared = await prepareWallpaper(file);
+          const imageId = newId();
+          await repo.putImage(imageId, prepared.blob);
+          added = {
+            imageId,
+            name: file.name.replace(/\.[^.]+$/, '') || 'Untitled',
+            addedAt: new Date().toISOString(),
+            width: prepared.width,
+            height: prepared.height,
+          };
+          resizedAny = resizedAny || prepared.resized;
+          setWallpaperLibrary((current) => addWallpaper(current, added!));
+        } catch (error) {
+          failures.push(error instanceof Error ? error.message : String(error));
+        }
+      }
+    } finally {
+      setWallpaperBusy(false);
+    }
+
+    if (added) {
+      setWallpaper({ ...wallpaper, id: 'custom', customImageId: added.imageId });
+      setMessage(
+        resizedAny
+          ? 'Added. Large pictures were resized to 2560px on the longest edge.'
+          : 'Added to your desktop pictures.',
+      );
+    }
+    if (failures.length > 0) setWallpaperError(failures.join(' '));
+  };
+
+  /**
+   * Removes a picture from the library and deletes its blob. If it was the
+   * one on the desktop, the desktop goes back to a bundled picture rather
+   * than pointing at an image that no longer exists.
+   */
+  const handleRemoveWallpaper = async (imageId: string) => {
+    const wasInUse = wallpaper.id === 'custom' && wallpaper.customImageId === imageId;
+    setWallpaperLibrary((current) => removeWallpaper(current, imageId));
+    await repo.deleteImage(imageId);
+    if (wasInUse) {
+      setWallpaper({ ...wallpaper, id: theme === 'light' ? 'linen' : 'obsidian', customImageId: null });
     }
   };
 
@@ -836,8 +911,15 @@ export default function App() {
           onPayment={setPayment}
           wallpaper={wallpaper}
           onWallpaper={setWallpaper}
-          onCustomWallpaper={(file) => void handleCustomWallpaper(file)}
-          customWallpaperUrl={wallpaperUrl}
+          wallpaperLibrary={wallpaperLibrary}
+          wallpaperUrls={wallpaperUrls}
+          onUploadWallpapers={(files) => void handleUploadWallpapers(files)}
+          onRemoveWallpaper={(imageId) => void handleRemoveWallpaper(imageId)}
+          onRenameWallpaper={(imageId, name) =>
+            setWallpaperLibrary((current) => renameWallpaper(current, imageId, name))
+          }
+          wallpaperBusy={wallpaperBusy}
+          wallpaperError={wallpaperError}
         />
       );
     }
@@ -866,7 +948,8 @@ export default function App() {
     <div
       className="workspace"
       data-wallpaper={wallpaper.id}
-      style={wallpaperStyle(wallpaper, wallpaperUrl)}
+      data-fit={wallpaper.fit ?? 'cover'}
+      style={wallpaperStyle(wallpaper, wallpaperUrls)}
     >
       <SystemBar
         studioName={studio.name}
@@ -985,10 +1068,20 @@ export default function App() {
   }
 }
 
-function wallpaperStyle(choice: WallpaperChoice, customUrl: string | null) {
-  if (choice.id === 'custom' && customUrl) return { backgroundImage: `url(${customUrl})` };
+function wallpaperStyle(
+  choice: WallpaperChoice,
+  customUrls: Record<string, string>,
+): React.CSSProperties {
+  // The dim is a CSS variable rather than a filter: a filter on the workspace
+  // would darken the windows and the dock along with the picture.
+  const dim = { '--wallpaper-dim': String((choice.dim ?? 0) / 100) } as React.CSSProperties;
+
+  if (choice.id === 'custom') {
+    const url = choice.customImageId ? customUrls[choice.customImageId] : undefined;
+    return url ? { ...dim, backgroundImage: `url(${url})` } : dim;
+  }
   const bundled = BUNDLED_WALLPAPERS.find((w) => w.id === choice.id);
-  return bundled ? { backgroundImage: `url(${bundled.src})` } : undefined;
+  return bundled ? { ...dim, backgroundImage: `url(${bundled.src})` } : dim;
 }
 
 function initialsOf(name: string): string {
