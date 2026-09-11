@@ -236,15 +236,20 @@ body {
 
 .desktop-surface { position: absolute; inset: 0; overflow: auto; }
 
-.desktop-icons {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, 112px);
-  gap: 10px 4px;
-  padding: 24px 20px 20px;
-  align-content: start;
+/* Icons are positioned, not flowed: the artist drags them where they like and
+   they stay there. The grid maths is in src/os/desktopLayout.ts — the cell is
+   116px, which is this width plus the gap between columns. */
+.desktop-tools {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 3;
+  display: flex;
+  gap: 8px;
 }
 
 .desktop-icon {
+  position: absolute;
   width: 112px;
   padding: 8px 6px 10px;
   border: 1px solid transparent;
@@ -266,6 +271,25 @@ body {
   border-color: var(--line-strong);
 }
 .desktop-icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* The icon being carried: lifted, semi-transparent, and out of the way of
+   hit-testing so the folder underneath can light up. */
+.desktop-icon[data-dragging='true'] {
+  opacity: 0.75;
+  transform: scale(1.04);
+  z-index: 5;
+  pointer-events: none;
+  transition: none;
+}
+
+/* The folder a drop would land in. */
+.desktop-icon[data-drop-target='true'] {
+  background: var(--accent-quiet);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-quiet);
+}
+
+.desktop-icon[data-drop-target='true'] .thumb { transform: scale(1.06); }
 
 /* The tile: a photo when the artist has added one, otherwise a drawn sheet or
    folder. Nothing invents a picture that does not exist. */
@@ -1832,8 +1856,7 @@ fieldset.section > legend {
   .tray { bottom: 92px; }
   .tray-item { max-width: 150px; }
 
-  .desktop-icons { padding: 14px; grid-template-columns: repeat(auto-fill, 96px); }
-  .desktop-icon { width: 96px; }
+  .desktop-tools { top: 10px; right: 12px; }
   .btn { padding: 9px 13px; }          /* larger touch targets */
   .invoice-sheet { padding: 24px 20px; }
   .build-stamp { display: none; }      /* the dock needs the room */
@@ -1891,3 +1914,167 @@ fieldset.section > legend {
   white-space: nowrap;
   border: 0;
 }
+
+
+/* --- Finder ------------------------------------------------------------- */
+
+.finder {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 0;
+  height: 100%;
+  min-height: 0;
+}
+
+.fnd-side {
+  border-right: 1px solid var(--line);
+  padding: 4px 10px 16px;
+  overflow: auto;
+}
+
+.fnd-side h4 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 16px 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.fnd-place {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.fnd-place:hover { background: var(--raised); }
+.fnd-place[aria-current='true'] { background: var(--accent-quiet); }
+.fnd-place-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fnd-place-count { color: var(--ink-soft); font-variant-numeric: tabular-nums; font-size: 12px; }
+
+.fnd-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+
+.fnd-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.fnd-search { flex: 1 1 auto; min-width: 0; }
+
+.fnd-folder-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 14px 0;
+}
+.fnd-rename { font-size: 17px; font-weight: 600; max-width: 320px; }
+
+.fnd-table { width: 100%; border-collapse: collapse; }
+.fnd-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel-solid);
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-align: left;
+}
+.fnd-table td { padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.fnd-table tbody tr { cursor: default; }
+.fnd-table tbody tr:hover { background: var(--raised); }
+.fnd-table tbody tr[data-selected='true'] { background: var(--accent-quiet); }
+.fnd-table .num, .fnd-cell .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.fnd-name { display: block; font-weight: 600; }
+.fnd-detail { display: block; color: var(--ink-soft); font-size: 12px; }
+.fnd-kind { color: var(--ink-soft); font-size: 13px; }
+
+.fnd-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+  gap: 12px;
+  padding: 14px;
+  overflow: auto;
+}
+
+.fnd-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+.fnd-cell:hover { background: var(--raised); }
+.fnd-cell[data-selected='true'] { background: var(--accent-quiet); border-color: var(--line-strong); }
+.fnd-cell .fnd-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 110px; }
+
+.fnd-thumb {
+  width: 64px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 8px;
+}
+.fnd-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+.fnd-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--panel-solid);
+}
+.fnd-selected { font-weight: 600; margin-right: auto; }
+.fnd-move { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft); }
+
+@media (max-width: 860px) {
+  /* One column on a phone: the sidebar becomes a scrolling row of places. */
+  .finder { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .fnd-side {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 8px 10px;
+  }
+  .fnd-side h4 { margin: 0; flex: 0 0 auto; }
+  .fnd-place { width: auto; flex: 0 0 auto; }
+  .fnd-table th:nth-child(3), .fnd-table td:nth-child(3) { display: none; }
+}
+
+/* The view switch sits beside the search box, never wrapping under it. */
+.fnd-bar .chip-row { flex: 0 0 auto; display: flex; gap: 6px; }
+.fnd-bar .chip-row .btn { padding: 7px 12px; }

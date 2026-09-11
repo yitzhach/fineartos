@@ -76,7 +76,12 @@ export function defaultSize(
   viewport: { width: number; height: number },
 ): { width: number; height: number } {
   const wide = kind.type === 'commission';
-  const medium = kind.type === 'invoice' || kind.type === 'folder' || kind.type === 'settings';
+  const medium =
+    kind.type === 'invoice' ||
+    kind.type === 'folder' ||
+    kind.type === 'settings' ||
+    // The Finder lists four columns; at the small size they would crush.
+    (kind.type === 'tool' && kind.tool === 'finder');
 
   const width = wide ? 1180 : medium ? 860 : 700;
   const height = wide ? 760 : medium ? 680 : 560;
@@ -249,4 +254,33 @@ export function clampToViewport(
     }
     return { ...w, rect: { x, y, width, height } };
   });
+}
+
+/**
+ * What a dock button does: open, focus, or put away.
+ *
+ * A dock button is a switch for its tool, not just an opener. Three cases,
+ * because anything less is annoying in a different way each time:
+ *  - Not open: open it.
+ *  - Open but buried or minimised: bring it to the front. (Closing something
+ *    you cannot currently see would look like the button did nothing.)
+ *  - Open and already in front: close it.
+ *
+ * Closing rather than minimising is deliberate. The tray is for windows you
+ * mean to come back to; a dock button can reopen its tool in one click, so a
+ * minimised copy of it would only clutter the tray.
+ */
+export function toggleWindow(
+  windows: WindowState[],
+  spec: { kind: WindowKind; title: string; subtitle?: string | null },
+  viewport: { width: number; height: number },
+): { windows: WindowState[]; id: string | null } {
+  const key = keyFor(spec.kind);
+  const existing = windows.find((w) => keyFor(w.kind) === key);
+
+  if (existing && !existing.minimized && existing.z === topZ(windows)) {
+    return { windows: closeWindow(windows, existing.id), id: null };
+  }
+
+  return openWindow(windows, spec, viewport);
 }

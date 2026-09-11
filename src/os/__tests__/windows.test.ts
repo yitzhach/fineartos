@@ -15,6 +15,7 @@ import {
   moveWindow,
   openWindow,
   resizeWindow,
+  toggleWindow,
   toggleZoom,
   topZ,
   type WindowState,
@@ -239,5 +240,39 @@ describe('clampToViewport', () => {
   it('leaves windows alone when they already fit', () => {
     const { windows } = open([], { type: 'settings' });
     expect(clampToViewport(windows, VIEW)[0]).toBe(windows[0]);
+  });
+});
+
+describe('toggleWindow', () => {
+  const spec = { kind: { type: 'tool' as const, tool: 'calendar' }, title: 'Calendar' };
+
+  it('opens the tool when it is not open', () => {
+    const result = toggleWindow([], spec, VIEW);
+    expect(result.windows).toHaveLength(1);
+    expect(result.id).not.toBeNull();
+  });
+
+  it('closes the tool when it is already in front', () => {
+    const opened = toggleWindow([], spec, VIEW).windows;
+    const result = toggleWindow(opened, spec, VIEW);
+    expect(result.windows).toHaveLength(0);
+    expect(result.id).toBeNull();
+  });
+
+  it('raises a buried tool rather than closing it', () => {
+    let windows = toggleWindow([], spec, VIEW).windows;
+    windows = openWindow(windows, { kind: { type: 'list' }, title: 'Projects' }, VIEW).windows;
+    const result = toggleWindow(windows, spec, VIEW);
+    expect(result.windows).toHaveLength(2);
+    expect(focused(result.windows)?.kind).toEqual(spec.kind);
+  });
+
+  it('brings a minimised tool back rather than closing it', () => {
+    const opened = toggleWindow([], spec, VIEW).windows;
+    const first = opened[0]!;
+    const away = minimizeWindow(opened, first.id);
+    const result = toggleWindow(away, spec, VIEW);
+    expect(result.windows).toHaveLength(1);
+    expect(result.windows[0]!.minimized).toBe(false);
   });
 });

@@ -142,8 +142,51 @@ it is the gate on all three.
 - **PDF generated directly**, instead of through the browser's print dialog.
   Needs a PDF library or a server; the print route works today and costs
   nothing.
-- **Drag a document into a folder** on the desktop. Filing works through the
-  Save button; dragging between icons does not.
 - **Recurring invoices**, for artists on retainer.
 - **A real JPEG at print resolution.** The canvas renderer draws at 2× today,
   which is fine for email and thin for print.
+
+
+## Saving to the cloud, and downloading a project
+
+Both are asked for and neither is built. They are written down here rather
+than half-started, because each needs a decision that has not been made.
+
+### Desktop and folders saved to Cloudflare
+
+Today a project, its invoices and its icon positions live in this browser:
+IndexedDB for the records, localStorage for the positions. Opening the app on
+a phone shows an empty desktop, because nothing has ever left the laptop.
+
+Blocked on the same gate as everything else in this document — sign-in. Until
+a request can say *whose* studio it is, a sync endpoint would either be open
+to everyone or belong to no one. The adapter that would do the talking is
+already written and switched off: `src/persistence/workerCloud.ts`, with the
+schema in `migrations/001_commissions.sql`.
+
+Two things to decide when it is built:
+- **Whether icon positions sync at all.** A desktop arranged for a 27-inch
+  screen makes no sense on a phone. Most likely answer: positions stay local
+  per device, and only the records sync.
+- **What happens to a conflict.** Two devices editing one invoice offline is
+  rare but not impossible, and last-write-wins silently loses work.
+
+### Downloading a whole project
+
+"You can download a project" — one file holding the commission, its invoices,
+the artwork images and the client's details. The open question is what shape
+it takes, and the honest answer is that it depends on who is opening it:
+
+- **A pitch deck / presentation PDF** — for sending to a client or a gallery.
+  Big images, few words, the artist's name on it.
+- **A working archive** — every record as JSON plus the original images, so
+  the project can be moved to another machine or another app. This is the one
+  that protects the artist; it is also the least impressive to look at.
+- **A printable dossier** — the invoice layout that already exists, extended
+  to cover the whole project.
+
+These are not alternatives so much as different jobs, and the app will
+probably end up doing two of them. The invoice exporter
+(`src/invoice/download.ts`) already renders a self-contained HTML file, a
+JPEG through canvas, and a PDF through the print dialog, so whichever shape
+wins has somewhere to start.

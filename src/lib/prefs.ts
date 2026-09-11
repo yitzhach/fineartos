@@ -8,6 +8,7 @@
  * images themselves are blobs in IndexedDB like every other image in the app.
  */
 
+import type { DesktopLayout } from '../os/desktopLayout';
 import type { CustomWallpaper, WallpaperFit } from './wallpapers';
 
 export type Theme = 'light' | 'dark';
@@ -121,6 +122,7 @@ const KEYS = {
   studio: 'artistOS.studioDefaults',
   payment: 'artistOS.paymentInstructions',
   wallpaperLibrary: 'artistOS.wallpaperLibrary',
+  desktopLayout: 'artistOS.desktopLayout',
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -185,6 +187,15 @@ export const loadLayout = (): WindowLayout =>
   // first launch shows both the work and the workspace around it.
   read<WindowLayout>(KEYS.layout, { x: 208, y: 54, maximized: false, locked: false });
 export const saveLayout = (value: WindowLayout): void => write(KEYS.layout, value);
+
+/**
+ * Where the artist has dragged each desktop icon. Positions only — the icons
+ * themselves are whatever is in the studio, so a position for something that
+ * has since been deleted is simply ignored when it is read back.
+ */
+export const loadDesktopLayout = (): DesktopLayout => read<DesktopLayout>(KEYS.desktopLayout, {});
+export const saveDesktopLayout = (value: DesktopLayout): void =>
+  write(KEYS.desktopLayout, value);
 
 export interface StudioDefaults {
   name: string;

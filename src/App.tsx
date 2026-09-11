@@ -5,6 +5,12 @@ import { SystemBar } from './os/SystemBar';
 import { Dock } from './os/Dock';
 import { Frame } from './os/Frame';
 import { Desktop, type DesktopItem } from './os/Desktop';
+import { Finder } from './os/Finder';
+import {
+  autoArrange,
+  pruneLayout,
+  type DesktopLayout,
+} from './os/desktopLayout';
 import { Settings } from './os/Settings';
 import { BuildStamp } from './os/BuildStamp';
 import { AppRail, type RailItem } from './os/AppRail';
@@ -19,6 +25,7 @@ import {
   minimizeWindow,
   moveWindow,
   openWindow,
+  toggleWindow,
   resizeWindow,
   toggleZoom,
   type WindowKind,
@@ -89,11 +96,13 @@ import {
   loadStudioDefaults,
   loadTheme,
   loadWallpaper,
+  loadDesktopLayout,
   loadWallpaperLibrary,
   savePaymentInstructions,
   saveStudioDefaults,
   saveTheme,
   saveWallpaper,
+  saveDesktopLayout,
   saveWallpaperLibrary,
   type PaymentInstructions,
   type StudioDefaults,
@@ -123,6 +132,7 @@ registerPlannedModules();
 registerModule({ id: 'home', name: 'Home', icon: '⌂', available: true });
 registerModule({ id: 'commissions', name: 'Projects', icon: '✎', available: true });
 registerModule({ id: 'invoices', name: 'Invoices', icon: '❑', available: true });
+registerModule({ id: 'finder', name: 'Finder', icon: '❐', available: true });
 
 export default function App() {
   const repo = useMemo(() => new Repository(WORKSPACE_ID), []);
@@ -130,6 +140,8 @@ export default function App() {
   const [rows, setRows] = useState<StoredDocument[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  /** False until the first read from IndexedDB has come back. */
+  const [loaded, setLoaded] = useState(false);
 
   const [windows, setWindows] = useState<WindowState[]>([]);
   const [viewport, setViewport] = useState(() => ({
@@ -139,6 +151,7 @@ export default function App() {
   const compact = viewport.width <= COMPACT_WIDTH;
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [desktopLayout, setDesktopLayout] = useState<DesktopLayout>(loadDesktopLayout);
   const [projectTabs, setProjectTabs] = useState<Record<string, ProjectTab>>({});
   const [invoicePreview, setInvoicePreview] = useState<Record<string, boolean>>({});
 
@@ -161,6 +174,7 @@ export default function App() {
   useEffect(() => saveTheme(theme), [theme]);
   useEffect(() => saveWallpaper(wallpaper), [wallpaper]);
   useEffect(() => saveWallpaperLibrary(wallpaperLibrary), [wallpaperLibrary]);
+  useEffect(() => saveDesktopLayout(desktopLayout), [desktopLayout]);
   useEffect(() => saveStudioDefaults(studio), [studio]);
   useEffect(() => savePaymentInstructions(payment), [payment]);
 
@@ -196,6 +210,7 @@ export default function App() {
     setRows(documentRows);
     setProjects(projectRows);
     setInvoices(invoiceRows);
+    setLoaded(true);
   }, [repo]);
 
   useEffect(() => {
@@ -634,6 +649,83 @@ export default function App() {
       .map((invoice) => ({ kind: 'invoice' as const, id: invoice.id, invoice })),
   ];
 
+  /** Which folder each filed item is in, for the Finder. */
+  const folderOf: Record<string, string> = {};
+  for (const project of projects) {
+    for (const id of project.documentIds) folderOf[id] = project.id;
+    for (const id of project.invoiceIds) folderOf[id] = project.id;
+  }
+
+  const handleMoveIcon = (id: string, position: { x: number; y: number }) => {
+    setDesktopLayout((current) => ({ ...current, [id]: position }));
+  };
+
+  const handleTidy = () => {
+    setDesktopLayout(autoArrange(desktopItems.map((item) => item.id), viewportRef.current));
+    setMessage('Desktop tidied up.');
+  };
+
+  const handleNewFolder = async () => {
+    const taken = new Set(projects.map((p) => p.name));
+    let name = 'New folder';
+    for (let n = 2; taken.has(name); n += 1) name = `New folder ${n}`;
+    await saveProjectRecord(createProject(name, null));
+    setMessage(`“${name}” is on your desktop. Drag files onto it, or rename it inside.`);
+  };
+
+  /** Drag a file onto a folder — or pick the folder from the Finder. */
+  const handleFileInto = async (folderId: string, itemId: string) => {
+    const folder = projects.find((p) => p.id === folderId);
+    // Never a folder into a folder, and never a folder into itself.
+    if (!folder || folder.id === itemId || projects.some((p) => p.id === itemId)) return;
+
+    // Out of whatever folder it was in first, so it is never in two at once.
+    const previous = projectContaining(itemId);
+    if (previous && previous.id !== folderId) {
+      await repo.saveProject(removeFromProject(previous, itemId));
+    }
+
+    const isInvoice = invoices.some((invoice) => invoice.id === itemId);
+    let next = isInvoice
+      ? addInvoiceToProject(folder, itemId)
+      : addDocumentToProject(folder, itemId);
+
+    // A folder with no face takes the first picture that lands in it.
+    if (!next.coverImageId && !isInvoice) {
+      const cover = docById(itemId)?.artwork.referenceImageIds[0];
+      if (cover) next = setProjectCover(next, cover);
+    }
+
+    await saveProjectRecord(next);
+    // The icon has gone into the folder, so its old spot is meaningless.
+    setDesktopLayout((current) => {
+      const { [itemId]: _gone, ...rest } = current;
+      return rest;
+    });
+    setMessage(`Filed into “${folder.name}”.`);
+  };
+
+  const handleTakeOut = async (itemId: string) => {
+    const folder = projectContaining(itemId);
+    if (!folder) return;
+    await saveProjectRecord(removeFromProject(folder, itemId));
+    setMessage('Moved back to the desktop. Nothing was deleted.');
+  };
+
+  // Positions for things that have been deleted or filed away would otherwise
+  // pile up in localStorage forever.
+  // Waits for `loaded`: before the first read comes back the desktop is empty,
+  // and pruning against nothing would throw away every saved position.
+  const desktopIdKey = desktopItems.map((item) => item.id).join('|');
+  useEffect(() => {
+    if (!loaded) return;
+    const ids = desktopIdKey ? desktopIdKey.split('|') : [];
+    setDesktopLayout((current) => {
+      const pruned = pruneLayout(current, ids);
+      return Object.keys(pruned).length === Object.keys(current).length ? current : pruned;
+    });
+  }, [desktopIdKey, loaded]);
+
   const openDocumentWindow = (id: string) => {
     const doc = docById(id);
     if (doc) open({ type: 'commission', docId: id }, 'Commission Studio', doc.documentNumber);
@@ -785,6 +877,16 @@ export default function App() {
       return <span className="faint" style={{ fontSize: 12 }}>Changes are saved as you make them.</span>;
     }
 
+    if (kind.type === 'tool' && kind.tool === 'finder') {
+      return (
+        <span className="faint" style={{ fontSize: 12 }}>
+          Select a row, then Open. Drag an icon onto a folder on the desktop, or use Move to here.
+        </span>
+      );
+    }
+
+    // Only the mock tools carry this. A built tool saying it saves nothing
+    // would be a lie about the Finder, which files things for real.
     return <span className="faint" style={{ fontSize: 12 }}>Preview — nothing here saves or sends.</span>;
   }
 
@@ -934,6 +1036,35 @@ export default function App() {
       );
     }
 
+    if (kind.type === 'tool' && kind.tool === 'finder') {
+      return (
+        <Finder
+          projects={projects}
+          documents={rows.filter((row) => row.document.state !== 'archived').map((r) => r.document)}
+          invoices={invoices}
+          folderOf={folderOf}
+          imageUrls={imageUrls}
+          onOpen={(itemKind, id) => {
+            if (itemKind === 'project') {
+              const project = projects.find((p) => p.id === id);
+              if (project) open({ type: 'folder', projectId: id }, project.name, 'Project folder');
+            } else if (itemKind === 'document') {
+              openDocumentWindow(id);
+            } else {
+              openInvoiceWindow(id);
+            }
+          }}
+          onFileInto={(folderId, itemId) => void handleFileInto(folderId, itemId)}
+          onTakeOut={(itemId) => void handleTakeOut(itemId)}
+          onNewFolder={() => void handleNewFolder()}
+          onRenameFolder={(folderId, name) => {
+            const project = projects.find((p) => p.id === folderId);
+            if (project) void saveProjectRecord(renameProject(project, name));
+          }}
+        />
+      );
+    }
+
     if (kind.type === 'tool') {
       const Tool = MOCK_TOOLS[kind.tool];
       return Tool ? <Tool /> : <p className="hint">This tool does not exist yet.</p>;
@@ -979,10 +1110,16 @@ export default function App() {
         <Desktop
           items={desktopItems}
           imageUrls={imageUrls}
+          layout={desktopLayout}
+          viewport={viewport}
           selectedId={selectedId}
           onSelect={setSelectedId}
           onOpen={openDesktopItem}
+          onMove={handleMoveIcon}
+          onFileInto={(folderId, itemId) => void handleFileInto(folderId, itemId)}
           onNew={handleNew}
+          onNewFolder={() => void handleNewFolder()}
+          onTidy={handleTidy}
         />
 
         {windows
@@ -1043,13 +1180,19 @@ export default function App() {
           if (id === 'home') {
             // Show the desktop: everything goes to the tray, nothing is lost.
             setWindows((c) => c.map((w) => ({ ...w, minimized: true })));
-          } else if (id === 'invoices') {
-            open({ type: 'tool', tool: 'invoices-list' }, 'Invoices', 'All invoices');
-          } else if (id === 'commissions') {
-            open({ type: 'list' }, 'Projects', 'All commissions');
-          } else {
-            open({ type: 'tool', tool: id }, MOCK_TOOL_NAMES[id] ?? id, 'Preview');
+            return;
           }
+          // Every other dock button is a switch for its tool: open it, bring
+          // it forward, or put it away. See toggleWindow.
+          const spec =
+            id === 'invoices'
+              ? { kind: { type: 'tool' as const, tool: 'invoices-list' }, title: 'Invoices', subtitle: 'All invoices' }
+              : id === 'commissions'
+                ? { kind: { type: 'list' as const }, title: 'Projects', subtitle: 'All commissions' }
+                : id === 'finder'
+                  ? { kind: { type: 'tool' as const, tool: 'finder' }, title: 'Finder', subtitle: 'Everything in the studio' }
+                  : { kind: { type: 'tool' as const, tool: id }, title: MOCK_TOOL_NAMES[id] ?? id, subtitle: 'Preview' };
+          setWindows((c) => toggleWindow(c, spec, viewportRef.current).windows);
         }}
       />
     </div>
