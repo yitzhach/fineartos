@@ -160,22 +160,31 @@ is only meaningful while one of them stops moving.
 Cloudflare Workers Builds is connected to `yitzhach/fineartos` and deploys
 `main` on push. The app is static assets only — no server in the read path.
 
-Required Cloudflare build setting:
+The build now lives in `wrangler.jsonc` as a custom build command:
 
-| Setting | Value |
-| --- | --- |
-| Deploy command | `npm run deploy` |
-| Branch | `main` |
+```jsonc
+"build": { "command": "npm run build" }
+```
 
-`npm run deploy` is `npm run build && wrangler deploy`. This matters: a deploy
-command of plain `npx wrangler deploy` fails with *"The directory specified by
-the assets.directory field does not exist"*, because nothing built `dist/`
-first.
+This matters more than it looks. Workers Builds does not run npm scripts — it
+invokes wrangler directly, and which command it uses depends on the branch:
 
-`wrangler.jsonc` carries the rest, including `workers_dev: true`. Without that
-the deploy succeeds but the URL does not resolve at all, which reads as a
-broken build when the build is fine. Keep it in the config rather than relying
-on the dashboard toggle.
+| Branch | Command Cloudflare runs | Effect |
+| --- | --- | --- |
+| Production (`main`) | `wrangler deploy` | Uploads a version **and releases it** |
+| Any other branch | `wrangler versions upload` | Uploads a version, releases nothing |
+
+Neither builds anything on its own. Twice now a build has failed with *"the
+directory specified by the assets.directory field does not exist"* because
+wrangler ran before anything produced `dist/`. With the build in the config,
+any wrangler command builds first, and no dashboard setting can lose it.
+
+The second row is worth remembering when a push to a branch appears to
+"deploy" and the live URL does not change: that is correct behaviour, not a
+failure. Only `main` releases.
+
+`workers_dev: true` is the other load-bearing line: without it the deploy
+succeeds but the URL does not resolve at all.
 
 Deploy by hand from a machine that is logged in:
 

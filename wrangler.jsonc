@@ -8,6 +8,21 @@
   // broken build when nothing is actually wrong with the build.
   "workers_dev": true,
 
+  // Build the app before any wrangler command that needs the output.
+  //
+  // This lives here rather than only in `npm run deploy` because Cloudflare
+  // Workers Builds invokes wrangler directly — `wrangler deploy` on the
+  // production branch, `wrangler versions upload` on every other branch — and
+  // neither of those runs an npm script. Without this, wrangler looks for
+  // ./dist, finds nothing, and fails with "the directory specified by the
+  // assets.directory field does not exist", which reads as a broken app when
+  // the app is fine and simply was never built. That has now happened twice.
+  // Keeping the build in the config means it cannot be lost to a dashboard
+  // setting again.
+  "build": {
+    "command": "npm run build"
+  },
+
   "assets": {
     "directory": "./dist",
     // The app is one page; anything else should still land on it rather than
