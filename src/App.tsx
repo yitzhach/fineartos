@@ -7,6 +7,7 @@ import { Frame } from './os/Frame';
 import { Desktop, type DesktopItem } from './os/Desktop';
 import { Finder } from './os/Finder';
 import { TrashWindow } from './os/TrashWindow';
+import { TrashButton } from './os/TrashButton';
 import {
   countPhrase,
   deletionTargets,
@@ -22,8 +23,9 @@ import {
 import {
   autoArrange,
   pruneLayout,
-  trashSlot,
+  trashPositionOf,
   type DesktopLayout,
+  type IconPosition,
 } from './os/desktopLayout';
 import { Settings } from './os/Settings';
 import { BuildStamp } from './os/BuildStamp';
@@ -86,6 +88,7 @@ import {
   createProject,
   filedDocumentIds,
   filedInvoiceIds,
+  projectItemCount,
   projectNameFor,
   removeFromProject,
   renameProject,
@@ -112,6 +115,7 @@ import {
   loadWallpaper,
   loadDesktopLayout,
   loadTrash,
+  loadTrashPosition,
   loadWallpaperLibrary,
   savePaymentInstructions,
   saveStudioDefaults,
@@ -119,6 +123,7 @@ import {
   saveWallpaper,
   saveDesktopLayout,
   saveTrash,
+  saveTrashPosition,
   saveWallpaperLibrary,
   type PaymentInstructions,
   type StudioDefaults,
@@ -171,6 +176,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [desktopLayout, setDesktopLayout] = useState<DesktopLayout>(loadDesktopLayout);
   const [trash, setTrash] = useState<Trash>(loadTrash);
+  const [trashPosition, setTrashPosition] = useState<IconPosition | null>(loadTrashPosition);
   /**
    * The desktop surface's own size, reported by Desktop. Smaller than the
    * window — the system bar is above it — and it is what the icon grid is
@@ -201,6 +207,7 @@ export default function App() {
   useEffect(() => saveWallpaperLibrary(wallpaperLibrary), [wallpaperLibrary]);
   useEffect(() => saveDesktopLayout(desktopLayout), [desktopLayout]);
   useEffect(() => saveTrash(trash), [trash]);
+  useEffect(() => saveTrashPosition(trashPosition), [trashPosition]);
   useEffect(() => saveStudioDefaults(studio), [studio]);
   useEffect(() => savePaymentInstructions(payment), [payment]);
 
@@ -700,7 +707,10 @@ export default function App() {
   const handleTidy = () => {
     const surface = desktopViewportRef.current;
     setDesktopLayout(
-      autoArrange(desktopItems.map((item) => item.id), surface, [trashSlot(surface)]),
+      autoArrange(desktopItems.map((item) => item.id), surface, [
+        // Wherever the can is now, the tidy leaves room for it.
+        trashPositionOf(trashPosition, surface),
+      ]),
     );
     setMessage('Desktop tidied up.');
   };
@@ -757,6 +767,19 @@ export default function App() {
     await refresh();
   };
 
+  /** Windows onto a record that has just been hidden or destroyed. */
+  const closeWindowsFor = (ids: string[]) => {
+    setWindows((current) =>
+      current.filter((w) => {
+        const kind = w.kind;
+        if (kind.type === 'commission') return !ids.includes(kind.docId);
+        if (kind.type === 'invoice') return !ids.includes(kind.invoiceId);
+        if (kind.type === 'folder') return !ids.includes(kind.projectId);
+        return true;
+      }),
+    );
+  };
+
   const handleTrash = async (itemId: string) => {
     const project = projects.find((p) => p.id === itemId);
     const doc = docById(itemId);
@@ -786,6 +809,9 @@ export default function App() {
 
     await applyTrash(trashItem(trashRef.current, entry));
     if (selectedId === itemId) setSelectedId(null);
+    // The record is hidden now, so a window onto it would only show a
+    // tombstone. Closing it loses nothing: Put back is one click away.
+    closeWindowsFor(deletionTargets(entry));
     setMessage(
       entry.contains.length > 0
         ? `“${entry.name}” and the ${countPhrase(entry.contains.length)} inside it went to the Trash. Nothing has been deleted.`
@@ -837,16 +863,7 @@ export default function App() {
       await repo.deleteImage(imageId);
     }
 
-    // Windows onto something that no longer exists would show a tombstone.
-    setWindows((current) =>
-      current.filter((w) => {
-        const kind = w.kind;
-        if (kind.type === 'commission') return !ids.includes(kind.docId);
-        if (kind.type === 'invoice') return !ids.includes(kind.invoiceId);
-        if (kind.type === 'folder') return !ids.includes(kind.projectId);
-        return true;
-      }),
-    );
+    closeWindowsFor(ids);
 
     const keep = trashRef.current.filter((e) => !entries.some((gone) => gone.id === e.id));
     await applyTrash(keep);
@@ -966,6 +983,7 @@ export default function App() {
           <button className="btn" data-variant="quiet" onClick={() => importRef.current?.click()}>
             Import
           </button>
+          <TrashButton onTrash={() => void handleTrash(doc.id)} />
           <span className="faint" style={{ fontSize: 12 }}>Saved as you type</span>
         </>
       );
@@ -1006,6 +1024,7 @@ export default function App() {
           >
             {invoice.state === 'issued' ? 'Issued' : 'Mark as issued'}
           </button>
+          <TrashButton onTrash={() => void handleTrash(invoice.id)} />
           <span className="faint" style={{ fontSize: 12 }}>Saved as you type</span>
         </>
       );
@@ -1033,6 +1052,16 @@ export default function App() {
           >
             New invoice
           </button>
+          {project && (
+            <TrashButton
+              onTrash={() => void handleTrash(project.id)}
+              note={
+                projectItemCount(project) > 0
+                  ? `Takes the ${countPhrase(projectItemCount(project))} inside it too. Nothing is deleted until you empty the Trash.`
+                  : undefined
+              }
+            />
+          )}
           <span className="faint" style={{ fontSize: 12 }}>Double-click a row to open it.</span>
         </>
       );
@@ -1306,6 +1335,8 @@ export default function App() {
           onNewFolder={() => void handleNewFolder()}
           onTidy={handleTidy}
           trashCount={trash.length}
+          trashPosition={trashPosition}
+          onMoveTrash={setTrashPosition}
           onTrash={(id) => void handleTrash(id)}
           onOpenTrash={openTrashWindow}
           onViewport={(size) => {
@@ -1350,6 +1381,16 @@ export default function App() {
               {renderContent(win)}
             </Frame>
           ))}
+        {/* With no window open there is nowhere for a message to go, and an
+            action like Move to Trash closes the window it was used in. */}
+        {message && !top && (
+          <div className="notice desktop-notice no-print">
+            {message}{' '}
+            <button className="btn" data-variant="quiet" onClick={() => setMessage(null)}>
+              Dismiss
+            </button>
+          </div>
+        )}
       </main>
 
       {tray.length > 0 && (

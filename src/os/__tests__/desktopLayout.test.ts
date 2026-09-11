@@ -13,7 +13,8 @@ import {
   rowsPerColumn,
   slotPosition,
   snapToGrid,
-  trashSlot,
+  defaultTrashSlot,
+  trashPositionOf,
   type DesktopLayout,
 } from '../desktopLayout';
 
@@ -144,21 +145,35 @@ describe('iconAt', () => {
   });
 });
 
-describe('trashSlot', () => {
-  it('sits in the bottom right, clear of the dock', () => {
-    const slot = trashSlot(VIEW);
-    expect(slot.x + CELL_WIDTH).toBeLessThanOrEqual(VIEW.width);
+describe('the Trash position', () => {
+  it('starts bottom left, clear of the dock', () => {
+    const slot = defaultTrashSlot(VIEW);
+    expect(slot.x).toBe(MARGIN_LEFT);
     expect(slot.y).toBeLessThan(VIEW.height - CELL_HEIGHT);
   });
 
   it('stays on screen on a phone', () => {
-    const slot = trashSlot({ width: 390, height: 700 });
+    const slot = defaultTrashSlot({ width: 390, height: 700 });
     expect(slot.x).toBeGreaterThanOrEqual(MARGIN_LEFT);
     expect(slot.y).toBeGreaterThanOrEqual(MARGIN_TOP);
   });
 
+  it('goes where the artist left it', () => {
+    expect(trashPositionOf({ x: 400, y: 300 }, VIEW)).toEqual({ x: 400, y: 300 });
+  });
+
+  it('falls back to the default when it has never been moved', () => {
+    expect(trashPositionOf(null, VIEW)).toEqual(defaultTrashSlot(VIEW));
+  });
+
+  it('pulls a can left off the edge of a big screen back into a small one', () => {
+    const small = { width: 600, height: 500 };
+    const moved = trashPositionOf({ x: 1400, y: 800 }, small);
+    expect(moved.x + CELL_WIDTH).toBeLessThanOrEqual(small.width);
+  });
+
   it('is somewhere auto-arrange will not put an icon', () => {
-    const slot = trashSlot(VIEW);
+    const slot = defaultTrashSlot(VIEW);
     const arranged = autoArrange(['a', 'b', 'c'], VIEW, [slot]);
     for (const position of Object.values(arranged)) {
       expect(position).not.toEqual(slot);

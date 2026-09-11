@@ -76,15 +76,27 @@ export function slotPosition(index: number, viewport: Viewport): IconPosition {
 }
 
 /**
- * Where the Trash sits: bottom right, always, like every desktop since 1984.
- * It is not part of the layout the artist arranges — it cannot be moved, and
- * nothing else is placed on top of it.
+ * Where the Trash starts: bottom left, out of the way of the icons, which
+ * fill from the top down. It can be dragged anywhere from there, and where
+ * the artist leaves it is remembered — so this is a default, not a rule.
  */
-export function trashSlot(viewport: Viewport): IconPosition {
+export function defaultTrashSlot(viewport: Viewport): IconPosition {
   return {
-    x: Math.max(MARGIN_LEFT, viewport.width - CELL_WIDTH - MARGIN_LEFT),
+    x: MARGIN_LEFT,
     y: Math.max(MARGIN_TOP, viewport.height - CELL_HEIGHT - MARGIN_BOTTOM),
   };
+}
+
+/**
+ * Where the Trash actually is. A remembered position is clamped like any
+ * other icon, so a can left in the corner of a large screen is still
+ * reachable on a small one.
+ */
+export function trashPositionOf(
+  saved: IconPosition | null,
+  viewport: Viewport,
+): IconPosition {
+  return saved ? clampToDesktop(saved, viewport) : defaultTrashSlot(viewport);
 }
 
 function samePlace(a: IconPosition, b: IconPosition): boolean {

@@ -11,8 +11,9 @@ import {
   iconAt,
   resolveLayout,
   snapToGrid,
-  trashSlot,
+  trashPositionOf,
   type DesktopLayout,
+  type IconPosition,
   type Viewport,
 } from './desktopLayout';
 
@@ -38,6 +39,9 @@ interface Props {
   onTidy: () => void;
   /** How many things are in the Trash, so the icon can look full. */
   trashCount: number;
+  /** Where the artist has left the can. Null means it has never been moved. */
+  trashPosition: IconPosition | null;
+  onMoveTrash: (position: IconPosition) => void;
   /** Moves something to the Trash. Nothing is deleted by this. */
   onTrash: (id: string) => void;
   onOpenTrash: () => void;
@@ -92,7 +96,7 @@ export function Desktop(props: Props) {
 
   const ids = items.map((item) => item.id);
   const resolved = resolveLayout(ids, props.layout, viewport);
-  const trash = trashSlot(viewport);
+  const trash = trashPositionOf(props.trashPosition, viewport);
   // The Trash takes part in hit-testing but not in the layout: it cannot be
   // moved, and nothing is ever placed on top of it.
   const targets = { ...resolved, [TRASH_ID]: trash };
@@ -111,8 +115,11 @@ export function Desktop(props: Props) {
   // A folder cannot go into a folder: nesting projects is not something this
   // app models, and a folder that swallowed another would lose it.
   const dragIsFolder = items.some((i) => i.id === drag?.id && i.kind === 'project');
+  const draggingTrash = drag?.id === TRASH_ID && drag.moved;
+  const trashAt = draggingTrash ? { x: drag.x, y: drag.y } : trash;
+
   const hovering =
-    drag && drag.moved
+    drag && drag.moved && drag.id !== TRASH_ID
       ? iconAt(targets, { x: drag.x + CELL_WIDTH / 2, y: drag.y + CELL_HEIGHT / 2 }, drag.id)
       : null;
   const overTrash = hovering === TRASH_ID;
@@ -151,7 +158,11 @@ export function Desktop(props: Props) {
           const targetIsFolder = items.some((i) => i.id === target && i.kind === 'project');
           const sourceIsFolder = items.some((i) => i.id === current.id && i.kind === 'project');
 
-          if (target === TRASH_ID) {
+          if (current.id === TRASH_ID) {
+            // The can itself was being carried: it lands like any icon, and
+            // nothing is filed or binned by moving it.
+            props.onMoveTrash(clampToDesktop(snapToGrid(current.x, current.y), viewport));
+          } else if (target === TRASH_ID) {
             props.onTrash(current.id);
           } else if (target && targetIsFolder && !sourceIsFolder) {
             props.onFileInto(target, current.id);
@@ -241,14 +252,29 @@ export function Desktop(props: Props) {
       <button
         className="desktop-icon trash"
         data-drop-target={overTrash}
+        data-dragging={Boolean(draggingTrash)}
         data-full={props.trashCount > 0}
-        style={{ left: trash.x, top: trash.y }}
+        style={{ left: trashAt.x, top: trashAt.y }}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          if (e.button !== 0) return;
+          const surface = surfaceRef.current?.getBoundingClientRect();
+          if (!surface) return;
+          setDrag({
+            id: TRASH_ID,
+            x: trash.x,
+            y: trash.y,
+            offsetX: e.clientX - surface.left - trash.x,
+            offsetY: e.clientY - surface.top - trash.y,
+            moved: false,
+          });
+        }}
         onClick={(e) => e.stopPropagation()}
         onDoubleClick={(e) => {
           e.stopPropagation();
           props.onOpenTrash();
         }}
-        title="Trash — drag things here, double-click to open"
+        title="Trash — drag things here, drag the can to move it, double-click to open"
       >
         <span className="thumb trash-can" aria-hidden="true">
           <span className="can" />

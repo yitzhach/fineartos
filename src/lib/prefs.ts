@@ -8,7 +8,7 @@
  * images themselves are blobs in IndexedDB like every other image in the app.
  */
 
-import type { DesktopLayout } from '../os/desktopLayout';
+import type { DesktopLayout, IconPosition } from '../os/desktopLayout';
 import type { Trash } from '../os/trash';
 import type { CustomWallpaper, WallpaperFit } from './wallpapers';
 
@@ -125,6 +125,7 @@ const KEYS = {
   wallpaperLibrary: 'artistOS.wallpaperLibrary',
   desktopLayout: 'artistOS.desktopLayout',
   trash: 'artistOS.trash',
+  trashPosition: 'artistOS.trashPosition',
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -206,6 +207,15 @@ export const saveDesktopLayout = (value: DesktopLayout): void =>
  */
 export const loadTrash = (): Trash => read<Trash>(KEYS.trash, []);
 export const saveTrash = (value: Trash): void => write(KEYS.trash, value);
+
+/**
+ * Where the artist dragged the can. Null means they never did, and it sits
+ * wherever the layout puts it by default.
+ */
+export const loadTrashPosition = (): IconPosition | null =>
+  read<IconPosition | null>(KEYS.trashPosition, null);
+export const saveTrashPosition = (value: IconPosition | null): void =>
+  write(KEYS.trashPosition, value);
 
 export interface StudioDefaults {
   name: string;
