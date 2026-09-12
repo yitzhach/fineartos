@@ -13,6 +13,8 @@ import {
   signGuestBook,
   smsLink,
   togglePhotoLike,
+  hasSignature,
+  pathFromPoints,
   likedOf,
   likeCounts,
   type GuestDraft,
@@ -204,5 +206,43 @@ describe('pictures a visitor liked', () => {
   it('writes the titles, not the ids, into the CSV', () => {
     const entry = signGuestBook({ ...draft0(), likedPhotoIds: ['p1'] });
     expect(csvOf([entry], (id) => (id === 'p1' ? 'Harbour light' : id))).toContain('"Harbour light"');
+  });
+});
+
+describe('signing by hand', () => {
+  it('is empty until somebody draws', () => {
+    expect(emptyDraft().signaturePaths).toEqual([]);
+    expect(hasSignature(signGuestBook(draft0()))).toBe(false);
+  });
+
+  it('stores null rather than an empty list when nobody signed', () => {
+    expect(signGuestBook(draft0()).signaturePaths).toBeNull();
+  });
+
+  it('keeps the strokes that were drawn', () => {
+    const entry = signGuestBook({ ...draft0(), signaturePaths: ['M0 0L10 10'] });
+    expect(entry.signaturePaths).toEqual(['M0 0L10 10']);
+    expect(hasSignature(entry)).toBe(true);
+  });
+
+  it('draws a tap as a dot, not as nothing', () => {
+    expect(pathFromPoints([{ x: 5, y: 6 }])).toBe('M5 6l0 0');
+  });
+
+  it('joins a stroke into one path', () => {
+    expect(pathFromPoints([{ x: 0, y: 0 }, { x: 4, y: 2 }, { x: 8, y: 0 }])).toBe('M0 0L4 2L8 0');
+  });
+
+  it('rounds to a quarter pixel rather than storing long floats', () => {
+    expect(pathFromPoints([{ x: 1.03125, y: 2.9999 }])).toBe('M1 3l0 0');
+  });
+
+  it('has nothing to draw for an empty stroke', () => {
+    expect(pathFromPoints([])).toBeNull();
+  });
+
+  it('reads an entry signed before this existed as unsigned', () => {
+    const old = { ...signGuestBook(draft0()), signaturePaths: undefined } as unknown as GuestEntry;
+    expect(hasSignature(old)).toBe(false);
   });
 });

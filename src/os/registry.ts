@@ -8,6 +8,7 @@
  */
 
 import type { ComponentType } from 'react';
+import type { IconName } from './icons';
 
 /**
  * Where a module sits in the dock. Working tools lead, previews follow behind
@@ -19,7 +20,8 @@ export type ModuleGroup = 'tool' | 'later' | 'trash';
 export interface OsModule {
   id: string;
   name: string;
-  icon: string;
+  /** Which drawn icon to use. See icons.tsx. */
+  icon: IconName;
   available: boolean;
   group?: ModuleGroup;
   /** Present only for a module that is actually built. */
@@ -59,11 +61,11 @@ export function getModule(id: string): OsModule | undefined {
 /** The tools named in the Phase 1 brief, in dock order. */
 export function registerPlannedModules(): void {
   for (const planned of [
-    { id: 'shows', name: 'Shows', icon: '◇' },
-    { id: 'artwork', name: 'Artwork', icon: '▤' },
-    { id: 'connect', name: 'Connect', icon: '◉' },
-    { id: 'visualizer', name: 'Visualizer', icon: '◱' },
-    { id: 'finance', name: 'Finance', icon: '≡' },
+    { id: 'shows', name: 'Shows', icon: 'shows' as const },
+    { id: 'artwork', name: 'Artwork', icon: 'artwork' as const },
+    { id: 'connect', name: 'Connect', icon: 'connect' as const },
+    { id: 'visualizer', name: 'Visualizer', icon: 'visualizer' as const },
+    { id: 'finance', name: 'Finance', icon: 'finance' as const },
   ]) {
     registerModule({ ...planned, available: false, group: 'later' });
   }

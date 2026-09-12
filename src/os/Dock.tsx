@@ -1,4 +1,5 @@
-import { Fragment, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { Icon } from './icons';
 import { groupOf, listModules, type OsModule } from './registry';
 
 interface Props {
@@ -18,11 +19,16 @@ interface Props {
  * finger has no hover, and a target that grows under the thumb is worse than
  * a still one), and it is off under prefers-reduced-motion.
  */
-const MAX_SCALE = 1.5;
-const REACH = 100; // px from an item's centre at which magnification fades out
+const MAX_SCALE = 1.42;
+const REACH = 132; // px from an item's centre at which magnification fades out
 
 export function Dock({ activeId, onOpen }: Props) {
   const [pointerX, setPointerX] = useState<number | null>(null);
+  const frame = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (frame.current !== null) cancelAnimationFrame(frame.current);
+  }, []);
   /**
    * At rest the dock sits smaller and lower, the way a desktop dock does, so
    * it takes less of the screen while the artist is working. It comes up to
@@ -51,9 +57,22 @@ export function Dock({ activeId, onOpen }: Props) {
       onFocusCapture={() => setNear(true)}
       onBlurCapture={() => setNear(false)}
       onPointerMove={(e) => {
-        if (magnifies && e.pointerType === 'mouse') setPointerX(e.clientX);
+        // One update per animation frame. Setting state on every pointermove
+        // queued several renders per frame, which is what made the swell look
+        // like it was stepping rather than flowing.
+        if (!magnifies || e.pointerType !== 'mouse') return;
+        const x = e.clientX;
+        if (frame.current !== null) return;
+        frame.current = requestAnimationFrame(() => {
+          frame.current = null;
+          setPointerX(x);
+        });
       }}
       onPointerLeave={() => {
+        if (frame.current !== null) {
+          cancelAnimationFrame(frame.current);
+          frame.current = null;
+        }
         setPointerX(null);
         setNear(false);
       }}
@@ -114,7 +133,7 @@ function DockItem({
       style={{ '--dock-scale': scale } as React.CSSProperties}
     >
       <span className="tile">
-        <span className="glyph" aria-hidden="true">{module.icon}</span>
+        <Icon name={module.icon} />
       </span>
       {/* Labels are always visible, the way a desktop dock shows them. A row
           of unexplained glyphs is not a dock, it is a puzzle. */}

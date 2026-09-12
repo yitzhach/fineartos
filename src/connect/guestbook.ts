@@ -31,6 +31,15 @@ export interface GuestEntry {
    * asked or did not pick any — never that they disliked everything.
    */
   likedPhotoIds: string[];
+  /**
+   * The signature, as SVG path data drawn in a 320×120 box.
+   *
+   * Paths rather than a PNG on purpose: a scribble is a few hundred bytes as
+   * a path and tens of kilobytes as an image, and these live in localStorage
+   * alongside everything else. Null means they did not sign — plenty of
+   * people will not, and an empty box is not a signature.
+   */
+  signaturePaths: string[] | null;
   signedAt: string;
 }
 
@@ -42,6 +51,7 @@ export interface GuestDraft {
   note: string;
   consented: boolean;
   likedPhotoIds: string[];
+  signaturePaths: string[];
 }
 
 export const emptyDraft = (show = ''): GuestDraft => ({
@@ -52,6 +62,7 @@ export const emptyDraft = (show = ''): GuestDraft => ({
   note: '',
   consented: false,
   likedPhotoIds: [],
+  signaturePaths: [],
 });
 
 /** Why a draft cannot be signed, or null when it can. */
@@ -81,6 +92,7 @@ export function signGuestBook(draft: GuestDraft, now = new Date()): GuestEntry {
     note: trimmedOrNull(draft.note),
     consented: draft.consented,
     likedPhotoIds: [...draft.likedPhotoIds],
+    signaturePaths: draft.signaturePaths.length > 0 ? [...draft.signaturePaths] : null,
     signedAt: now.toISOString(),
   };
 }
@@ -107,6 +119,35 @@ export function possibleDuplicates(entries: GuestEntry[], entry: GuestEntry): Gu
     if (phone && digitsOf(other.phone) === phone) return true;
     return false;
   });
+}
+
+/** The box a signature is drawn and displayed in. */
+export const SIGNATURE_WIDTH = 320;
+export const SIGNATURE_HEIGHT = 120;
+
+/**
+ * One stroke, as SVG path data. A single tap becomes a dot rather than
+ * nothing, because a full stop is what some people sign with.
+ */
+export function pathFromPoints(points: { x: number; y: number }[]): string | null {
+  if (points.length === 0) return null;
+  const first = points[0]!;
+  if (points.length === 1) {
+    // A zero-length line with a round cap draws as a dot.
+    return `M${round(first.x)} ${round(first.y)}l0 0`;
+  }
+  const rest = points.slice(1).map((point) => `L${round(point.x)} ${round(point.y)}`);
+  return `M${round(first.x)} ${round(first.y)}${rest.join('')}`;
+}
+
+export function hasSignature(entry: GuestEntry): boolean {
+  return (entry.signaturePaths?.length ?? 0) > 0;
+}
+
+function round(value: number): number {
+  // Quarter-pixel precision: finer than anyone can see, and a third of the
+  // characters of an unrounded float.
+  return Math.round(value * 4) / 4;
 }
 
 /** Older entries were written before pictures could be picked. */

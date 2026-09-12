@@ -175,13 +175,16 @@ const cloud = unavailableCloud;
 const COMPACT_WIDTH = 860;
 
 registerPlannedModules();
-registerModule({ id: 'home', name: 'Home', icon: '⌂', available: true, group: 'tool' });
-registerModule({ id: 'commissions', name: 'Projects', icon: '✎', available: true, group: 'tool' });
-registerModule({ id: 'invoices', name: 'Invoices', icon: '❑', available: true, group: 'tool' });
-registerModule({ id: 'finder', name: 'Finder', icon: '❐', available: true, group: 'tool' });
-registerModule({ id: 'connect', name: 'Connect', icon: '◉', available: true, group: 'tool' });
+// New commission leads the dock: it is the thing done most often, and it was
+// a tile marooned among the artist's own files before.
+registerModule({ id: 'new', name: 'New', icon: 'new', available: true, group: 'tool' });
+registerModule({ id: 'home', name: 'Home', icon: 'home', available: true, group: 'tool' });
+registerModule({ id: 'commissions', name: 'Projects', icon: 'projects', available: true, group: 'tool' });
+registerModule({ id: 'invoices', name: 'Invoices', icon: 'invoices', available: true, group: 'tool' });
+registerModule({ id: 'finder', name: 'Finder', icon: 'finder', available: true, group: 'tool' });
+registerModule({ id: 'connect', name: 'Connect', icon: 'connect', available: true, group: 'tool' });
 // Last in the dock, the way the Trash is always last.
-registerModule({ id: 'trash', name: 'Trash', icon: '♺', available: true, group: 'trash' });
+registerModule({ id: 'trash', name: 'Trash', icon: 'trash', available: true, group: 'trash' });
 
 export default function App() {
   const repo = useMemo(() => new Repository(WORKSPACE_ID), []);
@@ -1622,6 +1625,10 @@ export default function App() {
           onAddImages={(files, markCurrentShow) =>
             void handleImportPhotos(files, undefined, markCurrentShow)
           }
+          onToggleCurrentShow={(photoId, inShow) => {
+            const photo = photos.find((p) => p.id === photoId);
+            if (photo) void savePhotoRecord(editPhoto(photo, { inCurrentShow: inShow }));
+          }}
           selectedPhotoId={connectPhotoId}
           onSelectPhoto={setConnectPhotoId}
           siteUrl={siteUrl}
@@ -1737,7 +1744,6 @@ export default function App() {
           onOpen={openDesktopItem}
           onMove={handleMoveIcon}
           onFileInto={(folderId, itemId) => void handleFileInto(folderId, itemId)}
-          onNew={handleNew}
           onNewFolder={() => void handleNewFolder()}
           undoLabel={nextUndoLabel(undoStack)}
           onUndo={() => void undoLast()}
@@ -1823,6 +1829,12 @@ export default function App() {
       <Dock
         activeId={dockIdFor(top)}
         onOpen={(id) => {
+          if (id === 'new') {
+            // An action rather than a window to toggle: it makes a commission
+            // and opens it, the way the desktop tile used to.
+            void handleNew();
+            return;
+          }
           if (id === 'home') {
             // Show the desktop: everything goes to the tray, nothing is lost.
             setWindows((c) => c.map((w) => ({ ...w, minimized: true })));

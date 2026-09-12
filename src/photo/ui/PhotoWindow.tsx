@@ -92,13 +92,22 @@ export function PhotoWindow({ photo, url, onChange, onSend }: Props) {
           </div>
           <div className="field">
             <label htmlFor={`y-${photo.id}`}>Year</label>
+            {/* A list to pick from and a box to type in: the last twenty years
+                cover almost everything, and older work is still typeable. */}
             <input
               id={`y-${photo.id}`}
               type="number"
+              inputMode="numeric"
+              list={`years-${photo.id}`}
               value={photo.year ?? ''}
               placeholder="—"
               onChange={(e) => onChange({ year: numberOrNull(e.target.value) })}
             />
+            <datalist id={`years-${photo.id}`}>
+              {recentYears().map((year) => (
+                <option key={year} value={year} />
+              ))}
+            </datalist>
           </div>
         </div>
 
@@ -164,6 +173,12 @@ export function PhotoWindow({ photo, url, onChange, onSend }: Props) {
       </div>
     </div>
   );
+}
+
+/** This year first, then back twenty. Typing an older year still works. */
+function recentYears(): number[] {
+  const thisYear = new Date().getFullYear();
+  return Array.from({ length: 21 }, (_, index) => thisYear - index);
 }
 
 /** An empty box means not recorded, which is null — never 0. */

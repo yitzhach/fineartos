@@ -300,11 +300,16 @@ body {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
+  /* A tall photograph would otherwise spill over its own label. */
+  overflow: hidden;
 }
 
 .desktop-icon .thumb img {
-  width: 100%;
-  height: 100%;
+  /* Fixed pixels, not percentages: a percentage height inside a grid cell
+     that is centred rather than stretched resolves against nothing, so the
+     image fell back to its natural size and covered the title. */
+  width: 66px;
+  height: 62px;
   object-fit: cover;
   border-radius: 6px;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.42);
@@ -1523,6 +1528,9 @@ fieldset.section > legend {
   --dock-scale: 1;
   position: relative;
   width: 74px;
+  /* Room for the "coming later" line, which is positioned rather than flowed
+     so that every item in the row is exactly the same height. */
+  margin-bottom: 9px;
   border: 0;
   padding: 0 0 4px;
   background: transparent;
@@ -1550,17 +1558,21 @@ fieldset.section > legend {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transform: scale(var(--dock-scale));
   transform-origin: bottom center;
-  transition: transform 90ms ease-out, background 140ms ease;
+  /* Long enough to read as a swell rather than a snap, with an ease that
+     settles instead of stopping dead. */
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), background 160ms ease;
 }
 .dock-item:hover:not(:disabled) .tile { border-color: var(--line-strong); }
 .dock-item[aria-current='true'] .tile {
   background: linear-gradient(160deg, var(--accent), #c9b795);
   border-color: transparent;
 }
-.dock-item[aria-current='true'] .glyph { color: var(--accent-ink); }
+.dock-item[aria-current='true'] .icon { color: var(--accent-ink); }
 .dock-item:disabled .tile { opacity: 0.34; }
 .dock-item:disabled .name { opacity: 0.45; }
-.dock-item .glyph { font-size: 19px; line-height: 1; }
+/* One drawn icon, one size, centred in the tile — the row is even because
+   every icon is built on the same grid rather than borrowed from a font. */
+.dock-item .icon { display: block; }
 .dock-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 14px; }
 
 /* Labels are always on, as a desktop dock shows them — the tooltip-only
@@ -1575,7 +1587,14 @@ fieldset.section > legend {
   text-overflow: ellipsis;
 }
 .dock-item[aria-current='true'] .name { color: var(--ink); }
+/* Out of the flow on purpose. As a third line it made those items taller
+   than the rest, and because the dock aligns to the bottom, their tiles sat
+   9px higher — which is exactly what made the row look off. */
 .dock-item .later {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -9px;
   font-size: 8.5px;
   letter-spacing: 0.04em;
   color: var(--ink-faint);
@@ -2043,7 +2062,8 @@ fieldset.section > legend {
   overflow: hidden;
   border-radius: 8px;
 }
-.fnd-thumb img { width: 100%; height: 100%; object-fit: cover; }
+/* Fixed, for the same reason as the desktop icons above. */
+.fnd-thumb img { width: 64px; height: 60px; object-fit: cover; }
 
 .fnd-actions {
   display: flex;
@@ -2637,3 +2657,60 @@ fieldset.section > legend {
 
 /* A checkbox inside a field keeps the field's rhythm rather than the label's. */
 .photo-details .check { padding: 6px 0; }
+
+/* A picture in the picker, with the artist's "in the show" toggle under it. */
+.gb-pick-wrap { display: flex; flex-direction: column; gap: 4px; }
+
+.gb-show-toggle {
+  width: 104px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.gb-show-toggle:hover { background: var(--raised); }
+.gb-show-toggle[data-on='true'] {
+  border-color: var(--sage-deep);
+  color: var(--sage);
+}
+
+/* --- Signing by hand ------------------------------------------------------ */
+
+.sign { display: flex; flex-direction: column; gap: 6px; }
+
+.sign-pad {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 320 / 120;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--raised);
+  /* Without this a finger scrolls the page instead of drawing on it. */
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.sign-rule { stroke: var(--line-strong); stroke-width: 1; }
+.sign-ink {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sign-actions { display: flex; align-items: center; gap: 10px; }
+.sign-actions .hint { flex: 1 1 auto; margin: 0; }
+
+/* In the list: small, and clearly a mark rather than a picture. */
+.sign-mark {
+  width: 120px;
+  height: 45px;
+  margin-top: 2px;
+  opacity: 0.85;
+}
+.sign-mark .sign-ink { stroke-width: 3.2; }

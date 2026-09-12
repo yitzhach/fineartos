@@ -37,7 +37,6 @@ interface Props {
   onMove: (id: string, position: { x: number; y: number }) => void;
   /** A file dragged onto a folder is filed into it. */
   onFileInto: (folderId: string, itemId: string) => void;
-  onNew: () => void;
   onNewFolder: () => void;
   /** What ⌘Z would put back, or null when there is nothing to undo. */
   undoLabel: string | null;
@@ -137,9 +136,8 @@ export function Desktop(props: Props) {
   const overIsFolder =
     overFolder !== null && items.some((i) => i.id === overFolder && i.kind === 'project');
 
-  /** The two standing tiles sit after whatever the artist has arranged. */
-  const newTile = firstFreeSlot(targets, viewport);
-  const addTile = firstFreeSlot({ ...targets, __new: newTile }, viewport);
+  /** The Add images square sits after whatever the artist has arranged. */
+  const addTile = firstFreeSlot(targets, viewport);
 
   useEffect(() => {
     if (!drag) return undefined;
@@ -313,21 +311,8 @@ export function Desktop(props: Props) {
         )}
       </button>
 
-      {/* Always last, so they sit after whatever the artist has arranged. */}
-      <button
-        className="desktop-icon new"
-        style={{ left: newTile.x, top: newTile.y }}
-        onClick={(e) => {
-          e.stopPropagation();
-          props.onNew();
-        }}
-      >
-        <span className="thumb blank" aria-hidden="true">
-          <span className="plus">+</span>
-        </span>
-        <span className="label">New commission</span>
-      </button>
-
+      {/* Last, so it sits after whatever the artist has arranged. New
+          commission lives in the dock now, where the other verbs are. */}
       <AddImages
         position={addTile}
         importing={props.importing}

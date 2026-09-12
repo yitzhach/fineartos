@@ -50,7 +50,14 @@ not where it expects.
 | Commission overview | `src/commission/ui/Overview.tsx` | The at-a-glance screen: stats, facts, money, activity, next step |
 | Demo record | `src/lib/demo.ts` | Seeded once on a first run, labelled, removable |
 | Build stamp | `src/os/BuildStamp.tsx` | Commit and build time, bottom left of the desktop |
-| Desktop icons | `src/os/Desktop.tsx` | Click selects, double-click opens. Thumbnails from the first reference image |
+| Desktop icons | `src/os/Desktop.tsx` | Draggable, snapped to a grid, drop onto a folder to file, drop onto the Trash to bin |
+| Desktop layout maths | `src/os/desktopLayout.ts` | Snapping, clamping, free slots, auto-arrange, hit-testing — DOM-free and tested |
+| Undo | `src/os/undo.ts` | ⌘Z / Ctrl+Z for moves, filing, folders, trashing. Emptying the Trash is deliberately not undoable |
+| Trash | `src/os/trash.ts`, `src/os/TrashWindow.tsx` | Hides, never deletes. Emptying asks twice and names the real total |
+| Pictures | `src/photo/` | The artist's photographs as desktop files: size, medium, year, price, status, current show |
+| Finder | `src/os/Finder.tsx` | Every record in one place, with places, search, and Move to |
+| Connect | `src/connect/` | Guest book with signatures and picture picks, share a picture, QR and vCard |
+| Dock icons | `src/os/icons.tsx` | One 24×24 grid, one stroke weight — drawn, not borrowed from a font |
 | Drag-and-drop images | `src/os/ImageDrop.tsx` | One well used for references, the logo and the wallpaper |
 | Project folders | `src/project/` | A real record holding document and invoice ids |
 | Invoices | `src/invoice/` | Child records of a commission; many per project |
@@ -355,8 +362,28 @@ session. The visual direction follows the written description in the brief.
   the file is attached by the artist. The preview says this outright.
 - **No payment is processed.** See `FUTURE_BUILD.md`.
 - **No client portal.** See `FUTURE_BUILD.md`.
-- **Dragging an icon into a folder** is not wired up; filing happens through
-  the Save button and the folder window.
+- **Nothing is sent from Connect by the app itself.** Email and text hand off
+  to the phone's own apps; the share sheet attaches the picture where the
+  browser supports it. A QR code hands details out and cannot bring a
+  signature back — that needs a server. The tool says so on screen.
+- **The guest book is this device.** Signatures, picks and contact details are
+  local. See `FUTURE_BUILD.md` for what syncing them would need.
+
+## Recent work, newest first
+
+- Dock icons drawn as one set; the row is even because every icon shares a
+  grid, and the "coming later" line is positioned rather than flowed.
+- New commission moved from a desktop tile to the dock.
+- Guest book: signing by hand (pointer events, stored as SVG path data —
+  hundreds of bytes, not a PNG), picture picks, Current show / Available
+  filters, and "Email what they liked".
+- Undo across the desktop. A folder keeps its own face: filing a picture no
+  longer paints it onto the folder icon.
+- **The silent hang**: the photos store took the database to version 3, and a
+  second tab open on version 2 blocked the upgrade forever. Every read waited
+  behind it and the app did nothing while looking fine. Now: `onversionchange`
+  releases the connection, `onblocked` reports, and opening is capped at 8s
+  with a visible message. If anything ever looks dead again, look here first.
 
 ## Next phase
 

@@ -12,8 +12,10 @@ import {
 } from '../../photo/photo';
 import { missingFromCard, normaliseUrl, vcardFor } from '../contact';
 import { countPhrase } from '../../os/trash';
+import { SignatureMark, SignaturePad } from './SignaturePad';
 import {
   csvOf,
+  hasSignature,
   likeCounts,
   likedOf,
   togglePhotoLike,
@@ -45,6 +47,8 @@ interface Props {
   /** Files dropped on the picture picker become pictures in the studio. */
   onAddImages: (files: FileList | File[], markCurrentShow: boolean) => void;
   importing: boolean;
+  /** Puts a picture in — or takes it out of — the show being worked now. */
+  onToggleCurrentShow: (photoId: string, inShow: boolean) => void;
   selectedPhotoId: string | null;
   onSelectPhoto: (id: string | null) => void;
   siteUrl: string;
@@ -113,6 +117,7 @@ function GuestBook({
   imageUrls,
   onAddImages,
   importing,
+  onToggleCurrentShow,
 }: Props) {
   const [draft, setDraft] = useState<GuestDraft>(() => emptyDraft());
   const [query, setQuery] = useState('');
@@ -283,27 +288,48 @@ function GuestBook({
             >
               {shownPhotos.map((photo) => {
                 const picked = draft.likedPhotoIds.includes(photo.id);
+                const inShow = isInCurrentShow(photo);
                 return (
-                  <button
-                    key={photo.id}
-                    type="button"
-                    className="gb-pick"
-                    data-picked={picked}
-                    aria-pressed={picked}
-                    onClick={() => setDraft(togglePhotoLike(draft, photo.id))}
-                    title={photo.title}
-                  >
-                    {imageUrls[photo.imageId] ? (
-                      <img src={imageUrls[photo.imageId]} alt={photo.title} />
-                    ) : (
-                      <span className="sheet-face" />
+                  <div key={photo.id} className="gb-pick-wrap">
+                    <button
+                      type="button"
+                      className="gb-pick"
+                      data-picked={picked}
+                      aria-pressed={picked}
+                      onClick={() => setDraft(togglePhotoLike(draft, photo.id))}
+                      title={photo.title}
+                    >
+                      {imageUrls[photo.imageId] ? (
+                        <img src={imageUrls[photo.imageId]} alt={photo.title} />
+                      ) : (
+                        <span className="sheet-face" />
+                      )}
+                      <span className="gb-pick-name">{photo.title}</span>
+                      <span className="gb-pick-detail">
+                        {describeStatus(photo) ?? describePrice(photo)}
+                      </span>
+                      {picked && <span className="gb-tick" aria-hidden="true">✓</span>}
+                    </button>
+
+                    {/* Only the artist sees this: putting a piece in the show
+                        is studio work, not something a visitor should do. */}
+                    {!guestMode && (
+                      <button
+                        type="button"
+                        className="gb-show-toggle"
+                        data-on={inShow}
+                        aria-pressed={inShow}
+                        onClick={() => onToggleCurrentShow(photo.id, !inShow)}
+                        title={
+                          inShow
+                            ? 'In the current show — click to take it out'
+                            : 'Add to the current show'
+                        }
+                      >
+                        {inShow ? '✓ In show' : '+ Add to show'}
+                      </button>
                     )}
-                    <span className="gb-pick-name">{photo.title}</span>
-                    <span className="gb-pick-detail">
-                      {describeStatus(photo) ?? describePrice(photo)}
-                    </span>
-                    {picked && <span className="gb-tick" aria-hidden="true">✓</span>}
-                  </button>
+                  </div>
                 );
               })}
 
@@ -339,6 +365,14 @@ function GuestBook({
                 : 'Anything worth remembering about this visitor'
             }
             onChange={(e) => setDraft({ ...draft, note: e.target.value })}
+          />
+        </div>
+
+        <div className="field">
+          <label>Signature</label>
+          <SignaturePad
+            paths={draft.signaturePaths}
+            onChange={(signaturePaths) => setDraft({ ...draft, signaturePaths })}
           />
         </div>
 
@@ -435,6 +469,7 @@ function GuestBook({
                     {entry.consented ? ' · may contact' : ' · no contact'}
                   </span>
                   {entry.note && <span className="fnd-detail">“{entry.note}”</span>}
+                  {hasSignature(entry) && <SignatureMark paths={entry.signaturePaths ?? []} />}
                   {likedOf(entry).length > 0 && (
                     <span className="fnd-detail">
                       Liked: {likedOf(entry).map(titleOf).join(', ')}
