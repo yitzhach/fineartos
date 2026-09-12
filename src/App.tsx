@@ -31,6 +31,7 @@ import {
 } from './os/desktopLayout';
 import { Settings } from './os/Settings';
 import { BuildStamp } from './os/BuildStamp';
+import { WallpaperSlides } from './os/WallpaperSlides';
 import { AppRail, type RailItem } from './os/AppRail';
 import { MOCK_TOOLS, MOCK_TOOL_NAMES } from './os/mock/tools';
 import { registerModule, registerPlannedModules } from './os/registry';
@@ -117,6 +118,8 @@ import {
   type Photo,
 } from './photo/photo';
 import { PhotoWindow } from './photo/ui/PhotoWindow';
+import { emptySlideshow, readySlides, secondsPerSlide } from './lib/slideshow';
+import { SHIPPED_PHOTOGRAPHS } from './lib/photographs';
 import { Repository, type StoredDocument } from './persistence/repository';
 import { onDbProblem, type DbProblem } from './persistence/db';
 import {
@@ -1707,6 +1710,23 @@ export default function App() {
 
   // --- Render -------------------------------------------------------------
 
+  /**
+   * The slideshow's pictures, as object URLs in the order they were picked.
+   * A picture deleted from the library, or one whose URL has not been made
+   * yet, is left out rather than shown as a blank.
+   */
+  const slideshow = wallpaper.slideshow ?? emptySlideshow();
+  // A slide is keyed either by an image id in the artist's own library or by
+  // the path of a photograph that ships with the app.
+  const slideSources: Record<string, string> = {
+    ...wallpaperUrls,
+    ...Object.fromEntries(SHIPPED_PHOTOGRAPHS.map((photograph) => [photograph.src, photograph.src])),
+  };
+  const slideUrls = readySlides(slideshow, Object.keys(slideSources))
+    .map((key) => slideSources[key])
+    .filter((url): url is string => Boolean(url));
+  const slideSeconds = secondsPerSlide(slideshow, slideUrls.length);
+
   return (
     <div
       className="workspace"
@@ -1714,6 +1734,13 @@ export default function App() {
       data-fit={wallpaper.fit ?? 'cover'}
       style={wallpaperStyle(wallpaper, wallpaperUrls)}
     >
+      {wallpaper.id === 'slideshow' && (
+        <WallpaperSlides
+          urls={slideUrls}
+          seconds={slideSeconds}
+          reducedMotion={prefersReducedMotion()}
+        />
+      )}
       <SystemBar
         studioName={studio.name}
         search={search}
@@ -1886,6 +1913,12 @@ export default function App() {
   }
 }
 
+/** A viewer who has asked their system for less movement gets straight cuts. */
+function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+}
+
 function wallpaperStyle(
   choice: WallpaperChoice,
   customUrls: Record<string, string>,
@@ -1898,6 +1931,14 @@ function wallpaperStyle(
     const url = choice.customImageId ? customUrls[choice.customImageId] : undefined;
     return url ? { ...dim, backgroundImage: `url(${url})` } : dim;
   }
+  if (choice.id === 'photograph') {
+    return choice.photographSrc
+      ? { ...dim, backgroundImage: `url(${choice.photographSrc})` }
+      : dim;
+  }
+  // The slideshow draws its own layers; the workspace itself stays bare so
+  // nothing shows through the dissolve.
+  if (choice.id === 'slideshow') return dim;
   const bundled = BUNDLED_WALLPAPERS.find((w) => w.id === choice.id);
   return bundled ? { ...dim, backgroundImage: `url(${bundled.src})` } : dim;
 }

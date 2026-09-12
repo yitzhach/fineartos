@@ -20,7 +20,14 @@ interface Props {
  * a still one), and it is off under prefers-reduced-motion.
  */
 const MAX_SCALE = 1.42;
-const REACH = 132; // px from an item's centre at which magnification fades out
+/**
+ * How far from an item's centre the pointer still lifts it, in px. The swell
+ * is the same height as it always was; the reach is what sets how fast it
+ * arrives, because the lift is a function of the distance across it. Widened
+ * from 132 so the same movement of the mouse grows a tile about 30% more
+ * slowly — it read as a pop before.
+ */
+const REACH = 189;
 
 export function Dock({ activeId, onOpen }: Props) {
   const [pointerX, setPointerX] = useState<number | null>(null);
@@ -136,9 +143,10 @@ function DockItem({
         <Icon name={module.icon} />
       </span>
       {/* Labels are always visible, the way a desktop dock shows them. A row
-          of unexplained glyphs is not a dock, it is a puzzle. */}
+          of unexplained glyphs is not a dock, it is a puzzle. A tool that is
+          not built yet says so in its tooltip rather than in a line of its
+          own: the line cost every item in the row the space under it. */}
       <span className="name">{module.name}</span>
-      {!module.available && <span className="later">coming later</span>}
       <span className="dot" data-on={active} aria-hidden="true" />
     </button>
   );

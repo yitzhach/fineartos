@@ -11,7 +11,8 @@
     "test": "vitest run",
     "typecheck": "tsc -b --noEmit",
     "acceptance": "node scripts/acceptance.mjs",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "wallpapers": "node scripts/prepare-wallpapers.mjs"
   },
   "dependencies": {
     "@types/qrcode": "^1.5.6",

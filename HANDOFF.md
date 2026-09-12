@@ -64,6 +64,7 @@ calculation or a rule inside a component, put it in one of these instead.
 | `src/invoice/invoice.ts` | Invoices as child records of a commission |
 | `src/connect/guestbook.ts` | Guest entries, consent, CSV, signature paths |
 | `src/connect/picker.ts` | Which pictures a visitor is shown, and which they picked |
+| `src/lib/slideshow.ts` | The desktop slideshow: what plays, for how long |
 | `src/connect/contact.ts` | vCard for the QR code |
 
 `src/App.tsx` is the shell that wires them together. `src/os/icons.tsx` is
@@ -106,10 +107,23 @@ event must be a ref.
 ```bash
 npm install
 npm run dev            # http://localhost:5173
-npm test               # 319 tests
+npm test               # 333 tests
 npm run build          # typecheck + dist/
 npm run preview        # serve dist on 4173
+npm run wallpapers     # photographs in wallpaper-source/ → public/, resized
 ```
+
+**Shipping desktop photographs.** Put the originals in `wallpaper-source/`
+(gitignored) and run `npm run wallpapers`. Each becomes a 2560px WebP at
+quality 0.82 — usually 250–450 KB, against 1.5–3 MB for the same picture as a
+JPEG — plus a 480px thumbnail for the Settings grid, in
+`public/wallpapers/photographs/`, and the list in `src/lib/photographs.ts` is
+rewritten to match. Commit both and push; Cloudflare serves them as static
+assets, so nothing lands in the JavaScript bundle and a picture is downloaded
+only when it is picked. Keep the folder under about 8 MB: git keeps every
+version of a binary forever. They are deliberately **not** in the service
+worker's install list — precaching megabytes nobody has chosen would slow
+every first load — and are cached on first use instead.
 
 Browser checks run against the preview build with the pre-installed Chromium:
 

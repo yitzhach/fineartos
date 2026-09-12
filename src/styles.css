@@ -99,6 +99,28 @@ body {
   background-repeat: no-repeat;
 }
 
+/* The slideshow's layers. Behind the scrim and the dim below, which are at
+   z-index -1, so a set of photographs is darkened by exactly the same
+   controls as a single one. Every picture is a layer and only the current one
+   is opaque: a crossfade is then one opacity transition, with nothing to keep
+   in step. */
+.wp-slides { position: absolute; inset: 0; z-index: -2; pointer-events: none; }
+
+.wp-slide {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition: opacity 1300ms ease-in-out;
+}
+.workspace[data-fit='contain'] .wp-slide { background-size: contain; }
+.workspace[data-fit='centre'] .wp-slide { background-size: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wp-slide { transition: none; }
+}
+
 /* A hairline of depth over any wallpaper, so pale icon labels stay readable
    against a bright photo the artist dropped in. */
 .workspace::before {
@@ -1287,6 +1309,34 @@ fieldset.section > legend {
   box-shadow: 0 0 0 1px var(--accent);
 }
 .wp-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wp-tile:disabled { cursor: default; opacity: 0.45; }
+
+/* The slideshow's running order, on the corner of each picture it has. The
+   number is the point: the set plays in the order it was picked. */
+.wp-tile { position: relative; }
+.wp-order {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Wide enough for "3600", and 16px so iOS does not zoom in on it. */
+.wp-seconds {
+  width: 84px;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
 
 /* One of the artist's own: the tile, a remove button, and an editable name. */
 .wp-own { position: relative; display: flex; flex-direction: column; gap: 6px; }
@@ -1528,9 +1578,6 @@ fieldset.section > legend {
   --dock-scale: 1;
   position: relative;
   width: 74px;
-  /* Room for the "coming later" line, which is positioned rather than flowed
-     so that every item in the row is exactly the same height. */
-  margin-bottom: 9px;
   border: 0;
   padding: 0 0 4px;
   background: transparent;
@@ -1559,8 +1606,9 @@ fieldset.section > legend {
   transform: scale(var(--dock-scale));
   transform-origin: bottom center;
   /* Long enough to read as a swell rather than a snap, with an ease that
-     settles instead of stopping dead. */
-  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), background 160ms ease;
+     settles instead of stopping dead. 315ms rather than 220: the same
+     30% off the speed as the widened reach in Dock.tsx. */
+  transition: transform 315ms cubic-bezier(0.22, 1, 0.36, 1), background 160ms ease;
 }
 .dock-item:hover:not(:disabled) .tile { border-color: var(--line-strong); }
 .dock-item[aria-current='true'] .tile {
@@ -1587,20 +1635,6 @@ fieldset.section > legend {
   text-overflow: ellipsis;
 }
 .dock-item[aria-current='true'] .name { color: var(--ink); }
-/* Out of the flow on purpose. As a third line it made those items taller
-   than the rest, and because the dock aligns to the bottom, their tiles sat
-   9px higher — which is exactly what made the row look off. */
-.dock-item .later {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -9px;
-  font-size: 8.5px;
-  letter-spacing: 0.04em;
-  color: var(--ink-faint);
-  line-height: 1;
-}
-
 .dock-item .dot {
   width: 3.5px;
   height: 3.5px;
@@ -1897,7 +1931,6 @@ fieldset.section > legend {
   .dock-item { width: 58px; }
   .dock-item .tile { width: 38px; height: 38px; transform: none; }
   .dock-item .name { font-size: 9.5px; max-width: 56px; }
-  .dock-item .later { display: none; }
 }
 
 /* Tablet: windows still behave like windows, but the inspector folds away so
@@ -2271,12 +2304,10 @@ fieldset.section > legend {
 }
 
 /* Labels fade at rest; they keep their space, so nothing jumps on the way up. */
-.dock .name,
-.dock .later {
+.dock .name {
   transition: opacity 200ms ease;
 }
-.dock[data-resting='true'] .name,
-.dock[data-resting='true'] .later {
+.dock[data-resting='true'] .name {
   opacity: 0;
 }
 

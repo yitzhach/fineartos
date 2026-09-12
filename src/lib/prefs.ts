@@ -12,10 +12,14 @@ import type { DesktopLayout, IconPosition } from '../os/desktopLayout';
 import type { Trash } from '../os/trash';
 import type { GuestEntry } from '../connect/guestbook';
 import type { CustomWallpaper, WallpaperFit } from './wallpapers';
+import type { Slideshow } from './slideshow';
 
 export type Theme = 'light' | 'dark';
 
-/** The wallpapers that ship with the app. `custom` means the artist's own. */
+/**
+ * The wallpapers that ship with the app. `custom` is one of the artist's own;
+ * `slideshow` is several of them, one after another.
+ */
 export type WallpaperId =
   | 'obsidian'
   | 'graphite'
@@ -28,10 +32,12 @@ export type WallpaperId =
   | 'gesso'
   | 'mist'
   | 'solid'
-  | 'custom';
+  | 'custom'
+  | 'photograph'
+  | 'slideshow';
 
 export interface BundledWallpaper {
-  id: Exclude<WallpaperId, 'custom' | 'solid'>;
+  id: Exclude<WallpaperId, 'custom' | 'solid' | 'slideshow' | 'photograph'>;
   name: string;
   /** Path under public/, so the service worker can precache it. */
   src: string;
@@ -64,6 +70,11 @@ export interface WallpaperChoice {
    * when id is 'custom', and it names a record in the wallpaper library.
    */
   customImageId: string | null;
+  /**
+   * Which shipped photograph is on the desktop, as its path under public/.
+   * Only meaningful when id is 'photograph'.
+   */
+  photographSrc?: string | null;
   /** How the picture is fitted. Ignored by the bundled ones, which all tile. */
   fit?: WallpaperFit;
   /**
@@ -72,6 +83,12 @@ export interface WallpaperChoice {
    * having to edit the picture.
    */
   dim?: number;
+  /**
+   * The pictures the desktop cycles through, and how long each is up. Kept
+   * even while another wallpaper is chosen, so turning the slideshow back on
+   * does not mean picking them all again.
+   */
+  slideshow?: Slideshow;
 }
 
 export interface WindowLayout {
