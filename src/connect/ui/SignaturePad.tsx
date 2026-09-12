@@ -1,5 +1,10 @@
 import { useRef, useState } from 'react';
-import { pathFromPoints, SIGNATURE_HEIGHT, SIGNATURE_WIDTH } from '../guestbook';
+import {
+  pathFromPoints,
+  SIGNATURE_HEIGHT,
+  SIGNATURE_RULE_Y,
+  SIGNATURE_WIDTH,
+} from '../guestbook';
 
 interface Props {
   paths: string[];
@@ -81,7 +86,13 @@ export function SignaturePad({ paths, onChange }: Props) {
         onPointerCancel={finish}
         onPointerLeave={finish}
       >
-        <line className="sign-rule" x1="18" y1="94" x2={SIGNATURE_WIDTH - 18} y2="94" />
+        <line
+          className="sign-rule"
+          x1="18"
+          y1={SIGNATURE_RULE_Y}
+          x2={SIGNATURE_WIDTH - 18}
+          y2={SIGNATURE_RULE_Y}
+        />
         {paths.map((path, index) => (
           <path key={index} className="sign-ink" d={path} />
         ))}

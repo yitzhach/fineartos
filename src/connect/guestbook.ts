@@ -121,9 +121,20 @@ export function possibleDuplicates(entries: GuestEntry[], entry: GuestEntry): Gu
   });
 }
 
-/** The box a signature is drawn and displayed in. */
+/**
+ * The box a signature is drawn and displayed in.
+ *
+ * Taller than it was: at a booth this is signed standing up, often with a
+ * finger, and 120 was a slot rather than a space. Signatures written in the
+ * old box keep their coordinates, so they draw a little high in the new one
+ * rather than being stretched — a stretched signature is not the signature
+ * that was given.
+ */
 export const SIGNATURE_WIDTH = 320;
-export const SIGNATURE_HEIGHT = 120;
+export const SIGNATURE_HEIGHT = 168;
+
+/** Where the line to sign on sits, in the box's own coordinates. */
+export const SIGNATURE_RULE_Y = 132;
 
 /**
  * One stroke, as SVG path data. A single tap becomes a dot rather than

@@ -57,6 +57,8 @@ interface Props {
   onOpenPhoto: (photoId: string) => void;
   selectedPhotoId: string | null;
   onSelectPhoto: (id: string | null) => void;
+  /** Whether the book asks visitors to sign. Off means it does not ask. */
+  askForSignature: boolean;
   siteUrl: string;
   onSiteUrl: (url: string) => void;
   onMessage: (text: string) => void;
@@ -125,6 +127,7 @@ function GuestBook({
   onToggleCurrentShow,
   onSetVisible,
   onOpenPhoto,
+  askForSignature,
 }: Props) {
   const [draft, setDraft] = useState<GuestDraft>(() => emptyDraft());
   const [query, setQuery] = useState('');
@@ -491,13 +494,15 @@ function GuestBook({
           />
         </div>
 
-        <div className="field">
-          <label>Signature</label>
-          <SignaturePad
-            paths={draft.signaturePaths}
-            onChange={(signaturePaths) => setDraft({ ...draft, signaturePaths })}
-          />
-        </div>
+        {askForSignature && (
+          <div className="field">
+            <label>Sign our guest book</label>
+            <SignaturePad
+              paths={draft.signaturePaths}
+              onChange={(signaturePaths) => setDraft({ ...draft, signaturePaths })}
+            />
+          </div>
+        )}
 
         <label className="check">
           <input

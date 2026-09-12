@@ -21,6 +21,8 @@ interface Props {
   onRenameWallpaper: (imageId: string, name: string) => void;
   wallpaperBusy: boolean;
   wallpaperError: string | null;
+  askForSignature: boolean;
+  onAskForSignature: (value: boolean) => void;
 }
 
 const nullable = (value: string): string | null => (value.trim() === '' ? null : value);
@@ -171,6 +173,22 @@ export function Settings(props: Props) {
             client to guess.
           </div>
         )}
+      </fieldset>
+
+      <fieldset className="section">
+        <legend>Guest book</legend>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={props.askForSignature}
+            onChange={(e) => props.onAskForSignature(e.target.checked)}
+          />
+          <span>Ask visitors to sign</span>
+        </label>
+        <span className="hint">
+          On, the book shows a box to sign in and says “Sign our guest book”. Off, it does not
+          ask — signatures already given are kept and still shown.
+        </span>
       </fieldset>
 
       <fieldset className="section">

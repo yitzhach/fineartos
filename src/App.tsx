@@ -145,6 +145,7 @@ import {
   loadSiteUrl,
   loadTrash,
   loadTrashPosition,
+  loadAskForSignature,
   loadWallpaperLibrary,
   savePaymentInstructions,
   saveStudioDefaults,
@@ -155,6 +156,7 @@ import {
   saveSiteUrl,
   saveTrash,
   saveTrashPosition,
+  saveAskForSignature,
   saveWallpaperLibrary,
   type PaymentInstructions,
   type StudioDefaults,
@@ -266,6 +268,7 @@ export default function App() {
   const [theme, setTheme] = useState<Theme>(loadTheme);
   const [wallpaper, setWallpaper] = useState<WallpaperChoice>(loadWallpaper);
   const [studio, setStudio] = useState<StudioDefaults>(loadStudioDefaults);
+  const [askForSignature, setAskForSignature] = useState<boolean>(loadAskForSignature);
   const [payment, setPayment] = useState<PaymentInstructions>(loadPaymentInstructions);
 
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
@@ -286,6 +289,7 @@ export default function App() {
   useEffect(() => saveSiteUrl(siteUrl), [siteUrl]);
   useEffect(() => saveTrashPosition(trashPosition), [trashPosition]);
   useEffect(() => saveStudioDefaults(studio), [studio]);
+  useEffect(() => saveAskForSignature(askForSignature), [askForSignature]);
   useEffect(() => savePaymentInstructions(payment), [payment]);
 
   useEffect(() => {
@@ -1718,6 +1722,8 @@ export default function App() {
           onRenameWallpaper={(imageId, name) =>
             setWallpaperLibrary((current) => renameWallpaper(current, imageId, name))
           }
+          askForSignature={askForSignature}
+          onAskForSignature={setAskForSignature}
           wallpaperBusy={wallpaperBusy}
           wallpaperError={wallpaperError}
         />
@@ -1760,6 +1766,7 @@ export default function App() {
           onOpenPhoto={openPhotoWindow}
           selectedPhotoId={connectPhotoId}
           onSelectPhoto={setConnectPhotoId}
+          askForSignature={askForSignature}
           siteUrl={siteUrl}
           onSiteUrl={setSiteUrl}
           onMessage={setMessage}
@@ -1850,6 +1857,7 @@ export default function App() {
         '--dock-reserve': `${dockHeight + 20}px`,
       } as React.CSSProperties}
     >
+      {wallpaper.monochrome && <div className="wp-mono" aria-hidden="true" />}
       {wallpaper.id === 'slideshow' && (
         <WallpaperSlides
           urls={slideUrls}

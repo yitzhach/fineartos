@@ -121,6 +121,17 @@ body {
   .wp-slide { transition: none; }
 }
 
+/* Black and white, for the background alone. A filter on .workspace would
+   have taken the windows and the dock with it; this greys what is painted
+   behind it — the wallpaper and the slideshow's layers — and stops there. */
+.wp-mono {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  backdrop-filter: grayscale(1);
+}
+
 /* A hairline of depth over any wallpaper, so pale icon labels stay readable
    against a bright photo the artist dropped in. */
 .workspace::before {
@@ -2947,7 +2958,9 @@ fieldset.section > legend {
 .sign-pad {
   width: 100%;
   height: auto;
-  aspect-ratio: 320 / 120;
+  /* Matches the coordinate space in guestbook.ts — 40% taller than it was,
+     because this is signed standing up with a finger. */
+  aspect-ratio: 320 / 168;
   border: 1px solid var(--line-strong);
   border-radius: 10px;
   background: var(--raised);

@@ -362,6 +362,19 @@ export function WallpaperPicker(props: Props) {
             <span className="hint">{FITS.find((f) => f.id === fit)?.hint}</span>
           </div>
 
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={wallpaper.monochrome === true}
+              onChange={(e) => props.onWallpaper({ ...wallpaper, monochrome: e.target.checked })}
+            />
+            <span>Black and white</span>
+          </label>
+          <span className="hint">
+            Greys the desktop picture only — the windows, the icons and the dock keep their
+            colour, and the picture itself is not changed. Works on a slideshow too.
+          </span>
+
           <div className="field">
             <label htmlFor="wp-dim">Dim the picture — {dim}%</label>
             <input

@@ -84,6 +84,12 @@ export interface WallpaperChoice {
    */
   dim?: number;
   /**
+   * Shows the desktop picture in black and white. The picture itself is not
+   * changed — this is a filter over the background only, so the windows, the
+   * icons and the dock keep their colour.
+   */
+  monochrome?: boolean;
+  /**
    * The pictures the desktop cycles through, and how long each is up. Kept
    * even while another wallpaper is chosen, so turning the slideshow back on
    * does not mean picking them all again.
@@ -146,6 +152,7 @@ const KEYS = {
   trashPosition: 'artistOS.trashPosition',
   guests: 'artistOS.guestBook',
   siteUrl: 'artistOS.siteUrl',
+  askForSignature: 'artistOS.askForSignature',
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -200,6 +207,15 @@ export const saveWallpaper = (value: WallpaperChoice): void => write(KEYS.wallpa
  * The artist's own pictures. Only the records live here — each one points at
  * a blob in IndexedDB, which is where the actual image is.
  */
+/**
+ * Whether the guest book asks for a signature. On by default: a signature is
+ * the thing that makes a guest book a guest book. Some shows are not the
+ * place for one — a table with a queue, a tablet passed round in the rain —
+ * so it can be switched off, and then the book simply does not ask.
+ */
+export const loadAskForSignature = (): boolean => read<boolean>(KEYS.askForSignature, true);
+export const saveAskForSignature = (value: boolean): void => write(KEYS.askForSignature, value);
+
 export const loadWallpaperLibrary = (): CustomWallpaper[] =>
   read<CustomWallpaper[]>(KEYS.wallpaperLibrary, []);
 export const saveWallpaperLibrary = (value: CustomWallpaper[]): void =>
