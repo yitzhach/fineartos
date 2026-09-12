@@ -2600,3 +2600,40 @@ fieldset.section > legend {
 .gb-tally ol { margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 3px; }
 .gb-tally li { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
 .gb-tally-count { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+/* The picture filters in the guest book, and the drop area they sit above. */
+.gb-filters { flex-wrap: wrap; margin-bottom: 8px; }
+.chip-count {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 5px;
+  margin-left: 4px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.gb-picks {
+  border: 1px dashed transparent;
+  border-radius: 12px;
+  padding: 2px;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.gb-picks[data-over='true'] {
+  border-color: var(--accent);
+  background: var(--accent-quiet);
+}
+.gb-picks[data-busy='true'] { opacity: 0.7; }
+.gb-picks-empty { margin: 6px 2px; }
+.gb-pick-detail {
+  font-size: 11px;
+  color: var(--ink-faint);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A checkbox inside a field keeps the field's rhythm rather than the label's. */
+.photo-details .check { padding: 6px 0; }

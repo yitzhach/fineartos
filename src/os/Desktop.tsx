@@ -39,6 +39,9 @@ interface Props {
   onFileInto: (folderId: string, itemId: string) => void;
   onNew: () => void;
   onNewFolder: () => void;
+  /** What ⌘Z would put back, or null when there is nothing to undo. */
+  undoLabel: string | null;
+  onUndo: () => void;
   /** Files chosen or dropped on the Add images square. */
   onAddImages: (files: FileList | File[]) => void;
   /** True while an import is running, so the square can say so. */
@@ -205,6 +208,21 @@ export function Desktop(props: Props) {
         </button>
         <button className="btn" data-variant="quiet" onClick={(e) => { e.stopPropagation(); props.onTidy(); }}>
           Tidy up
+        </button>
+        {/* Named, so it is obvious what is about to be put back. ⌘Z does the
+            same thing from anywhere; this is for the artist who never learnt
+            the shortcut, and it is where a mistake is usually noticed. */}
+        <button
+          className="btn"
+          data-variant="quiet"
+          disabled={props.undoLabel === null}
+          title={props.undoLabel ? `Undo: ${props.undoLabel}` : 'Nothing to undo'}
+          onClick={(e) => {
+            e.stopPropagation();
+            props.onUndo();
+          }}
+        >
+          Undo
         </button>
         {/* The keyboard and small-screen route to the Trash, for anyone not
             dragging. Disabled rather than hidden, so its place is learnable. */}

@@ -15,6 +15,14 @@
 
 import { newId } from '../commission/document';
 
+/**
+ * Whether a piece can be bought. Null is the honest default: a photograph
+ * that has just been uploaded has not been said to be for sale, and guessing
+ * either way is a claim the artist did not make. "nfs" is the sign the trade
+ * actually uses — not for sale — for work that is hung but not selling.
+ */
+export type PhotoStatus = 'available' | 'sold' | 'nfs' | null;
+
 export interface Photo {
   id: string;
   /** The image blob's id in the image store. */
@@ -32,6 +40,10 @@ export interface Photo {
   price: number | null;
   currency: string;
   note: string | null;
+  /** Null until the artist says. Never assumed from anything else. */
+  status: PhotoStatus;
+  /** Hung at the show being worked right now. False until marked. */
+  inCurrentShow: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -54,6 +66,8 @@ export function createPhoto(
     price: null,
     currency: 'USD',
     note: null,
+    status: null,
+    inCurrentShow: false,
     createdAt: iso,
     updatedAt: iso,
   };
@@ -68,6 +82,29 @@ export function titleFromFileName(fileName: string): string {
   const withoutExtension = fileName.replace(/\.[a-z0-9]+$/i, '');
   const opened = withoutExtension.replace(/[_-]+/g, ' ').trim();
   return opened || 'Untitled';
+}
+
+/** What the status reads as. Null says nothing rather than inventing a state. */
+export function describeStatus(photo: Photo): string | null {
+  switch (statusOf(photo)) {
+    case 'available':
+      return 'Available';
+    case 'sold':
+      return 'Sold';
+    case 'nfs':
+      return 'Not for sale';
+    default:
+      return null;
+  }
+}
+
+/** Photos stored before status existed read as "not said". */
+export function statusOf(photo: Photo): PhotoStatus {
+  return photo.status ?? null;
+}
+
+export function isInCurrentShow(photo: Photo): boolean {
+  return photo.inCurrentShow === true;
 }
 
 /** "24 × 36 in", or null when the work has never been measured. */
@@ -91,7 +128,12 @@ export function describePrice(photo: Photo): string {
 
 /** The line under a thumbnail: size, or medium, or the honest silence. */
 export function describePhoto(photo: Photo): string {
-  const parts = [describeSize(photo), photo.medium, photo.year ? String(photo.year) : null];
+  const parts = [
+    describeSize(photo),
+    photo.medium,
+    photo.year ? String(photo.year) : null,
+    describeStatus(photo),
+  ];
   const said = parts.filter((part): part is string => Boolean(part));
   return said.length > 0 ? said.join(' · ') : 'No details yet';
 }
@@ -108,6 +150,9 @@ export function shareMessage(photo: Photo, studioName: string | null): string {
   if (photo.medium) lines.push(photo.medium);
   if (photo.year) lines.push(String(photo.year));
   lines.push(describePrice(photo));
+  // Only stated when the artist has said it. Silence is not "available".
+  const status = describeStatus(photo);
+  if (status && status !== 'Available') lines.push(status);
   if (photo.note) lines.push('', photo.note);
   if (studioName?.trim()) lines.push('', `— ${studioName.trim()}`);
   return lines.join('\n');

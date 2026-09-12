@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import type { StudioDefaults } from '../../lib/prefs';
-import { describePrice, describeSize, shareMessage, type Photo } from '../../photo/photo';
+import {
+  describePrice,
+  describeSize,
+  describeStatus,
+  isInCurrentShow,
+  shareMessage,
+  statusOf,
+  type Photo,
+} from '../../photo/photo';
 import { missingFromCard, normaliseUrl, vcardFor } from '../contact';
 import { countPhrase } from '../../os/trash';
 import {
@@ -34,6 +42,9 @@ interface Props {
   imageBlob: (imageId: string) => Promise<Blob | null>;
   guests: GuestEntry[];
   onGuests: (guests: GuestEntry[]) => void;
+  /** Files dropped on the picture picker become pictures in the studio. */
+  onAddImages: (files: FileList | File[], markCurrentShow: boolean) => void;
+  importing: boolean;
   selectedPhotoId: string | null;
   onSelectPhoto: (id: string | null) => void;
   siteUrl: string;
@@ -91,7 +102,18 @@ function Tab({
 
 // --- Guest book -----------------------------------------------------------
 
-function GuestBook({ guests, onGuests, studio, onMessage, photos, imageUrls }: Props) {
+type PickFilter = 'show' | 'available' | 'all';
+
+function GuestBook({
+  guests,
+  onGuests,
+  studio,
+  onMessage,
+  photos,
+  imageUrls,
+  onAddImages,
+  importing,
+}: Props) {
   const [draft, setDraft] = useState<GuestDraft>(() => emptyDraft());
   const [query, setQuery] = useState('');
   const [warning, setWarning] = useState<string | null>(null);
@@ -102,9 +124,41 @@ function GuestBook({ guests, onGuests, studio, onMessage, photos, imageUrls }: P
    * one tap away again.
    */
   const [guestMode, setGuestMode] = useState(false);
+  /**
+   * Which pictures to put in front of a visitor. "Current show" is what is on
+   * the wall in front of them; "Available" is what they could actually buy.
+   * Both are things the artist marks on a picture — neither is guessed, so a
+   * filter can be honestly empty.
+   */
+  const [filter, setFilter] = useState<PickFilter>('show');
+  const [over, setOver] = useState(false);
 
   const titleOf = (photoId: string) => photos.find((p) => p.id === photoId)?.title ?? 'Picture';
   const tally = likeCounts(guests);
+
+  const inShow = photos.filter(isInCurrentShow);
+  const available = photos.filter((photo) => statusOf(photo) === 'available');
+  const shownPhotos = filter === 'show' ? inShow : filter === 'available' ? available : photos;
+
+  /** An email to one visitor about the pieces they picked. */
+  const likedMailto = (entry: GuestEntry) => {
+    const picked = likedOf(entry)
+      .map((id) => photos.find((photo) => photo.id === id))
+      .filter((photo): photo is Photo => Boolean(photo));
+    const body = [
+      `Hi ${entry.name.split(' ')[0]},`,
+      '',
+      'Lovely to meet you. Here are the pieces you picked out:',
+      '',
+      ...picked.map((photo) => shareMessage(photo, null)).flatMap((block) => [block, '']),
+      // Said plainly, because an email about pictures with no pictures in it
+      // looks broken otherwise.
+      '(Attach the photographs before sending — Save picture in the Send a picture tab.)',
+      '',
+      `— ${studio.name || 'the studio'}`,
+    ].join('\n');
+    return mailtoLink(entry.email ?? '', 'The pieces you liked', body);
+  };
 
   const problem = draftProblem(draft);
   const shown = searchGuests(guests, query);
@@ -198,8 +252,36 @@ function GuestBook({ guests, onGuests, studio, onMessage, photos, imageUrls }: P
         {photos.length > 0 && (
           <div className="field">
             <label>{guestMode ? 'Which pieces you like' : 'Pieces they liked'}</label>
-            <div className="gb-picks">
-              {photos.map((photo) => {
+            <div className="chip-row gb-filters">
+              <FilterChip id="show" current={filter} onPick={setFilter} count={inShow.length}>
+                Current show
+              </FilterChip>
+              <FilterChip id="available" current={filter} onPick={setFilter} count={available.length}>
+                Available
+              </FilterChip>
+              <FilterChip id="all" current={filter} onPick={setFilter} count={photos.length}>
+                Everything
+              </FilterChip>
+            </div>
+
+            <div
+              className="gb-picks"
+              data-over={over}
+              data-busy={importing}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setOver(true);
+              }}
+              onDragLeave={() => setOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setOver(false);
+                // Dropped here, a picture is in the show being worked now —
+                // that is the only reason to drop it on this panel.
+                if (e.dataTransfer.files.length > 0) onAddImages(e.dataTransfer.files, filter === 'show');
+              }}
+            >
+              {shownPhotos.map((photo) => {
                 const picked = draft.likedPhotoIds.includes(photo.id);
                 return (
                   <button
@@ -217,14 +299,29 @@ function GuestBook({ guests, onGuests, studio, onMessage, photos, imageUrls }: P
                       <span className="sheet-face" />
                     )}
                     <span className="gb-pick-name">{photo.title}</span>
+                    <span className="gb-pick-detail">
+                      {describeStatus(photo) ?? describePrice(photo)}
+                    </span>
                     {picked && <span className="gb-tick" aria-hidden="true">✓</span>}
                   </button>
                 );
               })}
+
+              {shownPhotos.length === 0 && (
+                <p className="hint gb-picks-empty">
+                  {importing
+                    ? 'Adding…'
+                    : filter === 'show'
+                      ? 'Nothing is marked as being in the current show yet. Open a picture and tick “In the current show”, or drop photographs here.'
+                      : filter === 'available'
+                        ? 'Nothing is marked available yet. Open a picture and set its status.'
+                        : 'No pictures yet. Drop photographs here, or use Add images on the desktop.'}
+                </p>
+              )}
             </div>
             <span className="hint">
               {draft.likedPhotoIds.length === 0
-                ? 'Tap any you like. Tap again to change your mind.'
+                ? 'Tap any you like. Tap again to change your mind. Photographs can be dropped here too.'
                 : `${draft.likedPhotoIds.length} picked`}
             </span>
           </div>
@@ -359,6 +456,11 @@ function GuestBook({ guests, onGuests, studio, onMessage, photos, imageUrls }: P
                 {entry.phone && (
                   <a className="btn" href={smsLink(entry.phone, `Hi ${entry.name.split(' ')[0]}, `)}>
                     Text
+                  </a>
+                )}
+                {entry.email && likedOf(entry).length > 0 && (
+                  <a className="btn" data-variant="primary" href={likedMailto(entry)}>
+                    Email what they liked
                   </a>
                 )}
                 <button
@@ -667,4 +769,31 @@ function downloadUrl(url: string, fileName: string): void {
   anchor.href = url;
   anchor.download = fileName;
   anchor.click();
+}
+
+
+function FilterChip({
+  id,
+  current,
+  count,
+  onPick,
+  children,
+}: {
+  id: PickFilter;
+  current: PickFilter;
+  count: number;
+  onPick: (id: PickFilter) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      className="btn"
+      data-variant={current === id ? 'primary' : 'quiet'}
+      aria-current={current === id}
+      onClick={() => onPick(id)}
+    >
+      {children} <span className="chip-count">{count}</span>
+    </button>
+  );
 }

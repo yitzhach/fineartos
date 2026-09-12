@@ -4,7 +4,10 @@ import {
   describePhoto,
   describePrice,
   describeSize,
+  describeStatus,
   editPhoto,
+  isInCurrentShow,
+  statusOf,
   shareMessage,
   titleFromFileName,
 } from '../photo';
@@ -101,5 +104,38 @@ describe('shareMessage', () => {
 
   it('leads with the title', () => {
     expect(shareMessage(base(), null).split('\n')[0]).toBe('Harbour light');
+  });
+});
+
+describe('status and the current show', () => {
+  it('says nothing about a piece nobody has classified', () => {
+    expect(describeStatus(base())).toBeNull();
+    expect(statusOf(base())).toBeNull();
+    expect(isInCurrentShow(base())).toBe(false);
+  });
+
+  it('never reads an unstated piece as available', () => {
+    expect(describePhoto(base())).not.toContain('Available');
+  });
+
+  it('reads back what the artist set', () => {
+    expect(describeStatus(editPhoto(base(), { status: 'sold' }))).toBe('Sold');
+    expect(describeStatus(editPhoto(base(), { status: 'nfs' }))).toBe('Not for sale');
+    expect(describeStatus(editPhoto(base(), { status: 'available' }))).toBe('Available');
+  });
+
+  it('treats a photo saved before status existed as unstated', () => {
+    const old = { ...base(), status: undefined, inCurrentShow: undefined } as unknown as Parameters<typeof statusOf>[0];
+    expect(statusOf(old)).toBeNull();
+    expect(isInCurrentShow(old)).toBe(false);
+  });
+
+  it('tells a client a piece is sold, and does not brag that one is available', () => {
+    expect(shareMessage(editPhoto(base(), { status: 'sold' }), null)).toContain('Sold');
+    expect(shareMessage(editPhoto(base(), { status: 'available' }), null)).not.toContain('Available');
+  });
+
+  it('shows the status in the line under a thumbnail', () => {
+    expect(describePhoto(editPhoto(base(), { status: 'sold' }))).toBe('Sold');
   });
 });

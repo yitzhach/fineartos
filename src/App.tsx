@@ -119,6 +119,13 @@ import {
 import { PhotoWindow } from './photo/ui/PhotoWindow';
 import { Repository, type StoredDocument } from './persistence/repository';
 import { onDbProblem, type DbProblem } from './persistence/db';
+import {
+  isUndoKey,
+  nextUndoLabel,
+  popUndo,
+  pushUndo,
+  type UndoStack,
+} from './os/undo';
 import { describeSaveState, drainQueue, unavailableCloud } from './persistence/sync';
 import { exportDocument, importDocumentFromText } from './persistence/portable';
 import {
@@ -192,6 +199,19 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
   /** Set when the database cannot be opened — never left silent. */
   const [dbProblem, setDbProblem] = useState<DbProblem | null>(null);
+  /**
+   * What Cmd/Ctrl+Z would put back. Only reversible things go on here —
+   * emptying the Trash is deliberately absent, because an undo that sometimes
+   * cannot undo teaches people to ignore the warning that matters.
+   */
+  const [undoStack, setUndoStack] = useState<UndoStack>([]);
+  /**
+   * The stack itself. React's state updaters do not run synchronously, so
+   * reading the top entry out of one gave nothing and undo silently did
+   * nothing at all — caught by the browser test. The ref is the truth; the
+   * state above exists only so the Undo button can render its label.
+   */
+  const undoRef = useRef<UndoStack>([]);
 
   const [windows, setWindows] = useState<WindowState[]>([]);
   const [viewport, setViewport] = useState(() => ({
@@ -319,7 +339,8 @@ export default function App() {
             try {
               await repo.putImage(imageId, artwork);
               doc = { ...doc, artwork: { ...doc.artwork, referenceImageIds: [imageId] } };
-              project = { ...project, coverImageId: imageId };
+              // The folder keeps its own face. The artwork belongs to the
+              // commission inside it, and shows when the folder is opened.
             } catch {
               // An image the store refuses is not worth failing the seed over.
             }
@@ -560,10 +581,11 @@ export default function App() {
       open({ type: 'folder', projectId: existing.id }, existing.name, 'Project folder');
       return;
     }
+    // A folder looks like a folder. What is filed inside it is shown when it
+    // is opened, not painted onto its icon — the way a desktop has always
+    // worked, and the only way "take it out again" can leave no trace.
     let project = createProject(projectNameFor(doc), doc.client.name || null);
     project = addDocumentToProject(project, doc.id);
-    const cover = doc.artwork.referenceImageIds[0];
-    if (cover) project = setProjectCover(project, cover);
     await saveProjectRecord(project);
     open({ type: 'folder', projectId: project.id }, project.name, 'Project folder');
     setMessage(`Saved. “${project.name}” is on your desktop.`);
@@ -724,6 +746,34 @@ export default function App() {
     }
   };
 
+  // --- Undo -----------------------------------------------------------------
+
+  const pushUndoEntry = (label: string, undo: () => void | Promise<void>) => {
+    undoRef.current = pushUndo(undoRef.current, { label, undo });
+    setUndoStack(undoRef.current);
+  };
+
+  const undoLast = useCallback(async () => {
+    // Taken off the stack before it runs, so a double-tap cannot run the same
+    // undo twice.
+    const { entry, stack } = popUndo(undoRef.current);
+    undoRef.current = stack;
+    setUndoStack(stack);
+    if (!entry) return;
+    await entry.undo();
+    setMessage(`Undone: ${entry.label.toLowerCase()}.`);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!isUndoKey(event)) return;
+      event.preventDefault();
+      void undoLast();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [undoLast]);
+
   // --- Desktop ------------------------------------------------------------
 
   const filedDocs = filedDocumentIds(projects);
@@ -751,62 +801,114 @@ export default function App() {
     for (const id of project.imageIds ?? []) folderOf[id] = project.id;
   }
 
+  /** The name of anything on the desktop, for an undo label. */
+  const nameOf = (id: string): string => {
+    const project = projects.find((p) => p.id === id);
+    if (project) return project.name;
+    const photo = photos.find((p) => p.id === id);
+    if (photo) return photo.title;
+    const invoice = invoices.find((i) => i.id === id);
+    if (invoice) return invoice.invoiceNumber;
+    const doc = docById(id);
+    return doc ? doc.title.trim() || doc.documentNumber : 'item';
+  };
+
   const handleMoveIcon = (id: string, position: { x: number; y: number }) => {
-    setDesktopLayout((current) => ({ ...current, [id]: position }));
+    setDesktopLayout((current) => {
+      // The position it had before, so Cmd+Z can put it back exactly — including
+      // "nowhere yet", which means the icon goes back to being auto-placed.
+      const before = current[id];
+      pushUndoEntry(`Move “${nameOf(id)}”`, () =>
+        setDesktopLayout((now) => {
+          if (!before) {
+            const { [id]: _undone, ...rest } = now;
+            return rest;
+          }
+          return { ...now, [id]: before };
+        }),
+      );
+      return { ...current, [id]: position };
+    });
   };
 
   const handleTidy = () => {
     const surface = desktopViewportRef.current;
+    // The whole arrangement, kept whole: a tidy moves everything, so undoing
+    // it has to put everything back, not just the last icon.
+    const before = desktopLayout;
+    pushUndoEntry('Tidy up', () => setDesktopLayout(before));
     setDesktopLayout(
       autoArrange(desktopItems.map((item) => item.id), surface, [
         // Wherever the can is now, the tidy leaves room for it.
         trashPositionOf(trashPosition, surface),
       ]),
     );
-    setMessage('Desktop tidied up.');
+    setMessage('Desktop tidied up. ⌘Z puts it back.');
   };
 
   const handleNewFolder = async () => {
     const taken = new Set(projects.map((p) => p.name));
     let name = 'New folder';
     for (let n = 2; taken.has(name); n += 1) name = `New folder ${n}`;
-    await saveProjectRecord(createProject(name, null));
+    const folder = createProject(name, null);
+    await saveProjectRecord(folder);
+    // Undoing a brand new folder removes it. It is empty by definition, so
+    // nothing can be lost by doing so.
+    pushUndoEntry(`New folder “${name}”`, async () => {
+      await repo.deleteProject(folder.id);
+      await refresh();
+    });
     setMessage(`“${name}” is on your desktop. Drag files onto it, or rename it inside.`);
   };
 
-  /** Drag a file onto a folder — or pick the folder from the Finder. */
-  const handleFileInto = async (folderId: string, itemId: string) => {
-    const folder = projects.find((p) => p.id === folderId);
+  /**
+   * Drag a file onto a folder — or pick the folder from the Finder, or undo
+   * a "take out".
+   *
+   * Everything here is read from storage rather than from React state on
+   * purpose: an undo runs from a closure made before the last refresh, and
+   * filing against a stale copy of the folders silently did nothing at all.
+   */
+  const handleFileInto = async (folderId: string, itemId: string, quiet = false) => {
+    const folders = await repo.listProjects();
+    const folder = folders.find((p) => p.id === folderId);
     // Never a folder into a folder, and never a folder into itself.
-    if (!folder || folder.id === itemId || projects.some((p) => p.id === itemId)) return;
+    if (!folder || folder.id === itemId || folders.some((p) => p.id === itemId)) return;
 
     // Out of whatever folder it was in first, so it is never in two at once.
-    const previous = projectContaining(itemId);
-    if (previous && previous.id !== folderId) {
-      await repo.saveProject(removeFromProject(previous, itemId));
-    }
+    const previous = folders.find(
+      (p) => p.id !== folderId && projectItemIds(p).includes(itemId),
+    );
+    if (previous) await repo.saveProject(removeFromProject(previous, itemId));
 
-    const isInvoice = invoices.some((invoice) => invoice.id === itemId);
-    const photo = photos.find((p) => p.id === itemId);
-    let next = photo
+    const [storedPhoto, storedInvoice] = await Promise.all([
+      repo.loadPhoto(itemId),
+      repo.loadInvoice(itemId),
+    ]);
+    const next = storedPhoto
       ? addPhotoToProject(folder, itemId)
-      : isInvoice
+      : storedInvoice
         ? addInvoiceToProject(folder, itemId)
         : addDocumentToProject(folder, itemId);
 
-    // A folder with no face takes the first picture that lands in it.
-    if (!next.coverImageId) {
-      const cover = photo ? photo.imageId : docById(itemId)?.artwork.referenceImageIds[0];
-      if (cover) next = setProjectCover(next, cover);
-    }
-
     await saveProjectRecord(next);
-    // The icon has gone into the folder, so its old spot is meaningless.
+
+    // The icon has gone into the folder, so its old spot is meaningless —
+    // but it is remembered, so undoing puts it back where it was sitting.
+    const spot = desktopLayout[itemId];
     setDesktopLayout((current) => {
       const { [itemId]: _gone, ...rest } = current;
       return rest;
     });
-    setMessage(`Filed into “${folder.name}”.`);
+
+    if (!quiet) {
+      pushUndoEntry(`File “${nameOf(itemId)}” into ${folder.name}`, async () => {
+        await handleTakeOut(itemId, true);
+        if (previous) await handleFileInto(previous.id, itemId, true);
+        else if (spot) setDesktopLayout((current) => ({ ...current, [itemId]: spot }));
+      });
+      setMessage(`Filed into “${folder.name}”. ⌘Z undoes it.`);
+    }
   };
 
   // --- Pictures -------------------------------------------------------------
@@ -825,7 +927,11 @@ export default function App() {
    * pictures and losing nine because the third was a PDF would be worse than
    * saying which one failed.
    */
-  const handleImportPhotos = async (files: FileList | File[], folderId?: string) => {
+  const handleImportPhotos = async (
+    files: FileList | File[],
+    folderId?: string,
+    markCurrentShow = false,
+  ) => {
     const chosen = Array.from(files);
     if (chosen.length === 0) return;
 
@@ -842,17 +948,17 @@ export default function App() {
         const prepared = await prepareWallpaper(file, 2000);
         const imageId = newId();
         await repo.putImage(imageId, prepared.blob);
-        const photo = createPhoto({
+        let photo = createPhoto({
           imageId,
           title: titleFromFileName(file.name),
           pixelWidth: prepared.width,
           pixelHeight: prepared.height,
         });
+        // Dropped onto the current-show picker, a picture is in that show.
+        // Nothing else is assumed: its price and status stay unstated.
+        if (markCurrentShow) photo = editPhoto(photo, { inCurrentShow: true });
         await repo.savePhoto(photo);
-        if (folder) {
-          folder = addPhotoToProject(folder, photo.id);
-          if (!folder.coverImageId) folder = setProjectCover(folder, imageId);
-        }
+        if (folder) folder = addPhotoToProject(folder, photo.id);
         added += 1;
       } catch (cause) {
         failed.push(file.name);
@@ -939,6 +1045,7 @@ export default function App() {
 
     await applyTrash(trashItem(trashRef.current, entry));
     if (selectedId === itemId) setSelectedId(null);
+    pushUndoEntry(`Move “${entry.name}” to the Trash`, () => handlePutBack(itemId, true));
     // The record is hidden now, so a window onto it would only show a
     // tombstone. Closing it loses nothing: Put back is one click away.
     closeWindowsFor(deletionTargets(entry));
@@ -949,10 +1056,12 @@ export default function App() {
     );
   };
 
-  const handlePutBack = async (itemId: string) => {
+  const handlePutBack = async (itemId: string, quiet = false) => {
     const entry = findEntry(trashRef.current, itemId);
     if (!entry) return;
     await applyTrash(removeEntry(trashRef.current, itemId));
+    if (quiet) return;
+    pushUndoEntry(`Put “${entry.name}” back`, () => handleTrash(itemId));
     setMessage(
       entry.fromFolderId
         ? `“${entry.name}” is back in its folder.`
@@ -1021,11 +1130,34 @@ export default function App() {
     setMessage(`Trash emptied. ${countPhrase(records, 'record')} deleted for good.`);
   };
 
-  const handleTakeOut = async (itemId: string) => {
-    const folder = projectContaining(itemId);
+  /**
+   * A folder's picture, if it ever had one, belonged to something inside it.
+   * When that leaves, the picture goes with it — otherwise a folder keeps
+   * wearing the face of a photograph that is no longer in it. Folders made by
+   * an older version of this app are cleaned up by the same rule.
+   */
+  const clearCoverFrom = async (folder: Project, itemId: string): Promise<Project> => {
+    if (!folder.coverImageId) return folder;
+    const owned = new Set<string>();
+    const [photo, stored] = await Promise.all([repo.loadPhoto(itemId), repo.load(itemId)]);
+    if (photo) owned.add(photo.imageId);
+    for (const id of stored?.document.artwork.referenceImageIds ?? []) owned.add(id);
+    return owned.has(folder.coverImageId) ? setProjectCover(folder, null) : folder;
+  };
+
+  const handleTakeOut = async (itemId: string, quiet = false) => {
+    // Read from storage, not from state: this also runs as an undo. See
+    // handleFileInto.
+    const folders = await repo.listProjects();
+    const folder = folders.find((p) => projectItemIds(p).includes(itemId));
     if (!folder) return;
-    await saveProjectRecord(removeFromProject(folder, itemId));
-    setMessage('Moved back to the desktop. Nothing was deleted.');
+    await saveProjectRecord(await clearCoverFrom(removeFromProject(folder, itemId), itemId));
+    if (!quiet) {
+      pushUndoEntry(`Take “${nameOf(itemId)}” out of ${folder.name}`, () =>
+        handleFileInto(folder.id, itemId, true),
+      );
+      setMessage('Moved back to the desktop. Nothing was deleted.');
+    }
   };
 
   // Positions for things that have been deleted or filed away would otherwise
@@ -1486,6 +1618,10 @@ export default function App() {
           imageBlob={async (imageId) => (await repo.getImage(imageId))?.blob ?? null}
           guests={guests}
           onGuests={setGuests}
+          importing={importingImages}
+          onAddImages={(files, markCurrentShow) =>
+            void handleImportPhotos(files, undefined, markCurrentShow)
+          }
           selectedPhotoId={connectPhotoId}
           onSelectPhoto={setConnectPhotoId}
           siteUrl={siteUrl}
@@ -1603,12 +1739,18 @@ export default function App() {
           onFileInto={(folderId, itemId) => void handleFileInto(folderId, itemId)}
           onNew={handleNew}
           onNewFolder={() => void handleNewFolder()}
+          undoLabel={nextUndoLabel(undoStack)}
+          onUndo={() => void undoLast()}
           onAddImages={(files) => void handleImportPhotos(files)}
           importing={importingImages}
           onTidy={handleTidy}
           trashCount={trash.length}
           trashPosition={trashPosition}
-          onMoveTrash={setTrashPosition}
+          onMoveTrash={(position) => {
+            const before = trashPosition;
+            pushUndoEntry('Move the Trash', () => setTrashPosition(before));
+            setTrashPosition(position);
+          }}
           onTrash={(id) => void handleTrash(id)}
           onOpenTrash={openTrashWindow}
           onViewport={(size) => {

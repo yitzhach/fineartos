@@ -1,4 +1,12 @@
-import { describePrice, describeSize, type Photo } from '../photo';
+import {
+  describePrice,
+  describeSize,
+  describeStatus,
+  isInCurrentShow,
+  statusOf,
+  type Photo,
+  type PhotoStatus,
+} from '../photo';
 
 interface Props {
   photo: Photo;
@@ -30,6 +38,7 @@ export function PhotoWindow({ photo, url, onChange, onSend }: Props) {
           <strong>{photo.title}</strong>
           <span>
             {size ?? 'Size not recorded'} · {describePrice(photo)}
+            {describeStatus(photo) ? ` · ${describeStatus(photo)}` : ''}
           </span>
         </figcaption>
       </figure>
@@ -105,6 +114,37 @@ export function PhotoWindow({ photo, url, onChange, onSend }: Props) {
             onChange={(e) => onChange({ price: numberOrNull(e.target.value) })}
           />
           <span className="hint">Blank is not zero — it reads “Price on request”.</span>
+        </div>
+
+        <div className="field-row">
+          <div className="field">
+            <label htmlFor={`s-${photo.id}`}>Status</label>
+            <select
+              id={`s-${photo.id}`}
+              value={statusOf(photo) ?? ''}
+              onChange={(e) => onChange({ status: (e.target.value || null) as PhotoStatus })}
+            >
+              <option value="">Not said</option>
+              <option value="available">Available</option>
+              <option value="sold">Sold</option>
+              <option value="nfs">Not for sale</option>
+            </select>
+            <span className="hint">“Not said” is the honest default.</span>
+          </div>
+
+          <div className="field">
+            <label htmlFor={`c-${photo.id}`}>In the current show</label>
+            <label className="check">
+              <input
+                id={`c-${photo.id}`}
+                type="checkbox"
+                checked={isInCurrentShow(photo)}
+                onChange={(e) => onChange({ inCurrentShow: e.target.checked })}
+              />
+              <span>Hanging right now</span>
+            </label>
+            <span className="hint">Puts it in front of guests in Connect.</span>
+          </div>
         </div>
 
         <div className="field">
