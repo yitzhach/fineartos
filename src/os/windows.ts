@@ -21,6 +21,7 @@ export type WindowKind =
   | { type: 'invoice'; invoiceId: string }
   | { type: 'folder'; projectId: string }
   | { type: 'photo'; photoId: string }
+  | { type: 'photoEdit'; photoId: string }
   | { type: 'list' }
   | { type: 'settings' }
   | { type: 'tool'; tool: string };
@@ -54,6 +55,7 @@ export function keyFor(kind: WindowKind): string {
   if (kind.type === 'invoice') return `invoice:${kind.invoiceId}`;
   if (kind.type === 'folder') return `folder:${kind.projectId}`;
   if (kind.type === 'photo') return `photo:${kind.photoId}`;
+  if (kind.type === 'photoEdit') return `photo-edit:${kind.photoId}`;
   if (kind.type === 'tool') return `tool:${kind.tool}`;
   return kind.type;
 }
@@ -78,7 +80,12 @@ export function defaultSize(
   viewport: { width: number; height: number },
 ): { width: number; height: number } {
   // Connect is two columns of form: at the small size they crush together.
-  const wide = kind.type === 'commission' || (kind.type === 'tool' && kind.tool === 'connect');
+  // The editor is a picture beside a column of controls: at the medium size
+  // the sliders and the picture fight for the same room.
+  const wide =
+    kind.type === 'commission' ||
+    kind.type === 'photoEdit' ||
+    (kind.type === 'tool' && kind.tool === 'connect');
   const medium =
     kind.type === 'photo' ||
     kind.type === 'invoice' ||

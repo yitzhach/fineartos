@@ -13,6 +13,10 @@ interface Props {
   url: string | undefined;
   onChange: (changes: Partial<Photo>) => void;
   onSend: () => void;
+  /** Shows the picture on its own, everything else dimmed away. */
+  onPreview: () => void;
+  /** Opens the picture in the editor, in its own window. */
+  onEdit: () => void;
 }
 
 /**
@@ -23,14 +27,22 @@ interface Props {
  * price reads "Price on request" — which is a real answer at a show, and a
  * good deal better than implying it is free.
  */
-export function PhotoWindow({ photo, url, onChange, onSend }: Props) {
+export function PhotoWindow({ photo, url, onChange, onSend, onPreview, onEdit }: Props) {
   const size = describeSize(photo);
 
   return (
     <div className="photo-window">
       <figure className="photo-plate">
         {url ? (
-          <img src={url} alt={photo.title} />
+          // Double click is the desktop's own gesture for "open this
+          // properly", which here means the picture on its own.
+          <img
+            src={url}
+            alt={photo.title}
+            className="photo-openable"
+            title="Double click to see it on its own"
+            onDoubleClick={onPreview}
+          />
         ) : (
           <div className="photo-missing">This picture is still loading.</div>
         )}
@@ -167,9 +179,21 @@ export function PhotoWindow({ photo, url, onChange, onSend }: Props) {
           />
         </div>
 
-        <button className="btn" data-variant="primary" onClick={onSend}>
-          Send to a client
-        </button>
+        <div className="chip-row">
+          <button className="btn" data-variant="primary" onClick={onSend}>
+            Send to a client
+          </button>
+          <button className="btn" onClick={onPreview}>
+            Preview
+          </button>
+          <button className="btn" onClick={onEdit}>
+            Edit
+          </button>
+        </div>
+        <span className="hint">
+          Preview shows it on its own — double clicking the picture does the same. Edit opens the
+          darkroom in its own window and never writes over this picture.
+        </span>
       </div>
     </div>
   );

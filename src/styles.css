@@ -2404,6 +2404,153 @@ fieldset.section > legend {
   font-size: 13px;
 }
 .photo-plate figcaption strong { color: var(--ink); font-size: 15px; }
+.photo-openable { cursor: zoom-in; }
+
+/* --- One picture, on its own ---------------------------------------------- */
+/* Over everything, including the dock and the system bar: this is a look at
+   the work, and the rest of the app has no business being in the way. */
+
+.pv {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 18px;
+  background: rgba(0, 0, 0, 0.86);
+  backdrop-filter: blur(12px);
+}
+:root[data-theme='light'] .pv { background: rgba(18, 15, 12, 0.82); }
+
+.pv-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+}
+.pv-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.pv-title strong { color: #f6f1e8; font-family: var(--serif); font-size: 16px; }
+.pv-title span { color: rgba(246, 241, 232, 0.66); font-size: 12.5px; }
+.pv-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.pv-count {
+  color: rgba(246, 241, 232, 0.66);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pv-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+/* Contain, never crop: a preview that cut the top off a tall canvas would be
+   worse than useless in front of a buyer. */
+.pv-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+
+.pv-step {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 76px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #f6f1e8;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+.pv-step:hover { background: rgba(255, 255, 255, 0.12); }
+.pv-step:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.pv-hint {
+  flex: 0 0 auto;
+  margin: 0;
+  text-align: center;
+  color: rgba(246, 241, 232, 0.55);
+  font-size: 12px;
+}
+
+@media (max-width: 860px) {
+  .pv { padding: 10px 10px 14px; }
+  .pv-step { width: 38px; height: 60px; font-size: 22px; }
+  .pv-title span { display: none; }
+}
+
+/* --- The darkroom ---------------------------------------------------------- */
+
+.ed {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.6fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.ed-stage { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ed-canvas {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+}
+.ed-stage-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.ed-controls { display: flex; flex-direction: column; gap: 14px; }
+.ed-slider { gap: 2px; }
+.ed-slider label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.ed-value { color: var(--ink-faint); font-variant-numeric: tabular-nums; font-size: 11.5px; }
+
+.ed-bands { gap: 6px; }
+.ed-band { position: relative; text-transform: capitalize; gap: 6px; }
+/* The swatch is the band's own colour, so the row reads as a colour wheel
+   rather than as eight words. */
+.ed-swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+}
+.ed-band[data-band='red'] .ed-swatch { background: hsl(0 75% 52%); }
+.ed-band[data-band='orange'] .ed-swatch { background: hsl(30 80% 52%); }
+.ed-band[data-band='yellow'] .ed-swatch { background: hsl(55 80% 52%); }
+.ed-band[data-band='green'] .ed-swatch { background: hsl(120 45% 45%); }
+.ed-band[data-band='cyan'] .ed-swatch { background: hsl(180 55% 45%); }
+.ed-band[data-band='blue'] .ed-swatch { background: hsl(225 65% 55%); }
+.ed-band[data-band='purple'] .ed-swatch { background: hsl(275 55% 58%); }
+.ed-band[data-band='magenta'] .ed-swatch { background: hsl(320 60% 55%); }
+/* A dot on any band that has been moved: eight bands and three sliders each
+   is a lot of places for a change to hide. */
+.ed-band-dot {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+@media (max-width: 1180px) {
+  .ed { grid-template-columns: minmax(0, 1fr); }
+}
 
 .photo-missing {
   display: grid;

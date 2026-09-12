@@ -118,6 +118,8 @@ import {
   type Photo,
 } from './photo/photo';
 import { PhotoWindow } from './photo/ui/PhotoWindow';
+import { PicturePreview } from './photo/ui/PicturePreview';
+import { ImageEditor } from './photo/ui/ImageEditor';
 import { crossfadeSeconds, emptySlideshow, readySlides, secondsPerSlide } from './lib/slideshow';
 import { SHIPPED_PHOTOGRAPHS } from './lib/photographs';
 import { Repository, type StoredDocument } from './persistence/repository';
@@ -212,6 +214,12 @@ export default function App() {
    * that did not happen. Never reloads on its own — see src/lib/appUpdate.ts.
    */
   const [updateReady, setUpdateReady] = useState(false);
+  /**
+   * The picture being looked at on its own, and the ones it can be stepped
+   * through. Ids rather than photos, so a picture edited or deleted while the
+   * preview is open does not leave a stale copy on screen.
+   */
+  const [preview, setPreview] = useState<{ ids: string[]; index: number } | null>(null);
   const [dbProblem, setDbProblem] = useState<DbProblem | null>(null);
   /**
    * What Cmd/Ctrl+Z would put back. Only reversible things go on here —
@@ -1033,6 +1041,7 @@ export default function App() {
         if (kind.type === 'invoice') return !ids.includes(kind.invoiceId);
         if (kind.type === 'folder') return !ids.includes(kind.projectId);
         if (kind.type === 'photo') return !ids.includes(kind.photoId);
+        if (kind.type === 'photoEdit') return !ids.includes(kind.photoId);
         return true;
       }),
     );
@@ -1254,6 +1263,62 @@ export default function App() {
     if (photo) open({ type: 'photo', photoId: id }, photo.title, 'Picture');
   };
 
+  const openEditor = (id: string) => {
+    const photo = photos.find((p) => p.id === id);
+    if (photo) open({ type: 'photoEdit', photoId: id }, photo.title, 'Editing');
+  };
+
+  /**
+   * The pictures a preview steps through: the ones filed in the same folder
+   * when this picture is filed, and everything in the studio when it is not.
+   * A folder is the set the artist made on purpose, so it beats the pile.
+   */
+  const previewSetFor = (photoId: string): string[] => {
+    const folder = projects.find((project) => (project.imageIds ?? []).includes(photoId));
+    const ids = folder
+      ? (folder.imageIds ?? []).filter((id) => photos.some((photo) => photo.id === id))
+      : photos.map((photo) => photo.id);
+    return ids.length > 0 ? ids : [photoId];
+  };
+
+  const openPreview = (photoId: string) => {
+    const ids = previewSetFor(photoId);
+    setPreview({ ids, index: Math.max(0, ids.indexOf(photoId)) });
+  };
+
+  /**
+   * An edit saved as a new picture. The original is never written over: an
+   * edit is an opinion, and the photograph under it is the only copy there is.
+   */
+  const savePhotoCopy = async (source: Photo, blob: Blob, changes: string[]) => {
+    const imageId = newId();
+    await repo.putImage(imageId, blob);
+    const size = await imageSize(blob);
+    let copy = createPhoto({
+      imageId,
+      title: `${source.title} (edited)`,
+      pixelWidth: size?.width ?? source.pixelWidth,
+      pixelHeight: size?.height ?? source.pixelHeight,
+    });
+    // Everything the artist recorded about the work carries over — it is the
+    // same piece — but the note says plainly what this copy is.
+    copy = editPhoto(copy, {
+      widthIn: source.widthIn,
+      heightIn: source.heightIn,
+      medium: source.medium,
+      year: source.year,
+      price: source.price,
+      currency: source.currency,
+      note: [`Edited from “${source.title}”.`, changes.join(', ')].filter(Boolean).join(' '),
+    });
+    await repo.savePhoto(copy);
+    await refresh();
+    setMessage(`Saved as “${copy.title}”. The original is untouched.`);
+    // Opened from the record in hand: `photos` in this closure is the list as
+    // it was before the copy existed, so looking it up there finds nothing.
+    open({ type: 'photo', photoId: copy.id }, copy.title, 'Picture');
+  };
+
   const openDesktopItem = (item: DesktopItem) => {
     if (item.kind === 'project') {
       open({ type: 'folder', projectId: item.id }, item.project.name, 'Project folder');
@@ -1426,6 +1491,12 @@ export default function App() {
           <button className="btn" data-variant="primary" onClick={() => openConnect('send', photo.id)}>
             Send to a client
           </button>
+          <button className="btn" onClick={() => openPreview(photo.id)}>
+            Preview
+          </button>
+          <button className="btn" onClick={() => openEditor(photo.id)}>
+            Edit
+          </button>
           <TrashButton onTrash={() => void handleTrash(photo.id)} />
           <span className="faint" style={{ fontSize: 12 }}>Saved as you type</span>
         </>
@@ -1457,6 +1528,22 @@ export default function App() {
         <span className="faint" style={{ fontSize: 12 }}>
           Select a row, then Open. Drag an icon onto a folder on the desktop, or use Move to here.
         </span>
+      );
+    }
+
+    if (kind.type === 'photoEdit') {
+      const photo = photos.find((p) => p.id === kind.photoId);
+      return (
+        <>
+          {photo && (
+            <button className="btn" onClick={() => openPreview(photo.id)}>
+              Preview
+            </button>
+          )}
+          <span className="faint" style={{ fontSize: 12 }}>
+            Edits are not saved over the original — Save makes a new picture.
+          </span>
+        </>
       );
     }
 
@@ -1580,6 +1667,21 @@ export default function App() {
           url={imageUrls[photo.imageId]}
           onChange={(changes) => void savePhotoRecord(editPhoto(photo, changes))}
           onSend={() => openConnect('send', photo.id)}
+          onPreview={() => openPreview(photo.id)}
+          onEdit={() => openEditor(photo.id)}
+        />
+      );
+    }
+
+    if (kind.type === 'photoEdit') {
+      const photo = photos.find((p) => p.id === kind.photoId);
+      if (!photo) return <p className="hint">This picture has been deleted.</p>;
+      return (
+        <ImageEditor
+          photo={photo}
+          url={imageUrls[photo.imageId]}
+          onSaveCopy={(blob, changes) => savePhotoCopy(photo, blob, changes)}
+          onMessage={setMessage}
         />
       );
     }
@@ -1884,6 +1986,22 @@ export default function App() {
         )}
       </main>
 
+      {preview && (
+        <PicturePreview
+          photos={preview.ids
+            .map((id) => photos.find((photo) => photo.id === id))
+            .filter((photo): photo is Photo => Boolean(photo))}
+          index={preview.index}
+          imageUrls={imageUrls}
+          onIndex={(index) => setPreview((current) => (current ? { ...current, index } : current))}
+          onClose={() => setPreview(null)}
+          onEdit={(photoId) => {
+            setPreview(null);
+            openEditor(photoId);
+          }}
+        />
+      )}
+
       {tray.length > 0 && (
         <div className="tray no-print" aria-label="Minimised windows">
           {tray.map((win) => (
@@ -1942,6 +2060,18 @@ export default function App() {
         onChange={(changes) => void handleChange(doc.id, changes)}
       />
     );
+  }
+}
+
+/** The pixel size of a blob, or null when the browser cannot decode it. */
+async function imageSize(blob: Blob): Promise<{ width: number; height: number } | null> {
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const size = { width: bitmap.width, height: bitmap.height };
+    bitmap.close();
+    return size;
+  } catch {
+    return null;
   }
 }
 
