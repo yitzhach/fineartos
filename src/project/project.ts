@@ -23,6 +23,12 @@ export interface Project {
   documentIds: string[];
   invoiceIds: string[];
   /**
+   * Pictures filed into this folder. Optional in the type because folders
+   * created before photos existed have no such field; the repository fills
+   * it in on read, so nothing downstream has to wonder.
+   */
+  imageIds?: string[];
+  /**
    * Image shown on the folder. Null means no image was uploaded, and the
    * folder draws its plain form rather than an empty frame.
    */
@@ -51,6 +57,7 @@ export function createProject(name: string, clientName: string | null, now = new
     clientName: clientName?.trim() ? clientName.trim() : null,
     documentIds: [],
     invoiceIds: [],
+    imageIds: [],
     coverImageId: null,
     createdAt: iso,
     updatedAt: iso,
@@ -76,6 +83,12 @@ export function addInvoiceToProject(project: Project, invoiceId: string, now = n
   };
 }
 
+export function addPhotoToProject(project: Project, photoId: string, now = new Date()): Project {
+  const current = project.imageIds ?? [];
+  if (current.includes(photoId)) return project;
+  return { ...project, imageIds: [...current, photoId], updatedAt: now.toISOString() };
+}
+
 /**
  * Takes an item out of a folder. The item itself is untouched and still
  * exists — it goes back to sitting loose on the desktop.
@@ -85,6 +98,7 @@ export function removeFromProject(project: Project, itemId: string, now = new Da
     ...project,
     documentIds: project.documentIds.filter((id) => id !== itemId),
     invoiceIds: project.invoiceIds.filter((id) => id !== itemId),
+    imageIds: (project.imageIds ?? []).filter((id) => id !== itemId),
     updatedAt: now.toISOString(),
   };
 }
@@ -98,7 +112,7 @@ export function setProjectCover(project: Project, imageId: string | null, now = 
 }
 
 export function projectItemCount(project: Project): number {
-  return project.documentIds.length + project.invoiceIds.length;
+  return project.documentIds.length + project.invoiceIds.length + (project.imageIds ?? []).length;
 }
 
 /** The ids of every document that is already filed in some folder. */
@@ -108,4 +122,13 @@ export function filedDocumentIds(projects: Project[]): Set<string> {
 
 export function filedInvoiceIds(projects: Project[]): Set<string> {
   return new Set(projects.flatMap((p) => p.invoiceIds));
+}
+
+export function filedPhotoIds(projects: Project[]): Set<string> {
+  return new Set(projects.flatMap((p) => p.imageIds ?? []));
+}
+
+/** Every id filed in a folder, whatever kind of thing it is. */
+export function projectItemIds(project: Project): string[] {
+  return [...project.documentIds, ...project.invoiceIds, ...(project.imageIds ?? [])];
 }

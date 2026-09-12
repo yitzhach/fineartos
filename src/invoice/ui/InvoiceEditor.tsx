@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { calculateTotals, formatMoney, lineTotal, parseMoney, validateQuote } from '../../commission/calc';
 import { newId } from '../../commission/document';
+import type { Photo } from '../../photo/photo';
 import type { Invoice } from '../types';
 import { addDays } from '../invoice';
 
@@ -8,6 +9,12 @@ interface Props {
   invoice: Invoice;
   onChange: (changes: Partial<Invoice>) => void;
   onRecordPayment: (payment: { date: string; amount: number; note: string | null }) => void;
+  /** Pictures the studio has on the desktop, to choose from. */
+  photos: Photo[];
+  imageUrls: Record<string, string>;
+  /** Adds newly uploaded files as pictures and puts them on this invoice. */
+  onAddImages: (files: FileList | File[]) => void;
+  importing: boolean;
 }
 
 const NO_DEPOSIT = { kind: 'percent' as const, value: null };
@@ -22,7 +29,7 @@ const TERMS: { label: string; days: number | null }[] = [
   { label: 'Net 60', days: 60 },
 ];
 
-export function InvoiceEditor({ invoice, onChange, onRecordPayment }: Props) {
+export function InvoiceEditor({ invoice, onChange, onRecordPayment, photos, imageUrls, onAddImages, importing }: Props) {
   const totals = calculateTotals(invoice.quote, invoice.payments, NO_DEPOSIT);
   const issues = validateQuote(invoice.quote, invoice.payments, NO_DEPOSIT);
   const currency = invoice.quote.currency;
@@ -344,6 +351,18 @@ export function InvoiceEditor({ invoice, onChange, onRecordPayment }: Props) {
       </fieldset>
 
       <fieldset className="section">
+        <legend>Pictures</legend>
+        <InvoiceImages
+          chosen={invoice.imageIds ?? []}
+          photos={photos}
+          imageUrls={imageUrls}
+          importing={importing}
+          onChange={(imageIds) => onChange({ imageIds })}
+          onAddImages={onAddImages}
+        />
+      </fieldset>
+
+      <fieldset className="section">
         <legend>Note to the client</legend>
         <div className="field">
           <textarea
@@ -354,6 +373,79 @@ export function InvoiceEditor({ invoice, onChange, onRecordPayment }: Props) {
           <span className="hint">Printed above the payment details.</span>
         </div>
       </fieldset>
+    </div>
+  );
+}
+
+
+/**
+ * Which pictures go on this invoice.
+ *
+ * The invoice holds photo ids, not copies: retitling a picture on the desktop
+ * retitles it here, and the same picture can appear on two invoices without
+ * being stored twice. Nothing is selected by default — an invoice that
+ * silently attached the last thing uploaded would be a nasty surprise when it
+ * reached the client.
+ */
+function InvoiceImages({
+  chosen,
+  photos,
+  imageUrls,
+  importing,
+  onChange,
+  onAddImages,
+}: {
+  chosen: string[];
+  photos: Photo[];
+  imageUrls: Record<string, string>;
+  importing: boolean;
+  onChange: (imageIds: string[]) => void;
+  onAddImages: (files: FileList | File[]) => void;
+}) {
+  const toggle = (id: string) => {
+    onChange(chosen.includes(id) ? chosen.filter((one) => one !== id) : [...chosen, id]);
+  };
+
+  return (
+    <div className="inv-images">
+      <div className="inv-image-grid">
+        {photos.map((photo) => (
+          <button
+            key={photo.id}
+            className="inv-image"
+            data-selected={chosen.includes(photo.id)}
+            onClick={() => toggle(photo.id)}
+            title={photo.title}
+          >
+            {imageUrls[photo.imageId] ? (
+              <img src={imageUrls[photo.imageId]} alt="" />
+            ) : (
+              <span className="sheet-face" />
+            )}
+            <span className="inv-image-name">{photo.title}</span>
+          </button>
+        ))}
+
+        <label className="inv-image add" data-busy={importing}>
+          <span className="plus" aria-hidden="true">{importing ? '…' : '＋'}</span>
+          <span className="inv-image-name">{importing ? 'Adding…' : 'Upload'}</span>
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            multiple
+            className="sr-only"
+            onChange={(e) => {
+              if (e.target.files && e.target.files.length > 0) onAddImages(e.target.files);
+              e.target.value = '';
+            }}
+          />
+        </label>
+      </div>
+      <span className="hint">
+        {chosen.length === 0
+          ? 'No pictures on this invoice yet. Tap one to add it.'
+          : `${chosen.length} ${chosen.length === 1 ? 'picture' : 'pictures'} will appear on the invoice, in the order you picked them.`}
+      </span>
     </div>
   );
 }

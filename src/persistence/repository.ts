@@ -6,11 +6,13 @@
 
 import type { CommissionDocument } from '../commission/types';
 import type { Invoice } from '../invoice/types';
+import type { Photo } from '../photo/photo';
 import type { Project } from '../project/project';
 import {
   STORE_DOCUMENTS,
   STORE_IMAGES,
   STORE_INVOICES,
+  STORE_PHOTOS,
   STORE_PROJECTS,
   STORE_QUEUE,
   type PendingWrite,
@@ -56,6 +58,25 @@ interface InvoiceRow {
   id: string;
   workspaceId: string;
   invoice: Invoice;
+}
+
+interface PhotoRow {
+  id: string;
+  workspaceId: string;
+  photo: Photo;
+}
+
+/**
+ * Fields added after a record was first written come back undefined from
+ * storage. Filling them in on read means the rest of the app never has to
+ * ask whether a folder is old or new.
+ */
+function withImageIds(project: Project): Project {
+  return { ...project, imageIds: project.imageIds ?? [] };
+}
+
+function invoiceWithImageIds(invoice: Invoice): Invoice {
+  return { ...invoice, imageIds: invoice.imageIds ?? [] };
 }
 
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -140,14 +161,14 @@ export class Repository {
   async listProjects(): Promise<Project[]> {
     const rows = await listByWorkspace<ProjectRow>(STORE_PROJECTS, this.workspaceId);
     return rows
-      .map((row) => row.project)
+      .map((row) => withImageIds(row.project))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
   async loadProject(id: string): Promise<Project | null> {
     const row = await get<ProjectRow>(STORE_PROJECTS, id);
     if (!row || row.workspaceId !== this.workspaceId) return null;
-    return row.project;
+    return withImageIds(row.project);
   }
 
   async saveProject(project: Project): Promise<void> {
@@ -170,14 +191,14 @@ export class Repository {
   async listInvoices(): Promise<Invoice[]> {
     const rows = await listByWorkspace<InvoiceRow>(STORE_INVOICES, this.workspaceId);
     return rows
-      .map((row) => row.invoice)
+      .map((row) => invoiceWithImageIds(row.invoice))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
   async loadInvoice(id: string): Promise<Invoice | null> {
     const row = await get<InvoiceRow>(STORE_INVOICES, id);
     if (!row || row.workspaceId !== this.workspaceId) return null;
-    return row.invoice;
+    return invoiceWithImageIds(row.invoice);
   }
 
   async saveInvoice(invoice: Invoice): Promise<void> {
@@ -188,6 +209,32 @@ export class Repository {
     const existing = await this.loadInvoice(id);
     if (!existing) return;
     await remove(STORE_INVOICES, id);
+  }
+
+  // --- Photos -------------------------------------------------------------
+
+  async listPhotos(): Promise<Photo[]> {
+    const rows = await listByWorkspace<PhotoRow>(STORE_PHOTOS, this.workspaceId);
+    return rows
+      .map((row) => row.photo)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  async loadPhoto(id: string): Promise<Photo | null> {
+    const row = await get<PhotoRow>(STORE_PHOTOS, id);
+    if (!row || row.workspaceId !== this.workspaceId) return null;
+    return row.photo;
+  }
+
+  async savePhoto(photo: Photo): Promise<void> {
+    await put(STORE_PHOTOS, { id: photo.id, workspaceId: this.workspaceId, photo });
+  }
+
+  /** Removes the record. The image blob is dealt with by the caller. */
+  async deletePhoto(id: string): Promise<void> {
+    const existing = await this.loadPhoto(id);
+    if (!existing) return;
+    await remove(STORE_PHOTOS, id);
   }
 
   // --- Images -------------------------------------------------------------

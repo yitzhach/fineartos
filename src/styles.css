@@ -2229,3 +2229,268 @@ fieldset.section > legend {
   max-width: min(560px, calc(100% - 32px));
   box-shadow: var(--shadow, 0 18px 40px rgba(0, 0, 0, 0.3));
 }
+
+/* --- The dock at rest ----------------------------------------------------- */
+
+/* Smaller and lower while nothing is near it, full size when the pointer
+   arrives. Scaling rather than resizing keeps the dock's slot in the layout
+   the same, so the desktop above it never shifts as the dock breathes.
+   Touch is excluded in Dock.tsx: a thumb needs the full target. */
+.dock {
+  transform-origin: bottom center;
+  transition:
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 240ms ease,
+    box-shadow 240ms ease;
+}
+
+.dock[data-resting='true'] {
+  transform: scale(0.72) translateY(16px);
+  opacity: 0.92;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.34);
+}
+
+/* Labels fade at rest; they keep their space, so nothing jumps on the way up. */
+.dock .name,
+.dock .later {
+  transition: opacity 200ms ease;
+}
+.dock[data-resting='true'] .name,
+.dock[data-resting='true'] .later {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dock { transition: none; }
+}
+
+/* --- The Add images square ------------------------------------------------ */
+
+.desktop-icon.add-images {
+  padding: 0;
+  border-style: dashed;
+  border-color: var(--line-strong);
+  background: transparent;
+}
+.desktop-icon.add-images[data-over='true'] {
+  border-color: var(--accent);
+  background: var(--accent-quiet);
+}
+.desktop-icon.add-images[data-busy='true'] { opacity: 0.7; }
+
+.add-images-hit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 8px 6px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.desktop-icon.add-images .caption { opacity: 0.75; }
+
+/* --- A picture, opened ---------------------------------------------------- */
+
+.photo-window {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.photo-plate { margin: 0; }
+.photo-plate img {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+}
+.photo-plate figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 10px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.photo-plate figcaption strong { color: var(--ink); font-size: 15px; }
+
+.photo-missing {
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  color: var(--ink-soft);
+}
+
+.photo-details { display: flex; flex-direction: column; gap: 12px; }
+.photo-details .field-row { display: flex; gap: 10px; }
+.photo-details .field-row .field { flex: 1 1 0; min-width: 0; }
+
+/* --- Connect -------------------------------------------------------------- */
+
+.connect { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+.connect-tabs { flex-wrap: wrap; }
+
+.gb { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); gap: 22px; }
+.gb-form { display: flex; flex-direction: column; gap: 12px; }
+.gb-form h3, .gb-head h3 { margin: 0; }
+.gb-form .field-row { display: flex; gap: 10px; }
+.gb-form .field-row .field { flex: 1 1 0; min-width: 0; }
+.gb-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.check input { width: 18px; height: 18px; }
+
+.gb-list { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.gb-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gb-head .hint { margin: 0; flex: 1 1 auto; }
+
+.gb-entries { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.gb-entries li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--raised);
+}
+.gb-entries .grow { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+
+/* Send a picture */
+.send { display: flex; flex-direction: column; gap: 14px; }
+.send-strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.send-thumb {
+  flex: 0 0 auto;
+  width: 74px;
+  height: 62px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--raised);
+  cursor: pointer;
+}
+.send-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.send-thumb[data-selected='true'] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-quiet); }
+
+.send-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 1fr); gap: 20px; align-items: start; }
+.send-preview { margin: 0; }
+.send-preview img { width: 100%; border-radius: 10px; border: 1px solid var(--line); }
+.send-preview figcaption { display: flex; flex-direction: column; padding-top: 8px; font-size: 13px; color: var(--ink-soft); }
+.send-preview figcaption strong { color: var(--ink); font-size: 15px; }
+.send-form { display: flex; flex-direction: column; gap: 12px; }
+.send-message {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--raised);
+  font: inherit;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+.send-form .btn[aria-disabled='true'] { opacity: 0.45; pointer-events: none; }
+
+/* QR */
+.qr { display: grid; grid-template-columns: minmax(260px, 1fr) auto; gap: 24px; align-items: start; }
+.qr-side { display: flex; flex-direction: column; gap: 12px; }
+.qr-plate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--raised);
+}
+/* The code itself is always on white: a QR on a tinted panel can fail to scan. */
+.qr-plate canvas {
+  background: #fff;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+/* --- Pictures on an invoice ---------------------------------------------- */
+
+.inv-images { display: flex; flex-direction: column; gap: 8px; }
+.inv-image-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.inv-image {
+  width: 96px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--raised);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+.inv-image img { width: 100%; height: 60px; object-fit: cover; border-radius: 6px; }
+.inv-image[data-selected='true'] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-quiet); }
+.inv-image-name {
+  font-size: 11px;
+  color: var(--ink-soft);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inv-image.add {
+  border-style: dashed;
+  justify-content: center;
+  min-height: 84px;
+}
+.inv-image.add .plus { font-size: 20px; }
+
+.inv-plates { display: flex; flex-direction: column; gap: 16px; margin-top: 18px; }
+.inv-plate { margin: 0; }
+.inv-plate img { width: 100%; border-radius: 6px; }
+.inv-plate figcaption { padding-top: 6px; font-size: 12px; color: var(--ink-soft); }
+
+/* --- Pictures inside a folder -------------------------------------------- */
+
+.folder-plates { display: flex; flex-wrap: wrap; gap: 12px; }
+.folder-plate {
+  margin: 0;
+  width: 190px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--raised);
+}
+.folder-plate img { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; }
+.folder-plate figcaption { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; }
+
+@media (max-width: 860px) {
+  .photo-window,
+  .gb,
+  .send-body,
+  .qr {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .qr-plate { align-self: stretch; }
+}
+
+/* The search box is one row in a column of rows; without this the flex
+   stretch inherited from the Finder's toolbar makes it a tall empty box. */
+.gb-list .fnd-search { flex: 0 0 auto; }
+
+/* The chosen tab, marked by more than a fill: the parchment accent is pale
+   by design, and a pale "active" button reads as a disabled one. */
+.connect-tabs .btn[aria-current='true'] {
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--copper);
+}

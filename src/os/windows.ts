@@ -20,6 +20,7 @@ export type WindowKind =
   | { type: 'commission'; docId: string }
   | { type: 'invoice'; invoiceId: string }
   | { type: 'folder'; projectId: string }
+  | { type: 'photo'; photoId: string }
   | { type: 'list' }
   | { type: 'settings' }
   | { type: 'tool'; tool: string };
@@ -52,6 +53,7 @@ export function keyFor(kind: WindowKind): string {
   if (kind.type === 'commission') return `commission:${kind.docId}`;
   if (kind.type === 'invoice') return `invoice:${kind.invoiceId}`;
   if (kind.type === 'folder') return `folder:${kind.projectId}`;
+  if (kind.type === 'photo') return `photo:${kind.photoId}`;
   if (kind.type === 'tool') return `tool:${kind.tool}`;
   return kind.type;
 }
@@ -75,8 +77,10 @@ export function defaultSize(
   kind: WindowKind,
   viewport: { width: number; height: number },
 ): { width: number; height: number } {
-  const wide = kind.type === 'commission';
+  // Connect is two columns of form: at the small size they crush together.
+  const wide = kind.type === 'commission' || (kind.type === 'tool' && kind.tool === 'connect');
   const medium =
+    kind.type === 'photo' ||
     kind.type === 'invoice' ||
     kind.type === 'folder' ||
     kind.type === 'settings' ||

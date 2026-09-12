@@ -138,7 +138,6 @@ it is the gate on all three.
 
 ## Smaller things, not blocked on any of the above
 
-- **Multiple images per invoice.** The model supports it; the layout does not.
 - **PDF generated directly**, instead of through the browser's print dialog.
   Needs a PDF library or a server; the print route works today and costs
   nothing.
@@ -151,6 +150,29 @@ it is the gate on all three.
 
 Both are asked for and neither is built. They are written down here rather
 than half-started, because each needs a decision that has not been made.
+
+### The guest book, once there is a server
+
+The guest book works today on the artist's own device: the tablet on the
+table is the book. What it cannot do is collect a signature from a visitor's
+own phone. A QR code that opened a form on their phone would save their
+answers in *their* browser, where the studio would never see them — so the
+QR code hands details out (a contact card, or a link) rather than pretending
+to take anything in, and the tool says so on the screen rather than in a
+footnote.
+
+The moment there is a server and a signed-in studio, the same form can post
+to it and the QR can point at it. Three things to decide then:
+
+- **What a stranger's POST is allowed to do.** An open endpoint that writes
+  to the artist's guest book is a spam target. Rate limits at minimum,
+  probably a per-show token that the QR carries and that the artist can
+  revoke.
+- **Consent has to travel with the record.** The "happy to hear from the
+  studio" box is the difference between a mailing list and a complaint;
+  whatever syncs must carry it and must never default it to true.
+- **Whether a visitor can edit or remove their own entry later.** Easy to
+  promise on a sign, hard to build without accounts for visitors.
 
 ### The Trash, once there is a cloud
 

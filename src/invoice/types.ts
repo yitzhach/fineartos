@@ -47,6 +47,13 @@ export interface Invoice {
   /** Free text shown to the client above the payment block. */
   note: string | null;
 
+  /**
+   * Pictures shown on the invoice — the work itself, a detail, a photo of it
+   * hung. Optional in the type because invoices written before this existed
+   * have no such field; the repository fills it in on read.
+   */
+  imageIds?: string[];
+
   state: InvoiceState;
   issuedAt: string | null;
   createdAt: string;

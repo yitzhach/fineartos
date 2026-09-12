@@ -10,7 +10,7 @@
  * DOM-free and tested, like the rest of the model layer.
  */
 
-export type TrashKind = 'project' | 'document' | 'invoice';
+export type TrashKind = 'project' | 'document' | 'invoice' | 'photo';
 
 export interface TrashEntry {
   id: string;
@@ -68,6 +68,7 @@ export interface TrashSummary {
   folders: number;
   documents: number;
   invoices: number;
+  pictures: number;
 }
 
 /**
@@ -79,15 +80,17 @@ export function summarise(trash: Trash): TrashSummary {
   let folders = 0;
   let documents = 0;
   let invoices = 0;
+  let pictures = 0;
 
   for (const entry of trash) {
     records += deletionTargets(entry).length;
     if (entry.kind === 'project') folders += 1;
     else if (entry.kind === 'document') documents += 1;
+    else if (entry.kind === 'photo') pictures += 1;
     else invoices += 1;
   }
 
-  return { entries: trash.length, records, folders, documents, invoices };
+  return { entries: trash.length, records, folders, documents, invoices, pictures };
 }
 
 /** "3 items", "1 item" — never a bare number with no noun. */

@@ -10,6 +10,7 @@
 
 import type { DesktopLayout, IconPosition } from '../os/desktopLayout';
 import type { Trash } from '../os/trash';
+import type { GuestEntry } from '../connect/guestbook';
 import type { CustomWallpaper, WallpaperFit } from './wallpapers';
 
 export type Theme = 'light' | 'dark';
@@ -126,6 +127,8 @@ const KEYS = {
   desktopLayout: 'artistOS.desktopLayout',
   trash: 'artistOS.trash',
   trashPosition: 'artistOS.trashPosition',
+  guests: 'artistOS.guestBook',
+  siteUrl: 'artistOS.siteUrl',
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -235,3 +238,15 @@ export const loadPaymentInstructions = (): PaymentInstructions => {
   return { ...emptyPaymentInstructions(), ...stored };
 };
 export const savePaymentInstructions = (value: PaymentInstructions): void => write(KEYS.payment, value);
+
+
+/**
+ * The guest book. Small text records, kept on this device — see
+ * src/connect/contact.ts for why they cannot yet leave it.
+ */
+export const loadGuests = (): GuestEntry[] => read<GuestEntry[]>(KEYS.guests, []);
+export const saveGuests = (value: GuestEntry[]): void => write(KEYS.guests, value);
+
+/** The artist's own web address, for the QR code and the contact card. */
+export const loadSiteUrl = (): string => read<string>(KEYS.siteUrl, '');
+export const saveSiteUrl = (value: string): void => write(KEYS.siteUrl, value);

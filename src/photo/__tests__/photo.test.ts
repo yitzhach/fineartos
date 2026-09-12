@@ -1,0 +1,105 @@
+import { describe, expect, it } from 'vitest';
+import {
+  createPhoto,
+  describePhoto,
+  describePrice,
+  describeSize,
+  editPhoto,
+  shareMessage,
+  titleFromFileName,
+} from '../photo';
+
+const base = () =>
+  createPhoto({ imageId: 'img-1', title: 'Harbour light', pixelWidth: 1200, pixelHeight: 900 });
+
+describe('createPhoto', () => {
+  it('records nothing it was not told', () => {
+    const photo = base();
+    expect(photo.price).toBeNull();
+    expect(photo.widthIn).toBeNull();
+    expect(photo.medium).toBeNull();
+  });
+
+  it('falls back to Untitled rather than an empty name', () => {
+    expect(createPhoto({ imageId: 'i', title: '   ', pixelWidth: 1, pixelHeight: 1 }).title).toBe('Untitled');
+  });
+});
+
+describe('titleFromFileName', () => {
+  it('drops the extension and opens out separators', () => {
+    expect(titleFromFileName('harbour_light-study.JPG')).toBe('harbour light study');
+  });
+
+  it('never returns an empty title', () => {
+    expect(titleFromFileName('.png')).toBe('Untitled');
+  });
+});
+
+describe('describeSize', () => {
+  it('says nothing when the work has not been measured', () => {
+    expect(describeSize(base())).toBeNull();
+  });
+
+  it('needs both sides before it will state a size', () => {
+    expect(describeSize(editPhoto(base(), { widthIn: 24 }))).toBeNull();
+  });
+
+  it('reads the way an artist writes it', () => {
+    expect(describeSize(editPhoto(base(), { widthIn: 24, heightIn: 36 }))).toBe('24 × 36 in');
+  });
+
+  it('keeps a half inch without trailing zeros', () => {
+    expect(describeSize(editPhoto(base(), { widthIn: 24.5, heightIn: 36 }))).toBe('24.5 × 36 in');
+  });
+});
+
+describe('describePrice', () => {
+  it('says price on request rather than showing nothing', () => {
+    expect(describePrice(base())).toBe('Price on request');
+  });
+
+  it('never reads a missing price as free', () => {
+    expect(describePrice(base())).not.toContain('$0');
+  });
+
+  it('shows a set price whole when it is whole', () => {
+    expect(describePrice(editPhoto(base(), { price: 5200 }))).toBe('$5,200');
+  });
+
+  it('keeps the cents when there are cents', () => {
+    expect(describePrice(editPhoto(base(), { price: 5200.5 }))).toBe('$5,200.50');
+  });
+
+  it('shows a genuine zero as zero', () => {
+    expect(describePrice(editPhoto(base(), { price: 0 }))).toBe('$0');
+  });
+});
+
+describe('describePhoto', () => {
+  it('admits when nothing has been filled in', () => {
+    expect(describePhoto(base())).toBe('No details yet');
+  });
+
+  it('joins only what is known', () => {
+    const photo = editPhoto(base(), { widthIn: 24, heightIn: 36, year: 2026 });
+    expect(describePhoto(photo)).toBe('24 × 36 in · 2026');
+  });
+});
+
+describe('shareMessage', () => {
+  it('states the price even when there is none', () => {
+    expect(shareMessage(base(), null)).toContain('Price on request');
+  });
+
+  it('leaves out a size that was never measured', () => {
+    expect(shareMessage(base(), null)).not.toContain(' in');
+  });
+
+  it('signs off with the studio when there is one', () => {
+    expect(shareMessage(base(), 'Bob Dylan')).toContain('— Bob Dylan');
+  });
+
+  it('leads with the title', () => {
+    expect(shareMessage(base(), null).split('\n')[0]).toBe('Harbour light');
+  });
+});

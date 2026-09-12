@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CommissionDocument } from '../commission/types';
 import type { Invoice } from '../invoice/types';
+import type { Photo } from '../photo/photo';
+import { describePhoto } from '../photo/photo';
 import type { Project } from '../project/project';
 import { projectItemCount } from '../project/project';
 import {
@@ -20,7 +22,8 @@ import {
 export type DesktopItem =
   | { kind: 'project'; id: string; project: Project }
   | { kind: 'document'; id: string; document: CommissionDocument }
-  | { kind: 'invoice'; id: string; invoice: Invoice };
+  | { kind: 'invoice'; id: string; invoice: Invoice }
+  | { kind: 'photo'; id: string; photo: Photo };
 
 interface Props {
   items: DesktopItem[];
@@ -36,6 +39,10 @@ interface Props {
   onFileInto: (folderId: string, itemId: string) => void;
   onNew: () => void;
   onNewFolder: () => void;
+  /** Files chosen or dropped on the Add images square. */
+  onAddImages: (files: FileList | File[]) => void;
+  /** True while an import is running, so the square can say so. */
+  importing: boolean;
   onTidy: () => void;
   /** How many things are in the Trash, so the icon can look full. */
   trashCount: number;
@@ -127,8 +134,9 @@ export function Desktop(props: Props) {
   const overIsFolder =
     overFolder !== null && items.some((i) => i.id === overFolder && i.kind === 'project');
 
-  /** The "New commission" tile sits after whatever the artist has arranged. */
+  /** The two standing tiles sit after whatever the artist has arranged. */
   const newTile = firstFreeSlot(targets, viewport);
+  const addTile = firstFreeSlot({ ...targets, __new: newTile }, viewport);
 
   useEffect(() => {
     if (!drag) return undefined;
@@ -193,7 +201,7 @@ export function Desktop(props: Props) {
     >
       <div className="desktop-tools no-print">
         <button className="btn" data-variant="quiet" onClick={(e) => { e.stopPropagation(); props.onNewFolder(); }}>
-          New folder
+          New project folder
         </button>
         <button className="btn" data-variant="quiet" onClick={(e) => { e.stopPropagation(); props.onTidy(); }}>
           Tidy up
@@ -287,7 +295,7 @@ export function Desktop(props: Props) {
         )}
       </button>
 
-      {/* Always last, so it sits after whatever the artist has arranged. */}
+      {/* Always last, so they sit after whatever the artist has arranged. */}
       <button
         className="desktop-icon new"
         style={{ left: newTile.x, top: newTile.y }}
@@ -301,6 +309,12 @@ export function Desktop(props: Props) {
         </span>
         <span className="label">New commission</span>
       </button>
+
+      <AddImages
+        position={addTile}
+        importing={props.importing}
+        onFiles={props.onAddImages}
+      />
     </div>
   );
 }
@@ -395,6 +409,15 @@ function describe(item: DesktopItem): {
     };
   }
 
+  if (item.kind === 'photo') {
+    return {
+      name: item.photo.title,
+      caption: describePhoto(item.photo),
+      thumbId: item.photo.imageId,
+      badge: null,
+    };
+  }
+
   if (item.kind === 'invoice') {
     return {
       name: item.invoice.invoiceNumber,
@@ -413,4 +436,71 @@ function describe(item: DesktopItem): {
     thumbId: doc.artwork.referenceImageIds[0] ?? null,
     badge: doc.isDemo ? 'DEMO' : null,
   };
+}
+
+
+/**
+ * The Add images square: a file picker and a drop target in one tile.
+ *
+ * External files arrive through the HTML5 drag events — the only way a
+ * browser hands over a file — while icons on the desktop are dragged with
+ * pointer events. The two never meet, so dropping a file cannot be mistaken
+ * for filing an icon.
+ */
+function AddImages({
+  position,
+  importing,
+  onFiles,
+}: {
+  position: { x: number; y: number };
+  importing: boolean;
+  onFiles: (files: FileList | File[]) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
+
+  return (
+    <div
+      className="desktop-icon add-images"
+      data-over={over}
+      data-busy={importing}
+      style={{ left: position.x, top: position.y }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setOver(false);
+        if (e.dataTransfer.files.length > 0) onFiles(e.dataTransfer.files);
+      }}
+    >
+      <button
+        className="add-images-hit"
+        onClick={(e) => {
+          e.stopPropagation();
+          inputRef.current?.click();
+        }}
+        title="Add images — click to choose, or drop files here"
+      >
+        <span className="thumb blank" aria-hidden="true">
+          <span className="plus">{importing ? '…' : '＋'}</span>
+        </span>
+        <span className="label">{importing ? 'Adding…' : 'Add images'}</span>
+        <span className="caption">click or drop</span>
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        multiple
+        className="sr-only"
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) onFiles(e.target.files);
+          e.target.value = '';
+        }}
+      />
+    </div>
+  );
 }

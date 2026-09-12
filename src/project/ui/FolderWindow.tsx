@@ -1,5 +1,7 @@
 import { calculateTotals, formatMoney } from '../../commission/calc';
 import type { CommissionDocument } from '../../commission/types';
+import type { Photo } from '../../photo/photo';
+import { describePhoto } from '../../photo/photo';
 import type { Invoice } from '../../invoice/types';
 import type { Project } from '../project';
 
@@ -12,6 +14,9 @@ interface Props {
   onRename: (name: string) => void;
   onNewInvoice: () => void;
   onRemoveItem: (id: string) => void;
+  photos: Photo[];
+  imageUrls: Record<string, string>;
+  onOpenPhoto: (id: string) => void;
 }
 
 const NO_DEPOSIT = { kind: 'percent' as const, value: null };
@@ -24,8 +29,8 @@ const NO_DEPOSIT = { kind: 'percent' as const, value: null };
  * desktop, and the row says so.
  */
 export function FolderWindow(props: Props) {
-  const { project, documents, invoices } = props;
-  const empty = documents.length === 0 && invoices.length === 0;
+  const { project, documents, invoices, photos } = props;
+  const empty = documents.length === 0 && invoices.length === 0 && photos.length === 0;
 
   return (
     <div className="folder-window">
@@ -42,7 +47,10 @@ export function FolderWindow(props: Props) {
       {empty && (
         <div className="empty">
           <h3>This folder is empty</h3>
-          <p>Documents and invoices you file here will show up in this window.</p>
+          <p>
+            Documents, invoices and pictures you file here show up in this window. Drag an icon
+            onto the folder on the desktop, or use Add images above.
+          </p>
         </div>
       )}
 
@@ -79,6 +87,43 @@ export function FolderWindow(props: Props) {
               );
             })}
           </ul>
+        </>
+      )}
+
+      {photos.length > 0 && (
+        <>
+          <h3 className="folder-heading">Pictures</h3>
+          <div className="folder-plates">
+            {photos.map((photo) => (
+              <figure
+                key={photo.id}
+                className="folder-plate"
+                onDoubleClick={() => props.onOpenPhoto(photo.id)}
+                title="Double-click to open"
+              >
+                {props.imageUrls[photo.imageId] ? (
+                  <img src={props.imageUrls[photo.imageId]} alt={photo.title} />
+                ) : (
+                  <span className="sheet-face" />
+                )}
+                <figcaption>
+                  <span className="name">{photo.title}</span>
+                  <span className="fnd-detail">{describePhoto(photo)}</span>
+                  <span className="chip-row">
+                    <button className="btn" onClick={() => props.onOpenPhoto(photo.id)}>Open</button>
+                    <button
+                      className="btn"
+                      data-variant="quiet"
+                      title="Move this back to the desktop. It is not deleted."
+                      onClick={() => props.onRemoveItem(photo.id)}
+                    >
+                      Take out
+                    </button>
+                  </span>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
         </>
       )}
 

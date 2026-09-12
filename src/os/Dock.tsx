@@ -23,20 +23,40 @@ const REACH = 100; // px from an item's centre at which magnification fades out
 
 export function Dock({ activeId, onOpen }: Props) {
   const [pointerX, setPointerX] = useState<number | null>(null);
+  /**
+   * At rest the dock sits smaller and lower, the way a desktop dock does, so
+   * it takes less of the screen while the artist is working. It comes up to
+   * full size when the pointer is anywhere near it.
+   *
+   * Only with a mouse: a finger has no hover, so on a phone or tablet the
+   * dock stays at full size and full target area, which is what a thumb
+   * needs. Reduced motion keeps it up too, rather than animating at every
+   * pass of the pointer.
+   */
+  const [near, setNear] = useState(false);
 
   const magnifies =
     typeof window !== 'undefined' &&
     (window.matchMedia?.('(hover: hover) and (pointer: fine)').matches ?? false) &&
     !(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
 
+  const rests = magnifies && !near;
+
   return (
     <nav
       className="dock"
       aria-label="Applications"
+      data-resting={rests}
+      onPointerEnter={() => setNear(true)}
+      onFocusCapture={() => setNear(true)}
+      onBlurCapture={() => setNear(false)}
       onPointerMove={(e) => {
         if (magnifies && e.pointerType === 'mouse') setPointerX(e.clientX);
       }}
-      onPointerLeave={() => setPointerX(null)}
+      onPointerLeave={() => {
+        setPointerX(null);
+        setNear(false);
+      }}
     >
       {listModules().map((module) => (
         <DockItem

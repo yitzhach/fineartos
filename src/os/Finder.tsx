@@ -2,18 +2,20 @@ import { useState } from 'react';
 import { calculateTotals, formatMoney } from '../commission/calc';
 import type { CommissionDocument } from '../commission/types';
 import type { Invoice } from '../invoice/types';
+import { describePhoto, type Photo } from '../photo/photo';
 import { projectItemCount, type Project } from '../project/project';
 
 export type FinderPlace =
   | { kind: 'all' }
   | { kind: 'documents' }
   | { kind: 'invoices' }
+  | { kind: 'photos' }
   | { kind: 'loose' }
   | { kind: 'folder'; id: string };
 
 export interface FinderRow {
   id: string;
-  kind: 'project' | 'document' | 'invoice';
+  kind: 'project' | 'document' | 'invoice' | 'photo';
   name: string;
   detail: string;
   amount: string | null;
@@ -27,7 +29,8 @@ interface Props {
   projects: Project[];
   documents: CommissionDocument[];
   invoices: Invoice[];
-  /** Which folder each document and invoice is filed in, by item id. */
+  photos: Photo[];
+  /** Which folder each document, invoice and picture is filed in, by item id. */
   folderOf: Record<string, string>;
   imageUrls: Record<string, string>;
   onOpen: (kind: FinderRow['kind'], id: string) => void;
@@ -71,6 +74,7 @@ export function Finder(props: Props) {
         <Place label="All items" count={buildRows(props).length} active={place.kind === 'all'} onClick={() => setPlace({ kind: 'all' })} />
         <Place label="Commissions" count={props.documents.length} active={place.kind === 'documents'} onClick={() => setPlace({ kind: 'documents' })} />
         <Place label="Invoices" count={props.invoices.length} active={place.kind === 'invoices'} onClick={() => setPlace({ kind: 'invoices' })} />
+        <Place label="Pictures" count={props.photos.length} active={place.kind === 'photos'} onClick={() => setPlace({ kind: 'photos' })} />
         <Place label="Not in a folder" count={looseCount(props)} active={place.kind === 'loose'} onClick={() => setPlace({ kind: 'loose' })} />
 
         <h4>
@@ -240,6 +244,7 @@ function Place({
 function kindLabel(kind: FinderRow['kind']): string {
   if (kind === 'project') return 'Folder';
   if (kind === 'invoice') return 'Invoice';
+  if (kind === 'photo') return 'Picture';
   return 'Commission';
 }
 
@@ -255,6 +260,8 @@ function inPlace(row: FinderRow, place: FinderPlace, folderOf: Record<string, st
       return row.kind === 'document';
     case 'invoices':
       return row.kind === 'invoice';
+    case 'photos':
+      return row.kind === 'photo';
     case 'loose':
       return row.kind !== 'project' && !row.folderName;
     case 'folder':
@@ -311,7 +318,18 @@ function buildRows(props: Props): FinderRow[] {
     };
   });
 
-  return [...projects, ...documents, ...invoices].sort((a, b) =>
+  const photos: FinderRow[] = props.photos.map((photo) => ({
+    id: photo.id,
+    kind: 'photo',
+    name: photo.title,
+    detail: describePhoto(photo),
+    amount: photo.price === null ? 'On request' : null,
+    updatedAt: photo.updatedAt,
+    folderName: folderName(photo.id),
+    thumbId: photo.imageId,
+  }));
+
+  return [...projects, ...documents, ...invoices, ...photos].sort((a, b) =>
     b.updatedAt.localeCompare(a.updatedAt),
   );
 }

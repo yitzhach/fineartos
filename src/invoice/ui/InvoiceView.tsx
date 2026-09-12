@@ -7,6 +7,11 @@ interface Props {
   invoice: Invoice;
   /** Object URL for the studio logo, when one has been set. */
   logoUrl?: string | null;
+  /**
+   * How to draw a picture the invoice refers to. Returns null when the
+   * picture has been deleted since — the invoice then simply omits it.
+   */
+  photoFor?: (photoId: string) => { url: string | undefined; title: string; detail: string | null } | null;
 }
 
 const NO_DEPOSIT = { kind: 'percent' as const, value: null };
@@ -19,7 +24,7 @@ const NO_DEPOSIT = { kind: 'percent' as const, value: null };
  * Every figure comes from calculateTotals, so this can never disagree with the
  * editor or with the exported file.
  */
-export function InvoiceView({ invoice, logoUrl }: Props) {
+export function InvoiceView({ invoice, logoUrl, photoFor }: Props) {
   const totals = calculateTotals(invoice.quote, invoice.payments, NO_DEPOSIT);
   const currency = invoice.quote.currency;
   const money = (amount: number | null) => formatMoney(amount, currency);
@@ -128,6 +133,26 @@ export function InvoiceView({ invoice, logoUrl }: Props) {
       )}
 
       {invoice.note && <p className="inv-note">{invoice.note}</p>}
+
+      {/* The pictures, printed with the invoice. A missing image draws
+          nothing rather than a broken frame. */}
+      {(invoice.imageIds ?? []).length > 0 && (
+        <div className="inv-plates">
+          {(invoice.imageIds ?? []).map((photoId) => {
+            const plate = photoFor?.(photoId);
+            if (!plate?.url) return null;
+            return (
+              <figure key={photoId} className="inv-plate">
+                <img src={plate.url} alt={plate.title} />
+                <figcaption>
+                  {plate.title}
+                  {plate.detail ? ` · ${plate.detail}` : ''}
+                </figcaption>
+              </figure>
+            );
+          })}
+        </div>
+      )}
 
       <section className="inv-pay">
         <h2>How to pay</h2>

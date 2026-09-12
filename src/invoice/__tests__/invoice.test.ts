@@ -4,6 +4,7 @@ import { createDocument, recordPayment } from '../../commission/document';
 import { emptyPaymentInstructions, type PaymentInstructions } from '../../lib/prefs';
 import {
   addDays,
+  applyInvoiceEdit,
   createBlankInvoice,
   createInvoiceFromDocument,
   invoiceFileStem,
@@ -189,5 +190,23 @@ describe('invoiceFileStem', () => {
     const invoice = { ...createBlankInvoice('INV-2026-0005', instructions()) };
     invoice.client = { ...invoice.client, name: 'Smith / Jones & Co.' };
     expect(invoiceFileStem(invoice)).toBe('INV-2026-0005-Smith-Jones-Co');
+  });
+});
+
+describe('pictures on an invoice', () => {
+  it('starts with none rather than with a placeholder', () => {
+    expect(createBlankInvoice('INV-1', instructions()).imageIds).toEqual([]);
+  });
+
+  it('keeps the pictures an edit adds', () => {
+    const invoice = applyInvoiceEdit(createBlankInvoice('INV-1', instructions()), {
+      imageIds: ['photo-1', 'photo-2'],
+    });
+    expect(invoice.imageIds).toEqual(['photo-1', 'photo-2']);
+  });
+
+  it('leaves an invoice written before pictures existed alone', () => {
+    const old = { ...createBlankInvoice('INV-1', instructions()), imageIds: undefined };
+    expect(applyInvoiceEdit(old, { note: 'Thanks' }).imageIds).toBeUndefined();
   });
 });

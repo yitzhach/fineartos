@@ -8,6 +8,8 @@ import { Desktop, type DesktopItem } from './os/Desktop';
 import { Finder } from './os/Finder';
 import { TrashWindow } from './os/TrashWindow';
 import { TrashButton } from './os/TrashButton';
+import { Connect, type ConnectTab } from './connect/ui/Connect';
+import type { GuestEntry } from './connect/guestbook';
 import {
   countPhrase,
   deletionTargets,
@@ -87,8 +89,11 @@ import {
   addInvoiceToProject,
   createProject,
   filedDocumentIds,
+  addPhotoToProject,
   filedInvoiceIds,
+  filedPhotoIds,
   projectItemCount,
+  projectItemIds,
   projectNameFor,
   removeFromProject,
   renameProject,
@@ -104,6 +109,14 @@ import {
   renameWallpaper,
   type CustomWallpaper,
 } from './lib/wallpapers';
+import {
+  createPhoto,
+  describePhoto,
+  editPhoto,
+  titleFromFileName,
+  type Photo,
+} from './photo/photo';
+import { PhotoWindow } from './photo/ui/PhotoWindow';
 import { Repository, type StoredDocument } from './persistence/repository';
 import { describeSaveState, drainQueue, unavailableCloud } from './persistence/sync';
 import { exportDocument, importDocumentFromText } from './persistence/portable';
@@ -114,6 +127,8 @@ import {
   loadTheme,
   loadWallpaper,
   loadDesktopLayout,
+  loadGuests,
+  loadSiteUrl,
   loadTrash,
   loadTrashPosition,
   loadWallpaperLibrary,
@@ -122,6 +137,8 @@ import {
   saveTheme,
   saveWallpaper,
   saveDesktopLayout,
+  saveGuests,
+  saveSiteUrl,
   saveTrash,
   saveTrashPosition,
   saveWallpaperLibrary,
@@ -154,6 +171,7 @@ registerModule({ id: 'home', name: 'Home', icon: '⌂', available: true });
 registerModule({ id: 'commissions', name: 'Projects', icon: '✎', available: true });
 registerModule({ id: 'invoices', name: 'Invoices', icon: '❑', available: true });
 registerModule({ id: 'finder', name: 'Finder', icon: '❐', available: true });
+registerModule({ id: 'connect', name: 'Connect', icon: '◉', available: true });
 // Last in the dock, the way the Trash is always last.
 registerModule({ id: 'trash', name: 'Trash', icon: '♺', available: true });
 
@@ -163,6 +181,12 @@ export default function App() {
   const [rows, setRows] = useState<StoredDocument[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [importingImages, setImportingImages] = useState(false);
+  const [guests, setGuests] = useState<GuestEntry[]>(loadGuests);
+  const [siteUrl, setSiteUrl] = useState(loadSiteUrl);
+  const [connectTab, setConnectTab] = useState<ConnectTab>('guestbook');
+  const [connectPhotoId, setConnectPhotoId] = useState<string | null>(null);
   /** False until the first read from IndexedDB has come back. */
   const [loaded, setLoaded] = useState(false);
 
@@ -207,6 +231,8 @@ export default function App() {
   useEffect(() => saveWallpaperLibrary(wallpaperLibrary), [wallpaperLibrary]);
   useEffect(() => saveDesktopLayout(desktopLayout), [desktopLayout]);
   useEffect(() => saveTrash(trash), [trash]);
+  useEffect(() => saveGuests(guests), [guests]);
+  useEffect(() => saveSiteUrl(siteUrl), [siteUrl]);
   useEffect(() => saveTrashPosition(trashPosition), [trashPosition]);
   useEffect(() => saveStudioDefaults(studio), [studio]);
   useEffect(() => savePaymentInstructions(payment), [payment]);
@@ -242,10 +268,11 @@ export default function App() {
   }, [trash]);
 
   const refresh = useCallback(async () => {
-    const [documentRows, projectRows, invoiceRows] = await Promise.all([
+    const [documentRows, projectRows, invoiceRows, photoRows] = await Promise.all([
       repo.list(),
       repo.listProjects(),
       repo.listInvoices(),
+      repo.listPhotos(),
     ]);
     // Everything in the Trash is hidden from the desktop, the Finder and the
     // lists. The records themselves are untouched in storage — that is what
@@ -254,6 +281,7 @@ export default function App() {
     setRows(documentRows.filter((row) => !hidden.has(row.id)));
     setProjects(projectRows.filter((project) => !hidden.has(project.id)));
     setInvoices(invoiceRows.filter((invoice) => !hidden.has(invoice.id)));
+    setPhotos(photoRows.filter((photo) => !hidden.has(photo.id)));
     setLoaded(true);
   }, [repo]);
 
@@ -324,8 +352,9 @@ export default function App() {
       if (row.document.studio.logoImageId) ids.add(row.document.studio.logoImageId);
     }
     for (const project of projects) if (project.coverImageId) ids.add(project.coverImageId);
+    for (const photo of photos) ids.add(photo.imageId);
     return [...ids].sort().join(',');
-  }, [rows, projects]);
+  }, [rows, projects, photos]);
 
   useEffect(() => {
     const ids = neededImageIds ? neededImageIds.split(',') : [];
@@ -682,6 +711,7 @@ export default function App() {
 
   const filedDocs = filedDocumentIds(projects);
   const filedInvoices = filedInvoiceIds(projects);
+  const filedPhotos = filedPhotoIds(projects);
 
   const desktopItems: DesktopItem[] = [
     ...projects.map((project) => ({ kind: 'project' as const, id: project.id, project })),
@@ -691,6 +721,9 @@ export default function App() {
     ...invoices
       .filter((invoice) => !filedInvoices.has(invoice.id))
       .map((invoice) => ({ kind: 'invoice' as const, id: invoice.id, invoice })),
+    ...photos
+      .filter((photo) => !filedPhotos.has(photo.id))
+      .map((photo) => ({ kind: 'photo' as const, id: photo.id, photo })),
   ];
 
   /** Which folder each filed item is in, for the Finder. */
@@ -698,6 +731,7 @@ export default function App() {
   for (const project of projects) {
     for (const id of project.documentIds) folderOf[id] = project.id;
     for (const id of project.invoiceIds) folderOf[id] = project.id;
+    for (const id of project.imageIds ?? []) folderOf[id] = project.id;
   }
 
   const handleMoveIcon = (id: string, position: { x: number; y: number }) => {
@@ -736,13 +770,16 @@ export default function App() {
     }
 
     const isInvoice = invoices.some((invoice) => invoice.id === itemId);
-    let next = isInvoice
-      ? addInvoiceToProject(folder, itemId)
-      : addDocumentToProject(folder, itemId);
+    const photo = photos.find((p) => p.id === itemId);
+    let next = photo
+      ? addPhotoToProject(folder, itemId)
+      : isInvoice
+        ? addInvoiceToProject(folder, itemId)
+        : addDocumentToProject(folder, itemId);
 
     // A folder with no face takes the first picture that lands in it.
-    if (!next.coverImageId && !isInvoice) {
-      const cover = docById(itemId)?.artwork.referenceImageIds[0];
+    if (!next.coverImageId) {
+      const cover = photo ? photo.imageId : docById(itemId)?.artwork.referenceImageIds[0];
       if (cover) next = setProjectCover(next, cover);
     }
 
@@ -753,6 +790,78 @@ export default function App() {
       return rest;
     });
     setMessage(`Filed into “${folder.name}”.`);
+  };
+
+  // --- Pictures -------------------------------------------------------------
+
+  const savePhotoRecord = async (photo: Photo) => {
+    await repo.savePhoto(photo);
+    await refresh();
+  };
+
+  /**
+   * Brings pictures in from the Add images square, from a file picker or a
+   * drop. Each one is resized and re-encoded before it is stored — a modern
+   * phone photo is 4 MB and there is no reason to keep every pixel of it.
+   *
+   * A file that cannot be read stops that file, not the batch: dropping ten
+   * pictures and losing nine because the third was a PDF would be worse than
+   * saying which one failed.
+   */
+  const handleImportPhotos = async (files: FileList | File[], folderId?: string) => {
+    const chosen = Array.from(files);
+    if (chosen.length === 0) return;
+
+    setImportingImages(true);
+    setImageError(null);
+    const failed: string[] = [];
+    let added = 0;
+    let folder = folderId ? projects.find((p) => p.id === folderId) ?? null : null;
+
+    for (const file of chosen) {
+      try {
+        // The same resize the wallpapers use, at a smaller edge: this is a
+        // picture to show a client, not a backdrop.
+        const prepared = await prepareWallpaper(file, 2000);
+        const imageId = newId();
+        await repo.putImage(imageId, prepared.blob);
+        const photo = createPhoto({
+          imageId,
+          title: titleFromFileName(file.name),
+          pixelWidth: prepared.width,
+          pixelHeight: prepared.height,
+        });
+        await repo.savePhoto(photo);
+        if (folder) {
+          folder = addPhotoToProject(folder, photo.id);
+          if (!folder.coverImageId) folder = setProjectCover(folder, imageId);
+        }
+        added += 1;
+      } catch (cause) {
+        failed.push(file.name);
+        // eslint-disable-next-line no-console
+        console.warn('Could not add image', file.name, cause);
+      }
+    }
+
+    if (folder) await repo.saveProject(folder);
+    await refresh();
+    setImportingImages(false);
+
+    if (added > 0) {
+      setMessage(
+        folderId
+          ? `${countPhrase(added, 'picture')} added to the folder.`
+          : `${countPhrase(added, 'picture')} added to the desktop. Drag one onto a folder to file it.`,
+      );
+    }
+    if (failed.length > 0) {
+      // Said twice on purpose: the inspector's error line is only visible when
+      // a commission is open, and this import usually happens on the desktop.
+      const text = `Could not add ${failed.join(', ')}. PNG, JPEG and WebP images up to 8 MB work.`;
+      setImageError(text);
+      setMessage(text);
+    }
   };
 
   // --- Trash ---------------------------------------------------------------
@@ -775,6 +884,7 @@ export default function App() {
         if (kind.type === 'commission') return !ids.includes(kind.docId);
         if (kind.type === 'invoice') return !ids.includes(kind.invoiceId);
         if (kind.type === 'folder') return !ids.includes(kind.projectId);
+        if (kind.type === 'photo') return !ids.includes(kind.photoId);
         return true;
       }),
     );
@@ -784,7 +894,8 @@ export default function App() {
     const project = projects.find((p) => p.id === itemId);
     const doc = docById(itemId);
     const invoice = invoices.find((i) => i.id === itemId);
-    if (!project && !doc && !invoice) return;
+    const photo = photos.find((p) => p.id === itemId);
+    if (!project && !doc && !invoice && !photo) return;
 
     const entry: TrashEntry = project
       ? {
@@ -793,15 +904,17 @@ export default function App() {
           name: project.name,
           deletedAt: new Date().toISOString(),
           // The contents go in with the folder and come back out with it.
-          contains: [...project.documentIds, ...project.invoiceIds],
+          contains: projectItemIds(project),
           fromFolderId: null,
         }
       : {
           id: itemId,
-          kind: doc ? 'document' : 'invoice',
-          name: doc
-            ? doc.title.trim() || doc.documentNumber
-            : invoice?.invoiceNumber ?? 'Invoice',
+          kind: photo ? 'photo' : doc ? 'document' : 'invoice',
+          name: photo
+            ? photo.title
+            : doc
+              ? doc.title.trim() || doc.documentNumber
+              : invoice?.invoiceNumber ?? 'Invoice',
           deletedAt: new Date().toISOString(),
           contains: [],
           fromFolderId: projectContaining(itemId)?.id ?? null,
@@ -839,6 +952,12 @@ export default function App() {
     const removedImages: string[] = [];
 
     for (const id of ids) {
+      const storedPhoto = await repo.loadPhoto(id);
+      if (storedPhoto) {
+        removedImages.push(storedPhoto.imageId);
+        await repo.deletePhoto(id);
+        continue;
+      }
       const stored = await repo.load(id);
       if (stored) {
         removedImages.push(...stored.document.artwork.referenceImageIds);
@@ -854,9 +973,10 @@ export default function App() {
 
     // A photograph another commission still uses is never taken with it, and
     // neither is one being used as a desktop picture.
-    const remaining = await repo.list();
+    const [remaining, remainingPhotos] = await Promise.all([repo.list(), repo.listPhotos()]);
     const stillUsed = new Set<string>([
       ...remaining.flatMap((row) => row.document.artwork.referenceImageIds),
+      ...remainingPhotos.map((photo) => photo.imageId),
       ...wallpaperLibrary.map((picture) => picture.imageId),
     ]);
     for (const imageId of orphanImageIds(removedImages, stillUsed)) {
@@ -917,14 +1037,56 @@ export default function App() {
     }
   };
 
+  /** Opens Connect on a given tab — and on a given picture, when sending one. */
+  const openConnect = (tab: ConnectTab, photoId?: string) => {
+    setConnectTab(tab);
+    if (photoId) setConnectPhotoId(photoId);
+    open({ type: 'tool', tool: 'connect' }, 'Connect', 'Guest book, sharing and QR');
+  };
+
   const openTrashWindow = () =>
     open({ type: 'tool', tool: 'trash' }, 'Trash', 'Nothing here is deleted yet');
+
+  /** How the invoice draws a picture it refers to. */
+  const photoPlate = (photoId: string) => {
+    const photo = photos.find((p) => p.id === photoId);
+    if (!photo) return null;
+    return {
+      url: imageUrls[photo.imageId],
+      title: photo.title,
+      detail: describePhoto(photo) === 'No details yet' ? null : describePhoto(photo),
+    };
+  };
+
+  /**
+   * Uploading from inside an invoice: the pictures land on the desktop like
+   * any other, and are added to this invoice as well. One picture, one place —
+   * an invoice never gets a private copy.
+   */
+  const handleImportPhotosOnto = async (invoice: Invoice, files: FileList | File[]) => {
+    const before = new Set((await repo.listPhotos()).map((photo) => photo.id));
+    await handleImportPhotos(files);
+    const added = (await repo.listPhotos()).filter((photo) => !before.has(photo.id));
+    if (added.length === 0) return;
+    await saveInvoiceRecord(
+      applyInvoiceEdit(invoice, {
+        imageIds: [...(invoice.imageIds ?? []), ...added.map((photo) => photo.id)],
+      }),
+    );
+  };
+
+  const openPhotoWindow = (id: string) => {
+    const photo = photos.find((p) => p.id === id);
+    if (photo) open({ type: 'photo', photoId: id }, photo.title, 'Picture');
+  };
 
   const openDesktopItem = (item: DesktopItem) => {
     if (item.kind === 'project') {
       open({ type: 'folder', projectId: item.id }, item.project.name, 'Project folder');
     } else if (item.kind === 'document') {
       openDocumentWindow(item.id);
+    } else if (item.kind === 'photo') {
+      openPhotoWindow(item.id);
     } else {
       openInvoiceWindow(item.id);
     }
@@ -1053,6 +1215,21 @@ export default function App() {
             New invoice
           </button>
           {project && (
+            <label className="btn" data-variant="quiet">
+              {importingImages ? 'Adding…' : 'Add images'}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                multiple
+                className="sr-only"
+                onChange={(e) => {
+                  if (e.target.files?.length) void handleImportPhotos(e.target.files, project.id);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          )}
+          {project && (
             <TrashButton
               onTrash={() => void handleTrash(project.id)}
               note={
@@ -1067,8 +1244,30 @@ export default function App() {
       );
     }
 
+    if (kind.type === 'photo') {
+      const photo = photos.find((p) => p.id === kind.photoId);
+      if (!photo) return null;
+      return (
+        <>
+          <button className="btn" data-variant="primary" onClick={() => openConnect('send', photo.id)}>
+            Send to a client
+          </button>
+          <TrashButton onTrash={() => void handleTrash(photo.id)} />
+          <span className="faint" style={{ fontSize: 12 }}>Saved as you type</span>
+        </>
+      );
+    }
+
     if (kind.type === 'settings') {
       return <span className="faint" style={{ fontSize: 12 }}>Changes are saved as you make them.</span>;
+    }
+
+    if (kind.type === 'tool' && kind.tool === 'connect') {
+      return (
+        <span className="faint" style={{ fontSize: 12 }}>
+          Everything here runs on this device. Nothing is sent without you tapping send.
+        </span>
+      );
     }
 
     if (kind.type === 'tool' && kind.tool === 'trash') {
@@ -1159,10 +1358,15 @@ export default function App() {
           <InvoiceView
             invoice={invoice}
             logoUrl={invoice.studio.logoImageId ? imageUrls[invoice.studio.logoImageId] : null}
+            photoFor={photoPlate}
           />
         </>
       ) : (
         <InvoiceEditor
+          photos={photos}
+          imageUrls={imageUrls}
+          importing={importingImages}
+          onAddImages={(files) => void handleImportPhotosOnto(invoice, files)}
           invoice={invoice}
           onChange={(changes) => void saveInvoiceRecord(applyInvoiceEdit(invoice, changes))}
           onRecordPayment={(payload) => void saveInvoiceRecord(recordInvoicePayment(invoice, payload))}
@@ -1178,6 +1382,9 @@ export default function App() {
           project={project}
           documents={rows.filter((row) => project.documentIds.includes(row.id)).map((r) => r.document)}
           invoices={invoices.filter((invoice) => project.invoiceIds.includes(invoice.id))}
+          photos={photos.filter((photo) => (project.imageIds ?? []).includes(photo.id))}
+          imageUrls={imageUrls}
+          onOpenPhoto={openPhotoWindow}
           onOpenDocument={openDocumentWindow}
           onOpenInvoice={openInvoiceWindow}
           onRename={(name) => void saveProjectRecord(renameProject(project, name))}
@@ -1186,6 +1393,19 @@ export default function App() {
             void saveProjectRecord(removeFromProject(project, id));
             setMessage('Moved back to the desktop. Nothing was deleted.');
           }}
+        />
+      );
+    }
+
+    if (kind.type === 'photo') {
+      const photo = photos.find((p) => p.id === kind.photoId);
+      if (!photo) return <p className="hint">This picture has been deleted.</p>;
+      return (
+        <PhotoWindow
+          photo={photo}
+          url={imageUrls[photo.imageId]}
+          onChange={(changes) => void savePhotoRecord(editPhoto(photo, changes))}
+          onSend={() => openConnect('send', photo.id)}
         />
       );
     }
@@ -1238,6 +1458,26 @@ export default function App() {
       );
     }
 
+    if (kind.type === 'tool' && kind.tool === 'connect') {
+      return (
+        <Connect
+          tab={connectTab}
+          onTab={setConnectTab}
+          studio={studio}
+          photos={photos}
+          imageUrls={imageUrls}
+          imageBlob={async (imageId) => (await repo.getImage(imageId))?.blob ?? null}
+          guests={guests}
+          onGuests={setGuests}
+          selectedPhotoId={connectPhotoId}
+          onSelectPhoto={setConnectPhotoId}
+          siteUrl={siteUrl}
+          onSiteUrl={setSiteUrl}
+          onMessage={setMessage}
+        />
+      );
+    }
+
     if (kind.type === 'tool' && kind.tool === 'trash') {
       return (
         <TrashWindow
@@ -1255,6 +1495,7 @@ export default function App() {
           projects={projects}
           documents={rows.filter((row) => row.document.state !== 'archived').map((r) => r.document)}
           invoices={invoices}
+          photos={photos}
           folderOf={folderOf}
           imageUrls={imageUrls}
           onOpen={(itemKind, id) => {
@@ -1263,6 +1504,8 @@ export default function App() {
               if (project) open({ type: 'folder', projectId: id }, project.name, 'Project folder');
             } else if (itemKind === 'document') {
               openDocumentWindow(id);
+            } else if (itemKind === 'photo') {
+              openPhotoWindow(id);
             } else {
               openInvoiceWindow(id);
             }
@@ -1333,6 +1576,8 @@ export default function App() {
           onFileInto={(folderId, itemId) => void handleFileInto(folderId, itemId)}
           onNew={handleNew}
           onNewFolder={() => void handleNewFolder()}
+          onAddImages={(files) => void handleImportPhotos(files)}
+          importing={importingImages}
           onTidy={handleTidy}
           trashCount={trash.length}
           trashPosition={trashPosition}
@@ -1423,6 +1668,8 @@ export default function App() {
                 ? { kind: { type: 'list' as const }, title: 'Projects', subtitle: 'All commissions' }
                 : id === 'trash'
                   ? { kind: { type: 'tool' as const, tool: 'trash' }, title: 'Trash', subtitle: 'Nothing here is deleted yet' }
+                  : id === 'connect'
+                  ? { kind: { type: 'tool' as const, tool: 'connect' }, title: 'Connect', subtitle: 'Guest book, sharing and QR' }
                   : id === 'finder'
                   ? { kind: { type: 'tool' as const, tool: 'finder' }, title: 'Finder', subtitle: 'Everything in the studio' }
                   : { kind: { type: 'tool' as const, tool: id }, title: MOCK_TOOL_NAMES[id] ?? id, subtitle: 'Preview' };

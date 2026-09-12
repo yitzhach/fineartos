@@ -3,8 +3,11 @@ import { createDocument } from '../../commission/document';
 import {
   addDocumentToProject,
   addInvoiceToProject,
+  addPhotoToProject,
   createProject,
   filedDocumentIds,
+  filedPhotoIds,
+  projectItemIds,
   projectItemCount,
   projectNameFor,
   removeFromProject,
@@ -111,5 +114,35 @@ describe('filedDocumentIds', () => {
 
   it('is empty when nothing has been filed', () => {
     expect(filedDocumentIds([createProject('A', null)]).size).toBe(0);
+  });
+});
+
+describe('pictures in a folder', () => {
+  it('files a picture and counts it with everything else', () => {
+    let project = createProject('Bobs project', null);
+    project = addPhotoToProject(project, 'photo-1');
+    project = addDocumentToProject(project, 'doc-1');
+    expect(projectItemCount(project)).toBe(2);
+    expect(projectItemIds(project)).toEqual(['doc-1', 'photo-1']);
+  });
+
+  it('files the same picture only once', () => {
+    let project = addPhotoToProject(createProject('P', null), 'photo-1');
+    project = addPhotoToProject(project, 'photo-1');
+    expect(project.imageIds).toEqual(['photo-1']);
+  });
+
+  it('takes a picture back out without touching the rest', () => {
+    let project = addPhotoToProject(createProject('P', null), 'photo-1');
+    project = addPhotoToProject(project, 'photo-2');
+    expect(removeFromProject(project, 'photo-1').imageIds).toEqual(['photo-2']);
+  });
+
+  it('copes with a folder saved before pictures existed', () => {
+    // The field is simply missing on an older record.
+    const old = { ...createProject('P', null), imageIds: undefined };
+    expect(projectItemCount(old)).toBe(0);
+    expect(filedPhotoIds([old]).size).toBe(0);
+    expect(addPhotoToProject(old, 'photo-1').imageIds).toEqual(['photo-1']);
   });
 });

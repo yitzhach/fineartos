@@ -8,7 +8,7 @@
  */
 
 const DB_NAME = 'artist-os';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 export const STORE_DOCUMENTS = 'documents';
 export const STORE_IMAGES = 'images';
@@ -16,6 +16,8 @@ export const STORE_QUEUE = 'pendingWrites';
 /** Added in DB_VERSION 2: project folders and the invoices filed in them. */
 export const STORE_PROJECTS = 'projects';
 export const STORE_INVOICES = 'invoices';
+/** Added in DB_VERSION 3: pictures that sit on the desktop as files. */
+export const STORE_PHOTOS = 'photos';
 
 export interface StoredImage {
   id: string;
@@ -69,6 +71,12 @@ export function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_INVOICES)) {
         const store = db.createObjectStore(STORE_INVOICES, { keyPath: 'id' });
+        store.createIndex('workspaceId', 'workspaceId');
+      }
+      // Version 3 adds photos. Same rule as version 2: nothing already
+      // stored is touched, so an upgrade can never cost the artist work.
+      if (!db.objectStoreNames.contains(STORE_PHOTOS)) {
+        const store = db.createObjectStore(STORE_PHOTOS, { keyPath: 'id' });
         store.createIndex('workspaceId', 'workspaceId');
       }
     };

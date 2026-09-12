@@ -149,6 +149,7 @@ function Confirm({
 function kindLabel(kind: TrashEntry['kind']): string {
   if (kind === 'project') return 'Folder';
   if (kind === 'invoice') return 'Invoice';
+  if (kind === 'photo') return 'Picture';
   return 'Commission';
 }
 
@@ -157,11 +158,19 @@ function kindLabel(kind: TrashEntry['kind']): string {
  * the question is the total, so the detail has to account for all of it or
  * the two read as a contradiction.
  */
-function describeContents({ folders, documents, invoices, records, entries }: TrashSummary): string {
+function describeContents({
+  folders,
+  documents,
+  invoices,
+  pictures,
+  records,
+  entries,
+}: TrashSummary): string {
   const parts: string[] = [];
   if (folders) parts.push(countPhrase(folders, 'folder'));
   if (documents) parts.push(countPhrase(documents, 'commission'));
   if (invoices) parts.push(countPhrase(invoices, 'invoice'));
+  if (pictures) parts.push(countPhrase(pictures, 'picture'));
   const inside = records - entries;
   if (inside > 0) parts.push(`${countPhrase(inside)} filed inside`);
   return `${parts.join(', ')}. This cannot be undone.`;
