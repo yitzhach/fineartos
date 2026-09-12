@@ -4,8 +4,10 @@ import {
 } from '../lib/prefs';
 import { describeSize, type CustomWallpaper, type WallpaperFit } from '../lib/wallpapers';
 import {
-  CROSSFADE_MS,
+  DEFAULT_CROSSFADE_SECONDS,
+  MAX_CROSSFADE_SECONDS,
   MAX_SECONDS,
+  MIN_CROSSFADE_SECONDS,
   MAX_SLIDES,
   MIN_SECONDS,
   emptySlideshow,
@@ -200,9 +202,8 @@ export function WallpaperPicker(props: Props) {
 
       <h4>Slideshow</h4>
       <p className="hint">
-        Up to {MAX_SLIDES} of your own pictures, one after another, with a{' '}
-        {CROSSFADE_MS / 1000} second crossfade. Tap the ones you want, in the order you want
-        them.
+        Up to {MAX_SLIDES} of your own pictures, one after another. Tap the ones you want, in
+        the order you want them.
       </p>
 
       {slideChoices.length === 0 ? (
@@ -278,6 +279,29 @@ export function WallpaperPicker(props: Props) {
           />
         </div>
         <span className="hint">{timingNote(show, ready.length)}</span>
+      </div>
+
+      <div className="field">
+        <label htmlFor="wp-crossfade">Crossfade</label>
+        <div className="chip-row">
+          <input
+            className="wp-seconds"
+            id="wp-crossfade"
+            type="number"
+            min={MIN_CROSSFADE_SECONDS}
+            max={MAX_CROSSFADE_SECONDS}
+            step={0.1}
+            value={show.crossfadeSeconds ?? DEFAULT_CROSSFADE_SECONDS}
+            aria-label="Seconds of crossfade between pictures"
+            onChange={(e) => {
+              const crossfade = Number(e.target.value);
+              if (Number.isFinite(crossfade)) setShow({ ...show, crossfadeSeconds: crossfade });
+            }}
+          />
+          <span className="hint">
+            seconds to dissolve from one picture to the next. 0 cuts straight over.
+          </span>
+        </div>
       </div>
 
       <div className="chip-row">

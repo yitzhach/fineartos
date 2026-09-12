@@ -5,6 +5,12 @@ import { groupOf, listModules, type OsModule } from './registry';
 interface Props {
   activeId: string;
   onOpen: (id: string) => void;
+  /**
+   * The room the dock takes at the bottom of the screen, measured. The
+   * desktop keeps its icons clear of it — windows, on the other hand, are
+   * allowed to pass underneath, the way they do on a real desktop.
+   */
+  onHeight?: (height: number) => void;
 }
 
 /**
@@ -29,9 +35,22 @@ const MAX_SCALE = 1.42;
  */
 const REACH = 189;
 
-export function Dock({ activeId, onOpen }: Props) {
+export function Dock({ activeId, onOpen, onHeight }: Props) {
   const [pointerX, setPointerX] = useState<number | null>(null);
   const frame = useRef<number | null>(null);
+  const dockRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const dock = dockRef.current;
+    if (!dock || !onHeight || typeof ResizeObserver === 'undefined') return undefined;
+    // The layout height, which a transform does not change: the dock shrinks
+    // to 0.72 at rest, and the room it keeps is the room it needs at full size.
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) onHeight(Math.round(entry.contentRect.height));
+    });
+    observer.observe(dock);
+    return () => observer.disconnect();
+  }, [onHeight]);
 
   useEffect(() => () => {
     if (frame.current !== null) cancelAnimationFrame(frame.current);
@@ -56,7 +75,9 @@ export function Dock({ activeId, onOpen }: Props) {
   const rests = magnifies && !near;
 
   return (
+    <div className="dock-slot">
     <nav
+      ref={dockRef}
       className="dock"
       aria-label="Applications"
       data-resting={rests}
@@ -102,6 +123,7 @@ export function Dock({ activeId, onOpen }: Props) {
         );
       })}
     </nav>
+    </div>
   );
 }
 

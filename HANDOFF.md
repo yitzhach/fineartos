@@ -107,7 +107,7 @@ event must be a ref.
 ```bash
 npm install
 npm run dev            # http://localhost:5173
-npm test               # 333 tests
+npm test               # 339 tests
 npm run build          # typecheck + dist/
 npm run preview        # serve dist on 4173
 npm run wallpapers     # photographs in wallpaper-source/ → public/, resized

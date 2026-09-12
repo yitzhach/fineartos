@@ -118,7 +118,7 @@ import {
   type Photo,
 } from './photo/photo';
 import { PhotoWindow } from './photo/ui/PhotoWindow';
-import { emptySlideshow, readySlides, secondsPerSlide } from './lib/slideshow';
+import { crossfadeSeconds, emptySlideshow, readySlides, secondsPerSlide } from './lib/slideshow';
 import { SHIPPED_PHOTOGRAPHS } from './lib/photographs';
 import { Repository, type StoredDocument } from './persistence/repository';
 import { onDbProblem, type DbProblem } from './persistence/db';
@@ -204,6 +204,7 @@ export default function App() {
   /** False until the first read from IndexedDB has come back. */
   const [loaded, setLoaded] = useState(false);
   /** Set when the database cannot be opened — never left silent. */
+  const [dockHeight, setDockHeight] = useState(84);
   const [dbProblem, setDbProblem] = useState<DbProblem | null>(null);
   /**
    * What Cmd/Ctrl+Z would put back. Only reversible things go on here —
@@ -1726,18 +1727,24 @@ export default function App() {
     .map((key) => slideSources[key])
     .filter((url): url is string => Boolean(url));
   const slideSeconds = secondsPerSlide(slideshow, slideUrls.length);
+  const slideCrossfade = crossfadeSeconds(slideshow, slideUrls.length);
 
   return (
     <div
       className="workspace"
       data-wallpaper={wallpaper.id}
       data-fit={wallpaper.fit ?? 'cover'}
-      style={wallpaperStyle(wallpaper, wallpaperUrls)}
+      style={{
+        ...wallpaperStyle(wallpaper, wallpaperUrls),
+        // The room the dock takes, kept clear of the desktop icons.
+        '--dock-reserve': `${dockHeight + 20}px`,
+      } as React.CSSProperties}
     >
       {wallpaper.id === 'slideshow' && (
         <WallpaperSlides
           urls={slideUrls}
           seconds={slideSeconds}
+          crossfade={slideCrossfade}
           reducedMotion={prefersReducedMotion()}
         />
       )}
@@ -1868,6 +1875,7 @@ export default function App() {
 
       <Dock
         activeId={dockIdFor(top)}
+        onHeight={setDockHeight}
         onOpen={(id) => {
           if (id === 'new') {
             // An action rather than a window to toggle: it makes a commission

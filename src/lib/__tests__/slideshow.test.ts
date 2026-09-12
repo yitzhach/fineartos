@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CROSSFADE_MS,
+  DEFAULT_CROSSFADE_SECONDS,
   MAX_SLIDES,
   MIN_SECONDS,
+  crossfadeSeconds,
   describeDuration,
   emptySlideshow,
   isFull,
@@ -67,18 +68,51 @@ describe('timing', () => {
     expect(secondsPerSlide({ ...withIds(4), timing: 'loop', seconds: 60 })).toBe(15);
   });
 
-  it('never leaves a picture up for less than the crossfade', () => {
+  it('never leaves a picture up for less than the floor', () => {
     const rushed = { ...withIds(20), timing: 'loop' as const, seconds: 5 };
     expect(secondsPerSlide(rushed)).toBe(MIN_SECONDS);
-    expect(MIN_SECONDS * 1000).toBeGreaterThan(CROSSFADE_MS);
     // And it says the loop will take longer than was asked for.
     expect(timingNote(rushed)).toMatch(/floor/);
   });
 
   it('says what will happen in words', () => {
     expect(timingNote({ ...withIds(6), timing: 'each', seconds: 20 })).toBe(
-      '20 seconds on each picture — the whole set takes 2 minutes.',
+      '20 seconds on each picture, 2 seconds of crossfade — the whole set takes 2 minutes.',
     );
+  });
+});
+
+describe('the crossfade', () => {
+  it('is two seconds until the artist says otherwise', () => {
+    expect(DEFAULT_CROSSFADE_SECONDS).toBe(2);
+    expect(crossfadeSeconds(withIds(3))).toBe(2);
+  });
+
+  it('takes the time that was typed in', () => {
+    expect(crossfadeSeconds({ ...withIds(3), crossfadeSeconds: 0.4 })).toBe(0.4);
+  });
+
+  it('allows a straight cut', () => {
+    const cut = { ...withIds(3), crossfadeSeconds: 0 };
+    expect(crossfadeSeconds(cut)).toBe(0);
+    expect(timingNote(cut)).toMatch(/cutting straight over/);
+  });
+
+  it('never runs longer than the picture is up, and says so', () => {
+    const silly = { ...withIds(3), timing: 'each' as const, seconds: 3, crossfadeSeconds: 9 };
+    expect(crossfadeSeconds(silly)).toBe(3);
+    expect(timingNote(silly)).toMatch(/cannot run longer/);
+  });
+
+  it('holds a nonsense value inside the range', () => {
+    expect(crossfadeSeconds({ ...withIds(3), seconds: 60, crossfadeSeconds: -4 })).toBe(0);
+    expect(crossfadeSeconds({ ...withIds(3), seconds: 60, crossfadeSeconds: 999 })).toBe(10);
+  });
+
+  it('gives a setting saved before it existed the default', () => {
+    const older = { ...withIds(3) } as { crossfadeSeconds?: number };
+    delete older.crossfadeSeconds;
+    expect(crossfadeSeconds(older as never)).toBe(DEFAULT_CROSSFADE_SECONDS);
   });
 
   it('reads a duration the way a person says it', () => {

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { CROSSFADE_MS, nextIndex } from '../lib/slideshow';
+import { nextIndex } from '../lib/slideshow';
 
 interface Props {
   /** Object URLs, in the order they were picked. Two or more, or nothing runs. */
   urls: string[];
   /** How long each picture is up, crossfade included. From `secondsPerSlide`. */
   seconds: number;
+  /** How long the dissolve takes, in seconds. From `crossfadeSeconds`. */
+  crossfade: number;
   /** Straight cuts instead of dissolves, for a viewer who asked for less motion. */
   reducedMotion: boolean;
 }
@@ -21,7 +23,7 @@ interface Props {
  *
  * The timing arithmetic is all in src/lib/slideshow.ts. This only counts.
  */
-export function WallpaperSlides({ urls, seconds, reducedMotion }: Props) {
+export function WallpaperSlides({ urls, seconds, crossfade, reducedMotion }: Props) {
   const [index, setIndex] = useState(0);
 
   // A picture removed from the set can leave the index past the end.
@@ -48,7 +50,7 @@ export function WallpaperSlides({ urls, seconds, reducedMotion }: Props) {
           style={{
             backgroundImage: `url(${url})`,
             opacity: i === current ? 1 : 0,
-            transitionDuration: reducedMotion ? '0ms' : `${CROSSFADE_MS}ms`,
+            transitionDuration: reducedMotion ? '0ms' : `${Math.round(crossfade * 1000)}ms`,
           }}
         />
       ))}

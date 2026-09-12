@@ -256,7 +256,16 @@ body {
   overflow: hidden;
 }
 
-.desktop-surface { position: absolute; inset: 0; overflow: auto; }
+/* The icons' half of the desktop: everything above the dock. Windows use the
+   whole of .desktop and are allowed under the dock; icons are not, because an
+   icon nobody can click is not a place to put anything. The reserve is
+   measured from the dock itself — see Dock's onHeight. */
+.desktop-surface {
+  position: absolute;
+  inset: 0;
+  bottom: var(--dock-reserve, 104px);
+  overflow: auto;
+}
 
 /* Icons are positioned, not flowed: the artist drags them where they like and
    they stay there. The grid maths is in src/os/desktopLayout.ts — the cell is
@@ -566,7 +575,8 @@ body {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 104px;
+  /* Clear of the dock, off the same measurement the icons use. */
+  bottom: var(--dock-reserve, 104px);
   /* Above the dock. At a lower z-index the dock swallows the clicks and a
      minimised window becomes unreachable — which a browser test caught. */
   z-index: 24;
@@ -1556,14 +1566,32 @@ fieldset.section > legend {
 
 /* --- Dock --------------------------------------------------------------- */
 
+/* The dock floats over the desktop rather than taking a slice of it. It used
+   to be a flex row in the workspace column, which meant the desktop stopped
+   where the dock's layout box began — and because the dock shrinks to 0.72 at
+   rest, a window was cut off along a line with visibly nothing on it. Windows
+   now run to the bottom of the screen and pass under the dock, the way they
+   do on a real desktop; the icons still keep clear of it, see
+   .desktop-surface. */
+.dock-slot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 14px;
+  display: flex;
+  justify-content: center;
+  z-index: 20;
+  /* Only the dock itself takes clicks; the strip either side of it is desktop. */
+  pointer-events: none;
+}
+.dock-slot > * { pointer-events: auto; }
+
 .dock {
-  flex: 0 0 auto;
   display: flex;
   align-items: flex-end;
   justify-content: center;
   gap: 2px;
   padding: 8px 10px 6px;
-  margin: 0 auto 14px;
   max-width: calc(100% - 24px);
   background: var(--panel);
   backdrop-filter: blur(30px) saturate(1.4);
@@ -1606,9 +1634,10 @@ fieldset.section > legend {
   transform: scale(var(--dock-scale));
   transform-origin: bottom center;
   /* Long enough to read as a swell rather than a snap, with an ease that
-     settles instead of stopping dead. 315ms rather than 220: the same
-     30% off the speed as the widened reach in Dock.tsx. */
-  transition: transform 315ms cubic-bezier(0.22, 1, 0.36, 1), background 160ms ease;
+     settles instead of stopping dead. 360ms rather than the original 220,
+     alongside the widened reach in Dock.tsx: together they take the best part
+     of a third off how quickly a tile grows under the pointer. */
+  transition: transform 360ms cubic-bezier(0.4, 0, 0.2, 1), background 160ms ease;
 }
 .dock-item:hover:not(:disabled) .tile { border-color: var(--line-strong); }
 .dock-item[aria-current='true'] .tile {
@@ -2291,10 +2320,13 @@ fieldset.section > legend {
    Touch is excluded in Dock.tsx: a thumb needs the full target. */
 .dock {
   transform-origin: bottom center;
+  /* Slow, and eased at both ends so it rises rather than snaps: at 240ms on
+     an ease-out the dock was most of the way up within a tenth of a second of
+     the pointer arriving, which read as a pop. */
   transition:
-    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 240ms ease,
-    box-shadow 240ms ease;
+    transform 430ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 430ms ease,
+    box-shadow 430ms ease;
 }
 
 .dock[data-resting='true'] {
@@ -2305,7 +2337,7 @@ fieldset.section > legend {
 
 /* Labels fade at rest; they keep their space, so nothing jumps on the way up. */
 .dock .name {
-  transition: opacity 200ms ease;
+  transition: opacity 320ms ease;
 }
 .dock[data-resting='true'] .name {
   opacity: 0;

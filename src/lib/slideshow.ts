@@ -17,13 +17,20 @@
 /** As many as the desktop picker offers. Past this it is a screensaver. */
 export const MAX_SLIDES = 20;
 
-/** The crossfade, fixed: long enough to read as a dissolve, not a cut. */
-export const CROSSFADE_MS = 1300;
+/** The crossfade when the artist has not said otherwise. */
+export const DEFAULT_CROSSFADE_SECONDS = 2;
 
 /**
- * The shortest a picture stays. The crossfade is 1.3s at each end, so at 2s a
- * picture is fully itself for only a fraction of a second — below that it is
- * a flicker rather than a background.
+ * The crossfade can be turned down to nothing — a straight cut is a real
+ * choice — but not up past the time a picture is on screen, or the desktop
+ * would never settle on anything.
+ */
+export const MIN_CROSSFADE_SECONDS = 0;
+export const MAX_CROSSFADE_SECONDS = 10;
+
+/**
+ * The shortest a picture stays. A crossfade runs at each end of it, so much
+ * below this a picture is a flicker rather than a background.
  */
 export const MIN_SECONDS = 2;
 export const MAX_SECONDS = 3600;
@@ -37,10 +44,20 @@ export interface Slideshow {
   timing: SlideTiming;
   /** Read as seconds per picture, or seconds for the whole loop. */
   seconds: number;
+  /**
+   * How long the dissolve between two pictures takes. Older settings saved
+   * before this was a choice have no value here and get the default.
+   */
+  crossfadeSeconds?: number;
 }
 
 export function emptySlideshow(): Slideshow {
-  return { imageIds: [], timing: 'each', seconds: 10 };
+  return {
+    imageIds: [],
+    timing: 'each',
+    seconds: 10,
+    crossfadeSeconds: DEFAULT_CROSSFADE_SECONDS,
+  };
 }
 
 export function isFull(show: Slideshow): boolean {
@@ -88,6 +105,18 @@ export function loopSeconds(show: Slideshow, count = show.imageIds.length): numb
   return Math.round(secondsPerSlide(show, count) * count * 10) / 10;
 }
 
+/**
+ * The crossfade actually used: what was asked for, held inside the range, and
+ * never longer than the picture is up. A dissolve as long as the dwell means
+ * nothing is ever fully itself, so it is capped at the time on screen.
+ */
+export function crossfadeSeconds(show: Slideshow, count = show.imageIds.length): number {
+  const asked = show.crossfadeSeconds ?? DEFAULT_CROSSFADE_SECONDS;
+  if (!Number.isFinite(asked)) return DEFAULT_CROSSFADE_SECONDS;
+  const held = Math.min(MAX_CROSSFADE_SECONDS, Math.max(MIN_CROSSFADE_SECONDS, asked));
+  return Math.round(Math.min(held, secondsPerSlide(show, count)) * 100) / 100;
+}
+
 export function nextIndex(index: number, count: number): number {
   if (count <= 0) return 0;
   return (index + 1) % count;
@@ -111,11 +140,16 @@ export function timingNote(show: Slideshow, count = show.imageIds.length): strin
   if (count < 2) return 'Pick at least two pictures and the timing applies to each of them.';
   const each = secondsPerSlide(show, count);
   const loop = loopSeconds(show, count);
-  const base = `${describeDuration(each)} on each picture — the whole set takes ${describeDuration(loop)}.`;
+  const fade = crossfadeSeconds(show, count);
+  const base =
+    `${describeDuration(each)} on each picture, ${
+      fade === 0 ? 'cutting straight over' : `${describeDuration(fade)} of crossfade`
+    } — the whole set takes ${describeDuration(loop)}.`;
   if (show.timing === 'loop' && Math.abs(loop - show.seconds) >= 0.5) {
-    return `${base} A loop that short would leave each picture up for less than the ${
-      CROSSFADE_MS / 1000
-    }s crossfade, so ${MIN_SECONDS} seconds each is the floor.`;
+    return `${base} A loop that short would leave each picture up for less time than it takes to change, so ${MIN_SECONDS} seconds each is the floor.`;
+  }
+  if (fade < (show.crossfadeSeconds ?? DEFAULT_CROSSFADE_SECONDS)) {
+    return `${base} A crossfade cannot run longer than the picture is up.`;
   }
   return base;
 }
