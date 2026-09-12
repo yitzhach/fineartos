@@ -118,6 +118,7 @@ import {
 } from './photo/photo';
 import { PhotoWindow } from './photo/ui/PhotoWindow';
 import { Repository, type StoredDocument } from './persistence/repository';
+import { onDbProblem, type DbProblem } from './persistence/db';
 import { describeSaveState, drainQueue, unavailableCloud } from './persistence/sync';
 import { exportDocument, importDocumentFromText } from './persistence/portable';
 import {
@@ -167,13 +168,13 @@ const cloud = unavailableCloud;
 const COMPACT_WIDTH = 860;
 
 registerPlannedModules();
-registerModule({ id: 'home', name: 'Home', icon: '⌂', available: true });
-registerModule({ id: 'commissions', name: 'Projects', icon: '✎', available: true });
-registerModule({ id: 'invoices', name: 'Invoices', icon: '❑', available: true });
-registerModule({ id: 'finder', name: 'Finder', icon: '❐', available: true });
-registerModule({ id: 'connect', name: 'Connect', icon: '◉', available: true });
+registerModule({ id: 'home', name: 'Home', icon: '⌂', available: true, group: 'tool' });
+registerModule({ id: 'commissions', name: 'Projects', icon: '✎', available: true, group: 'tool' });
+registerModule({ id: 'invoices', name: 'Invoices', icon: '❑', available: true, group: 'tool' });
+registerModule({ id: 'finder', name: 'Finder', icon: '❐', available: true, group: 'tool' });
+registerModule({ id: 'connect', name: 'Connect', icon: '◉', available: true, group: 'tool' });
 // Last in the dock, the way the Trash is always last.
-registerModule({ id: 'trash', name: 'Trash', icon: '♺', available: true });
+registerModule({ id: 'trash', name: 'Trash', icon: '♺', available: true, group: 'trash' });
 
 export default function App() {
   const repo = useMemo(() => new Repository(WORKSPACE_ID), []);
@@ -189,6 +190,8 @@ export default function App() {
   const [connectPhotoId, setConnectPhotoId] = useState<string | null>(null);
   /** False until the first read from IndexedDB has come back. */
   const [loaded, setLoaded] = useState(false);
+  /** Set when the database cannot be opened — never left silent. */
+  const [dbProblem, setDbProblem] = useState<DbProblem | null>(null);
 
   const [windows, setWindows] = useState<WindowState[]>([]);
   const [viewport, setViewport] = useState(() => ({
@@ -267,13 +270,27 @@ export default function App() {
     trashRef.current = trash;
   }, [trash]);
 
+  useEffect(() => onDbProblem(setDbProblem), []);
+
   const refresh = useCallback(async () => {
-    const [documentRows, projectRows, invoiceRows, photoRows] = await Promise.all([
-      repo.list(),
-      repo.listProjects(),
-      repo.listInvoices(),
-      repo.listPhotos(),
-    ]);
+    let documentRows: StoredDocument[];
+    let projectRows: Project[];
+    let invoiceRows: Invoice[];
+    let photoRows: Photo[];
+    try {
+      [documentRows, projectRows, invoiceRows, photoRows] = await Promise.all([
+        repo.list(),
+        repo.listProjects(),
+        repo.listInvoices(),
+        repo.listPhotos(),
+      ]);
+    } catch (cause) {
+      // The database reports its own problem through onDbProblem; this stops
+      // the app pretending the studio is empty when it simply cannot be read.
+      // eslint-disable-next-line no-console
+      console.error('Could not read the studio', cause);
+      return;
+    }
     // Everything in the Trash is hidden from the desktop, the Finder and the
     // lists. The records themselves are untouched in storage — that is what
     // makes Put back instant and lossless.
@@ -1562,6 +1579,16 @@ export default function App() {
           e.target.value = '';
         }}
       />
+
+      {dbProblem && (
+        <div className="db-problem no-print" role="alert">
+          <strong>{dbProblem.kind === 'superseded' ? 'Reload needed' : 'The studio is not open'}</strong>
+          <span>{dbProblem.message}</span>
+          <button className="btn" data-variant="primary" onClick={() => window.location.reload()}>
+            Reload
+          </button>
+        </div>
+      )}
 
       <main className="desktop">
         <Desktop

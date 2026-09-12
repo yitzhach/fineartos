@@ -3,8 +3,12 @@ import QRCode from 'qrcode';
 import type { StudioDefaults } from '../../lib/prefs';
 import { describePrice, describeSize, shareMessage, type Photo } from '../../photo/photo';
 import { missingFromCard, normaliseUrl, vcardFor } from '../contact';
+import { countPhrase } from '../../os/trash';
 import {
   csvOf,
+  likeCounts,
+  likedOf,
+  togglePhotoLike,
   draftProblem,
   emptyDraft,
   mailingList,
@@ -87,10 +91,20 @@ function Tab({
 
 // --- Guest book -----------------------------------------------------------
 
-function GuestBook({ guests, onGuests, studio, onMessage }: Props) {
+function GuestBook({ guests, onGuests, studio, onMessage, photos, imageUrls }: Props) {
   const [draft, setDraft] = useState<GuestDraft>(() => emptyDraft());
   const [query, setQuery] = useState('');
   const [warning, setWarning] = useState<string | null>(null);
+  /**
+   * Guest mode hides the book from whoever is holding the tablet: at a booth
+   * the last visitor's phone number should not be on screen while the next
+   * one signs. It hides nothing from the artist — the tally and the list are
+   * one tap away again.
+   */
+  const [guestMode, setGuestMode] = useState(false);
+
+  const titleOf = (photoId: string) => photos.find((p) => p.id === photoId)?.title ?? 'Picture';
+  const tally = likeCounts(guests);
 
   const problem = draftProblem(draft);
   const shown = searchGuests(guests, query);
@@ -121,9 +135,21 @@ function GuestBook({ guests, onGuests, studio, onMessage }: Props) {
           sign();
         }}
       >
-        <h3>Sign the book</h3>
+        <div className="gb-title">
+          <h3>Sign the book</h3>
+          <button
+            className="btn"
+            data-variant={guestMode ? 'primary' : 'quiet'}
+            type="button"
+            onClick={() => setGuestMode(!guestMode)}
+          >
+            {guestMode ? 'Back to the studio view' : 'Guest mode'}
+          </button>
+        </div>
         <p className="hint">
-          Hand the tablet over, or fill it in yourself. Only a name is needed.
+          {guestMode
+            ? 'Hand the tablet over. Nobody else’s details are on screen.'
+            : 'Hand the tablet over, or fill it in yourself. Only a name is needed.'}
         </p>
 
         <div className="field">
@@ -169,13 +195,52 @@ function GuestBook({ guests, onGuests, studio, onMessage }: Props) {
           />
         </div>
 
+        {photos.length > 0 && (
+          <div className="field">
+            <label>{guestMode ? 'Which pieces you like' : 'Pieces they liked'}</label>
+            <div className="gb-picks">
+              {photos.map((photo) => {
+                const picked = draft.likedPhotoIds.includes(photo.id);
+                return (
+                  <button
+                    key={photo.id}
+                    type="button"
+                    className="gb-pick"
+                    data-picked={picked}
+                    aria-pressed={picked}
+                    onClick={() => setDraft(togglePhotoLike(draft, photo.id))}
+                    title={photo.title}
+                  >
+                    {imageUrls[photo.imageId] ? (
+                      <img src={imageUrls[photo.imageId]} alt={photo.title} />
+                    ) : (
+                      <span className="sheet-face" />
+                    )}
+                    <span className="gb-pick-name">{photo.title}</span>
+                    {picked && <span className="gb-tick" aria-hidden="true">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+            <span className="hint">
+              {draft.likedPhotoIds.length === 0
+                ? 'Tap any you like. Tap again to change your mind.'
+                : `${draft.likedPhotoIds.length} picked`}
+            </span>
+          </div>
+        )}
+
         <div className="field">
           <label htmlFor="gb-note">Note</label>
           <textarea
             id="gb-note"
             rows={2}
             value={draft.note}
-            placeholder="Which piece they liked, anything worth remembering"
+            placeholder={
+              guestMode
+                ? 'Anything you would like to say'
+                : 'Anything worth remembering about this visitor'
+            }
             onChange={(e) => setDraft({ ...draft, note: e.target.value })}
           />
         </div>
@@ -198,6 +263,17 @@ function GuestBook({ guests, onGuests, studio, onMessage }: Props) {
         {warning && <p className="notice">{warning}</p>}
       </form>
 
+      {guestMode ? (
+        <div className="gb-list">
+          <div className="empty">
+            <h3>Guest mode</h3>
+            <p>
+              The book is hidden while the tablet is being handed round. Tap “Back to the studio
+              view” to see it again — {countPhrase(guests.length, 'signature')} so far.
+            </p>
+          </div>
+        </div>
+      ) : (
       <div className="gb-list">
         <div className="gb-head">
           <h3>{guests.length === 1 ? '1 signature' : `${guests.length} signatures`}</h3>
@@ -209,7 +285,7 @@ function GuestBook({ guests, onGuests, studio, onMessage }: Props) {
             data-variant="quiet"
             disabled={guests.length === 0}
             onClick={() => {
-              downloadText(csvOf(guests), 'guest-book.csv', 'text/csv');
+              downloadText(csvOf(guests, titleOf), 'guest-book.csv', 'text/csv');
               onMessage('Guest book saved as a CSV you can open in any spreadsheet.');
             }}
           >
@@ -224,6 +300,22 @@ function GuestBook({ guests, onGuests, studio, onMessage }: Props) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
+
+        {tally.length > 0 && (
+          <div className="gb-tally">
+            <h4>Most liked</h4>
+            <ol>
+              {tally.slice(0, 5).map(({ photoId, count }) => (
+                <li key={photoId}>
+                  <span className="gb-tally-name">{titleOf(photoId)}</span>
+                  <span className="gb-tally-count">
+                    {count} {count === 1 ? 'vote' : 'votes'}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
 
         {shown.length === 0 ? (
           <div className="empty">
@@ -246,6 +338,11 @@ function GuestBook({ guests, onGuests, studio, onMessage }: Props) {
                     {entry.consented ? ' · may contact' : ' · no contact'}
                   </span>
                   {entry.note && <span className="fnd-detail">“{entry.note}”</span>}
+                  {likedOf(entry).length > 0 && (
+                    <span className="fnd-detail">
+                      Liked: {likedOf(entry).map(titleOf).join(', ')}
+                    </span>
+                  )}
                 </div>
                 {entry.email && (
                   <a
@@ -276,6 +373,7 @@ function GuestBook({ guests, onGuests, studio, onMessage }: Props) {
           </ul>
         )}
       </div>
+      )}
     </div>
   );
 }

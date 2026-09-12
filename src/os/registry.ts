@@ -9,25 +9,47 @@
 
 import type { ComponentType } from 'react';
 
+/**
+ * Where a module sits in the dock. Working tools lead, previews follow behind
+ * a divider, and the Trash is last — five dead buttons at the head of the
+ * dock made the row look broken rather than forthcoming.
+ */
+export type ModuleGroup = 'tool' | 'later' | 'trash';
+
 export interface OsModule {
   id: string;
   name: string;
   icon: string;
   available: boolean;
+  group?: ModuleGroup;
   /** Present only for a module that is actually built. */
   entry?: ComponentType;
 }
 
 const modules: OsModule[] = [];
 
+/**
+ * Registering a module again replaces it and moves it to the end, so a tool
+ * that was a planned placeholder and has since been built takes its place
+ * among the working tools rather than keeping the slot it held as a stub.
+ */
 export function registerModule(module: OsModule): void {
   const existing = modules.findIndex((m) => m.id === module.id);
-  if (existing >= 0) modules[existing] = module;
-  else modules.push(module);
+  if (existing >= 0) modules.splice(existing, 1);
+  modules.push(module);
 }
 
+const GROUP_ORDER: Record<ModuleGroup, number> = { tool: 0, later: 1, trash: 2 };
+
+/** Registration order within a group is kept; only the groups are ordered. */
 export function listModules(): OsModule[] {
-  return [...modules];
+  return [...modules].sort(
+    (a, b) => GROUP_ORDER[groupOf(a)] - GROUP_ORDER[groupOf(b)],
+  );
+}
+
+export function groupOf(module: OsModule): ModuleGroup {
+  return module.group ?? (module.available ? 'tool' : 'later');
 }
 
 export function getModule(id: string): OsModule | undefined {
@@ -43,6 +65,6 @@ export function registerPlannedModules(): void {
     { id: 'visualizer', name: 'Visualizer', icon: '◱' },
     { id: 'finance', name: 'Finance', icon: '≡' },
   ]) {
-    registerModule({ ...planned, available: false });
+    registerModule({ ...planned, available: false, group: 'later' });
   }
 }

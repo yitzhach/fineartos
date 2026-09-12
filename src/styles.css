@@ -2494,3 +2494,109 @@ fieldset.section > legend {
   font-weight: 600;
   box-shadow: inset 0 -2px 0 var(--copper);
 }
+
+/* --- The database could not be opened ------------------------------------- */
+
+/* Loud on purpose. The failure this replaces was an app that looked perfectly
+   normal and quietly did nothing at all. */
+.db-problem {
+  position: fixed;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  max-width: min(680px, calc(100% - 24px));
+  padding: 12px 16px;
+  border: 1px solid var(--danger);
+  border-radius: 12px;
+  background: var(--panel-solid);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
+}
+.db-problem strong { flex: 0 0 auto; color: var(--danger); }
+.db-problem span { flex: 1 1 240px; font-size: 13px; color: var(--ink); }
+
+/* The divider between working tools, previews, and the Trash. */
+.dock-divider {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 1px;
+  height: 34px;
+  margin: 0 7px;
+  background: var(--line-strong);
+  opacity: 0.7;
+}
+
+/* Previews are dimmed, not shrunk: at 0.34 they read as a hole in the row. */
+.dock-item:disabled .tile { opacity: 0.5; }
+.dock-item:disabled .name { opacity: 0.6; }
+
+/* --- Guest book: the pictures a visitor taps ------------------------------ */
+
+.gb-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+.gb-picks { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Big enough for a thumb on a tablet at a booth, where this is used. */
+.gb-pick {
+  position: relative;
+  width: 104px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--raised);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+.gb-pick img { width: 100%; height: 68px; object-fit: cover; border-radius: 6px; }
+.gb-pick[data-picked='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-quiet);
+}
+.gb-pick-name {
+  font-size: 11px;
+  color: var(--ink-soft);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gb-tick {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.gb-tally {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--raised);
+}
+.gb-tally h4 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.gb-tally ol { margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 3px; }
+.gb-tally li { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+.gb-tally-count { color: var(--ink-soft); font-variant-numeric: tabular-nums; }

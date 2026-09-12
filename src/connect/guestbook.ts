@@ -26,6 +26,11 @@ export interface GuestEntry {
   note: string | null;
   /** True when the visitor said yes to hearing from the studio. */
   consented: boolean;
+  /**
+   * Pictures the visitor tapped as ones they liked. Empty means they were not
+   * asked or did not pick any — never that they disliked everything.
+   */
+  likedPhotoIds: string[];
   signedAt: string;
 }
 
@@ -36,6 +41,7 @@ export interface GuestDraft {
   show: string;
   note: string;
   consented: boolean;
+  likedPhotoIds: string[];
 }
 
 export const emptyDraft = (show = ''): GuestDraft => ({
@@ -45,6 +51,7 @@ export const emptyDraft = (show = ''): GuestDraft => ({
   show,
   note: '',
   consented: false,
+  likedPhotoIds: [],
 });
 
 /** Why a draft cannot be signed, or null when it can. */
@@ -73,6 +80,7 @@ export function signGuestBook(draft: GuestDraft, now = new Date()): GuestEntry {
     show: trimmedOrNull(draft.show),
     note: trimmedOrNull(draft.note),
     consented: draft.consented,
+    likedPhotoIds: [...draft.likedPhotoIds],
     signedAt: now.toISOString(),
   };
 }
@@ -101,6 +109,33 @@ export function possibleDuplicates(entries: GuestEntry[], entry: GuestEntry): Gu
   });
 }
 
+/** Older entries were written before pictures could be picked. */
+export function likedOf(entry: GuestEntry): string[] {
+  return entry.likedPhotoIds ?? [];
+}
+
+/** Toggles a picture in a draft — tapping a liked one again un-likes it. */
+export function togglePhotoLike(draft: GuestDraft, photoId: string): GuestDraft {
+  const liked = draft.likedPhotoIds.includes(photoId)
+    ? draft.likedPhotoIds.filter((id) => id !== photoId)
+    : [...draft.likedPhotoIds, photoId];
+  return { ...draft, likedPhotoIds: liked };
+}
+
+/**
+ * How many visitors liked each picture, most-liked first. The artist's answer
+ * to "which of these should I bring to the next show?".
+ */
+export function likeCounts(entries: GuestEntry[]): { photoId: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const entry of entries) {
+    for (const id of likedOf(entry)) counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([photoId, count]) => ({ photoId, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
 export function searchGuests(entries: GuestEntry[], query: string): GuestEntry[] {
   const needle = query.trim().toLowerCase();
   if (!needle) return entries;
@@ -116,8 +151,8 @@ export function mailingList(entries: GuestEntry[]): GuestEntry[] {
   return entries.filter((entry) => entry.consented && entry.email);
 }
 
-export function csvOf(entries: GuestEntry[]): string {
-  const header = ['Name', 'Email', 'Phone', 'Show', 'Note', 'May contact', 'Signed'];
+export function csvOf(entries: GuestEntry[], titleOf?: (photoId: string) => string): string {
+  const header = ['Name', 'Email', 'Phone', 'Show', 'Note', 'May contact', 'Liked', 'Signed'];
   const rows = entries.map((entry) => [
     entry.name,
     entry.email ?? '',
@@ -125,6 +160,8 @@ export function csvOf(entries: GuestEntry[]): string {
     entry.show ?? '',
     entry.note ?? '',
     entry.consented ? 'yes' : 'no',
+    // Titles rather than ids: a spreadsheet is read by a person.
+    likedOf(entry).map((id) => titleOf?.(id) ?? id).join('; '),
     entry.signedAt,
   ]);
   return [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');

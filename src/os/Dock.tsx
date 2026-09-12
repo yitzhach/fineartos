@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { listModules, type OsModule } from './registry';
+import { Fragment, useRef, useState } from 'react';
+import { groupOf, listModules, type OsModule } from './registry';
 
 interface Props {
   activeId: string;
@@ -58,15 +58,23 @@ export function Dock({ activeId, onOpen }: Props) {
         setNear(false);
       }}
     >
-      {listModules().map((module) => (
-        <DockItem
-          key={module.id}
-          module={module}
-          active={activeId === module.id}
-          pointerX={magnifies ? pointerX : null}
-          onOpen={onOpen}
-        />
-      ))}
+      {listModules().map((module, index, all) => {
+        // A rule between groups: what works, what is coming later, and the
+        // Trash. Without it the dimmed previews read as a gap in the row.
+        const previous = index > 0 ? all[index - 1] : undefined;
+        const divides = previous !== undefined && groupOf(previous) !== groupOf(module);
+        return (
+          <Fragment key={module.id}>
+            {divides && <span className="dock-divider" aria-hidden="true" />}
+            <DockItem
+              module={module}
+              active={activeId === module.id}
+              pointerX={magnifies ? pointerX : null}
+              onOpen={onOpen}
+            />
+          </Fragment>
+        );
+      })}
     </nav>
   );
 }

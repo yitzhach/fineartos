@@ -45,10 +45,63 @@ export interface PendingWrite {
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
+/**
+ * What went wrong opening the database, for the UI to show.
+ *
+ * This exists because of a real failure: version 3 added the photos store,
+ * and a browser will not upgrade a database while another connection to the
+ * old version is open. A second tab left open on the old version blocked the
+ * upgrade, every read waited behind it, and the app sat there looking fine
+ * and doing nothing — no records, no windows, uploads stuck on "Adding…",
+ * and not one error on screen. A silent hang is the worst possible failure,
+ * so now it is reported, and it is escapable without clearing any data.
+ */
+export type DbProblem =
+  | { kind: 'blocked'; message: string }
+  | { kind: 'superseded'; message: string }
+  | { kind: 'failed'; message: string };
+
+type ProblemListener = (problem: DbProblem) => void;
+
+const listeners = new Set<ProblemListener>();
+let lastProblem: DbProblem | null = null;
+
+export function onDbProblem(listener: ProblemListener): () => void {
+  listeners.add(listener);
+  if (lastProblem) listener(lastProblem);
+  return () => listeners.delete(listener);
+}
+
+function report(problem: DbProblem): void {
+  lastProblem = problem;
+  for (const listener of listeners) listener(problem);
+}
+
+/** Long enough for a slow disk, short enough that nobody sits staring. */
+const OPEN_TIMEOUT_MS = 8000;
+
 export function openDb(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    // Nothing below ever leaves this promise pending: a hang here stops the
+    // whole app, so every path ends in a resolve or a reject.
+    const timer = setTimeout(() => {
+      const message =
+        'The studio could not be opened. Another tab of Artist OS is probably still open on an older version — close the other tabs and reload this page. Nothing has been lost.';
+      report({ kind: 'blocked', message });
+      dbPromise = null;
+      reject(new Error(message));
+    }, OPEN_TIMEOUT_MS);
+
+    request.onblocked = () => {
+      report({
+        kind: 'blocked',
+        message:
+          'Another tab of Artist OS is holding the studio open. Close the other tabs and reload — nothing has been lost.',
+      });
+    };
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains(STORE_DOCUMENTS)) {
@@ -80,8 +133,34 @@ export function openDb(): Promise<IDBDatabase> {
         store.createIndex('workspaceId', 'workspaceId');
       }
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      clearTimeout(timer);
+      const db = request.result;
+
+      // A later version opened in another tab needs this connection closed,
+      // or that tab hangs the way this one just did. Closing makes the
+      // records unreachable here, so the page has to be reloaded — say so
+      // rather than failing quietly.
+      db.onversionchange = () => {
+        db.close();
+        dbPromise = null;
+        report({
+          kind: 'superseded',
+          message:
+            'Artist OS was updated in another tab. Reload this page to carry on — your work is saved.',
+        });
+      };
+
+      resolve(db);
+    };
+
+    request.onerror = () => {
+      clearTimeout(timer);
+      const message = request.error?.message ?? 'The studio could not be opened.';
+      report({ kind: 'failed', message });
+      dbPromise = null;
+      reject(request.error ?? new Error(message));
+    };
   });
   return dbPromise;
 }

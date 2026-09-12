@@ -12,8 +12,15 @@ import {
   searchGuests,
   signGuestBook,
   smsLink,
+  togglePhotoLike,
+  likedOf,
+  likeCounts,
   type GuestDraft,
+  type GuestEntry,
 } from '../guestbook';
+
+/** A named helper so the picture tests read plainly. */
+const draft0 = (): GuestDraft => ({ ...emptyDraft(), name: 'Ada Lovelace' });
 
 function draft(over: Partial<GuestDraft> = {}): GuestDraft {
   return { ...emptyDraft(), name: 'Ada Lovelace', ...over };
@@ -156,5 +163,46 @@ describe('links out to the phone', () => {
 
   it('keeps a leading + on an international number', () => {
     expect(smsLink('+44 20 7946 0018', 'hi', false)).toContain('sms:+442079460018');
+  });
+});
+
+describe('pictures a visitor liked', () => {
+  it('starts with none picked', () => {
+    expect(emptyDraft().likedPhotoIds).toEqual([]);
+  });
+
+  it('toggles a picture on and off again', () => {
+    let draft = togglePhotoLike(draft0(), 'photo-1');
+    expect(draft.likedPhotoIds).toEqual(['photo-1']);
+    draft = togglePhotoLike(draft, 'photo-1');
+    expect(draft.likedPhotoIds).toEqual([]);
+  });
+
+  it('keeps the picks on the signed entry', () => {
+    const entry = signGuestBook(togglePhotoLike(draft0(), 'photo-1'));
+    expect(likedOf(entry)).toEqual(['photo-1']);
+  });
+
+  it('reads an entry signed before pictures could be picked as none', () => {
+    const old = { ...signGuestBook(draft0()), likedPhotoIds: undefined } as unknown as GuestEntry;
+    expect(likedOf(old)).toEqual([]);
+  });
+
+  it('counts the most liked picture first', () => {
+    const a = signGuestBook({ ...draft0(), likedPhotoIds: ['p1', 'p2'] });
+    const b = signGuestBook({ ...draft0(), likedPhotoIds: ['p2'] });
+    expect(likeCounts([a, b])).toEqual([
+      { photoId: 'p2', count: 2 },
+      { photoId: 'p1', count: 1 },
+    ]);
+  });
+
+  it('counts nothing when nobody picked anything', () => {
+    expect(likeCounts([signGuestBook(draft0())])).toEqual([]);
+  });
+
+  it('writes the titles, not the ids, into the CSV', () => {
+    const entry = signGuestBook({ ...draft0(), likedPhotoIds: ['p1'] });
+    expect(csvOf([entry], (id) => (id === 'p1' ? 'Harbour light' : id))).toContain('"Harbour light"');
   });
 });
