@@ -7,6 +7,7 @@ import {
   describeStatus,
   editPhoto,
   isInCurrentShow,
+  isShownToVisitors,
   statusOf,
   shareMessage,
   titleFromFileName,
@@ -137,5 +138,22 @@ describe('status and the current show', () => {
 
   it('shows the status in the line under a thumbnail', () => {
     expect(describePhoto(editPhoto(base(), { status: 'sold' }))).toBe('Sold');
+  });
+});
+
+
+describe('isShownToVisitors', () => {
+  it('shows a new picture: hiding is something the artist does', () => {
+    expect(isShownToVisitors(base())).toBe(true);
+  });
+
+  it('hides one the artist took out, without deleting it', () => {
+    expect(isShownToVisitors(editPhoto(base(), { hiddenFromVisitors: true }))).toBe(false);
+  });
+
+  it('shows a picture stored before hiding existed', () => {
+    const older = { ...base() } as Partial<ReturnType<typeof base>>;
+    delete older.hiddenFromVisitors;
+    expect(isShownToVisitors(older as ReturnType<typeof base>)).toBe(true);
   });
 });

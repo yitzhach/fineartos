@@ -229,8 +229,14 @@ export default function App() {
   const [trashPosition, setTrashPosition] = useState<IconPosition | null>(loadTrashPosition);
   /**
    * The desktop surface's own size, reported by Desktop. Smaller than the
-   * window — the system bar is above it — and it is what the icon grid is
-   * laid out against, so Tidy up must use the same number.
+   * browser window — the system bar is above it and the dock below — and it
+   * is what the icon grid is laid out against, so Tidy up must use the same
+   * number.
+   *
+   * Windows are measured against it too. They are drawn inside this surface,
+   * which clips what hangs past it, so sizing them against the browser window
+   * cut the bottom off every tall one: no border, no resize grip, and no
+   * scrollbar to reach them with.
    */
   const desktopViewportRef = useRef(viewport);
   const [projectTabs, setProjectTabs] = useState<Record<string, ProjectTab>>({});
@@ -263,25 +269,29 @@ export default function App() {
   useEffect(() => saveStudioDefaults(studio), [studio]);
   useEffect(() => savePaymentInstructions(payment), [payment]);
 
-  // The latest viewport, for callbacks that must not close over a stale one.
-  const viewportRef = useRef(viewport);
-  useEffect(() => {
-    viewportRef.current = viewport;
-  }, [viewport]);
-
   useEffect(() => {
     const onResize = () => {
-      const next = { width: window.innerWidth, height: window.innerHeight };
-      setViewport(next);
-      // Windows follow the screen in, so none is left unreachable.
-      setWindows((current) => clampToViewport(current, next));
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+      // The windows follow the desktop surface in, not the browser window —
+      // see onDesktopViewport below, which the same resize triggers.
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  /** The desktop surface has been measured, or has changed size. */
+  const onDesktopViewport = useCallback((size: { width: number; height: number }) => {
+    const previous = desktopViewportRef.current;
+    desktopViewportRef.current = size;
+    if (previous.width === size.width && previous.height === size.height) return;
+    // Windows follow the surface in, so none is left unreachable or clipped.
+    setWindows((current) => clampToViewport(current, size));
+  }, []);
+
   const open = useCallback((kind: WindowKind, title: string, subtitle?: string | null) => {
-    setWindows((current) => openWindow(current, { kind, title, subtitle }, viewportRef.current).windows);
+    setWindows(
+      (current) => openWindow(current, { kind, title, subtitle }, desktopViewportRef.current).windows,
+    );
   }, []);
 
   // --- Data ---------------------------------------------------------------
@@ -1264,7 +1274,7 @@ export default function App() {
   const focusWin = (id: string) => setWindows((c) => focusWindow(c, id));
   const closeWin = (id: string) => setWindows((c) => closeWindow(c, id));
   const minimizeWin = (id: string) => setWindows((c) => minimizeWindow(c, id));
-  const zoomWin = (id: string) => setWindows((c) => toggleZoom(c, id, viewportRef.current));
+  const zoomWin = (id: string) => setWindows((c) => toggleZoom(c, id, desktopViewportRef.current));
 
   const statusRow =
     top && top.kind.type === 'commission'
@@ -1629,6 +1639,11 @@ export default function App() {
             const photo = photos.find((p) => p.id === photoId);
             if (photo) void savePhotoRecord(editPhoto(photo, { inCurrentShow: inShow }));
           }}
+          onSetVisible={(photoId, visible) => {
+            const photo = photos.find((p) => p.id === photoId);
+            if (photo) void savePhotoRecord(editPhoto(photo, { hiddenFromVisitors: !visible }));
+          }}
+          onOpenPhoto={openPhotoWindow}
           selectedPhotoId={connectPhotoId}
           onSelectPhoto={setConnectPhotoId}
           siteUrl={siteUrl}
@@ -1759,9 +1774,7 @@ export default function App() {
           }}
           onTrash={(id) => void handleTrash(id)}
           onOpenTrash={openTrashWindow}
-          onViewport={(size) => {
-            desktopViewportRef.current = size;
-          }}
+          onViewport={onDesktopViewport}
         />
 
         {windows
@@ -1854,7 +1867,7 @@ export default function App() {
                   : id === 'finder'
                   ? { kind: { type: 'tool' as const, tool: 'finder' }, title: 'Finder', subtitle: 'Everything in the studio' }
                   : { kind: { type: 'tool' as const, tool: id }, title: MOCK_TOOL_NAMES[id] ?? id, subtitle: 'Preview' };
-          setWindows((c) => toggleWindow(c, spec, viewportRef.current).windows);
+          setWindows((c) => toggleWindow(c, spec, desktopViewportRef.current).windows);
         }}
       />
     </div>

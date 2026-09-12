@@ -44,6 +44,14 @@ export interface Photo {
   status: PhotoStatus;
   /** Hung at the show being worked right now. False until marked. */
   inCurrentShow: boolean;
+  /**
+   * Kept out of the picker a visitor is handed at a show. Not a property of
+   * the work — a picture is hidden because it is sold, promised, or simply
+   * not what this booth is about, and the artist can put it back in one tap.
+   * False by default: a new picture is shown, because hiding by default is
+   * how a picture goes missing without anyone noticing.
+   */
+  hiddenFromVisitors: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -68,6 +76,7 @@ export function createPhoto(
     note: null,
     status: null,
     inCurrentShow: false,
+    hiddenFromVisitors: false,
     createdAt: iso,
     updatedAt: iso,
   };
@@ -105,6 +114,15 @@ export function statusOf(photo: Photo): PhotoStatus {
 
 export function isInCurrentShow(photo: Photo): boolean {
   return photo.inCurrentShow === true;
+}
+
+/**
+ * Whether a visitor is shown this picture. Pictures stored before hiding
+ * existed have no flag at all, and those are shown: the default is visible,
+ * and only an explicit hide takes a picture out.
+ */
+export function isShownToVisitors(photo: Photo): boolean {
+  return photo.hiddenFromVisitors !== true;
 }
 
 /** "24 × 36 in", or null when the work has never been measured. */

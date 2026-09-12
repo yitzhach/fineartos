@@ -24,6 +24,8 @@ export type IconName =
   | 'artwork'
   | 'visualizer'
   | 'finance'
+  | 'eye'
+  | 'eye-off'
   | 'trash';
 
 interface Props {
@@ -53,6 +55,21 @@ export function Icon({ name, size = 22 }: Props) {
 }
 
 const paths: Record<IconName, JSX.Element> = {
+  // Shown to a visitor, and the same eye struck through when it is not.
+  eye: (
+    <>
+      <path d="M2.8 12S6.4 5.9 12 5.9 21.2 12 21.2 12 17.6 18.1 12 18.1 2.8 12 2.8 12Z" />
+      <circle cx="12" cy="12" r="2.9" />
+    </>
+  ),
+  'eye-off': (
+    <>
+      <path d="M9.6 6.3A8.6 8.6 0 0 1 12 5.9c5.6 0 9.2 6.1 9.2 6.1a17 17 0 0 1-2.7 3.4" />
+      <path d="M6.1 8A17 17 0 0 0 2.8 12S6.4 18.1 12 18.1a8.7 8.7 0 0 0 3.4-.7" />
+      <path d="M10 10a2.9 2.9 0 0 0 4 4" />
+      <path d="M4.4 4.4 19.6 19.6" />
+    </>
+  ),
   // A fresh sheet with a pencil laid across it: start a new commission.
   new: (
     <>

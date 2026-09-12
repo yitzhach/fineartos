@@ -6,12 +6,14 @@ import {
   describeSize,
   describeStatus,
   isInCurrentShow,
+  isShownToVisitors,
   shareMessage,
-  statusOf,
   type Photo,
 } from '../../photo/photo';
+import { filterCounts, pickedPhotos, picksFor, type PickFilter } from '../picker';
 import { missingFromCard, normaliseUrl, vcardFor } from '../contact';
 import { countPhrase } from '../../os/trash';
+import { Icon } from '../../os/icons';
 import { SignatureMark, SignaturePad } from './SignaturePad';
 import {
   csvOf,
@@ -49,6 +51,10 @@ interface Props {
   importing: boolean;
   /** Puts a picture in — or takes it out of — the show being worked now. */
   onToggleCurrentShow: (photoId: string, inShow: boolean) => void;
+  /** Takes a picture out of what a visitor is shown, or puts it back. */
+  onSetVisible: (photoId: string, visible: boolean) => void;
+  /** Opens the picture itself, where its price and status are edited. */
+  onOpenPhoto: (photoId: string) => void;
   selectedPhotoId: string | null;
   onSelectPhoto: (id: string | null) => void;
   siteUrl: string;
@@ -106,8 +112,6 @@ function Tab({
 
 // --- Guest book -----------------------------------------------------------
 
-type PickFilter = 'show' | 'available' | 'all';
-
 function GuestBook({
   guests,
   onGuests,
@@ -115,9 +119,12 @@ function GuestBook({
   onMessage,
   photos,
   imageUrls,
+  imageBlob,
   onAddImages,
   importing,
   onToggleCurrentShow,
+  onSetVisible,
+  onOpenPhoto,
 }: Props) {
   const [draft, setDraft] = useState<GuestDraft>(() => emptyDraft());
   const [query, setQuery] = useState('');
@@ -137,19 +144,18 @@ function GuestBook({
    */
   const [filter, setFilter] = useState<PickFilter>('show');
   const [over, setOver] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const titleOf = (photoId: string) => photos.find((p) => p.id === photoId)?.title ?? 'Picture';
   const tally = likeCounts(guests);
 
-  const inShow = photos.filter(isInCurrentShow);
-  const available = photos.filter((photo) => statusOf(photo) === 'available');
-  const shownPhotos = filter === 'show' ? inShow : filter === 'available' ? available : photos;
+  const counts = filterCounts(photos, { guestMode });
+  const shownPhotos = picksFor(photos, filter, { guestMode });
+  const picked = pickedPhotos(photos, draft.likedPhotoIds);
 
   /** An email to one visitor about the pieces they picked. */
   const likedMailto = (entry: GuestEntry) => {
-    const picked = likedOf(entry)
-      .map((id) => photos.find((photo) => photo.id === id))
-      .filter((photo): photo is Photo => Boolean(photo));
+    const picked = pickedPhotos(photos, likedOf(entry));
     const body = [
       `Hi ${entry.name.split(' ')[0]},`,
       '',
@@ -163,6 +169,60 @@ function GuestBook({
       `— ${studio.name || 'the studio'}`,
     ].join('\n');
     return mailtoLink(entry.email ?? '', 'The pieces you liked', body);
+  };
+
+  /**
+   * The picked pictures, handed over. On a phone that is the share sheet with
+   * the files actually attached; anywhere else it saves them, because a
+   * mailto: link cannot carry a picture and pretending otherwise is the one
+   * thing this tool must not do.
+   */
+  const canShareFiles = typeof navigator !== 'undefined' && typeof navigator.canShare === 'function';
+  const takeLabel = canShareFiles ? 'Share the picked pictures' : 'Save the picked pictures';
+
+  const takePicked = async () => {
+    if (picked.length === 0) return;
+    setSending(true);
+    try {
+      const blobs = await Promise.all(picked.map((photo) => imageBlob(photo.imageId)));
+      const files = picked
+        .map((photo, index) => {
+          const blob = blobs[index];
+          if (!blob) return null;
+          return new File([blob], `${photo.title.replace(/[^\w -]/g, '') || 'artwork'}.jpg`, {
+            type: blob.type || 'image/jpeg',
+          });
+        })
+        .filter((file): file is File => Boolean(file));
+
+      const text = picked.map((photo) => shareMessage(photo, studio.name || null)).join('\n\n');
+
+      if (files.length > 0 && navigator.canShare?.({ files })) {
+        await navigator.share({ files, text, title: 'The pieces you picked' });
+        onMessage('Handed to your phone’s share sheet.');
+        return;
+      }
+
+      let saved = 0;
+      for (const photo of picked) {
+        const url = imageUrls[photo.imageId];
+        if (!url) continue;
+        downloadUrl(url, `${photo.title || 'artwork'}.jpg`);
+        saved += 1;
+      }
+      onMessage(
+        saved === 0
+          ? 'Those pictures are still loading — try again in a moment.'
+          : `${countPhrase(saved, 'picture')} saved to your downloads. Attach them to an email yourself.`,
+      );
+    } catch (cause) {
+      // A cancelled share throws as well; that is not worth shouting about.
+      if ((cause as Error)?.name !== 'AbortError') {
+        onMessage('That could not be handed over. Save picture in the Send a picture tab still works.');
+      }
+    } finally {
+      setSending(false);
+    }
   };
 
   const problem = draftProblem(draft);
@@ -258,13 +318,13 @@ function GuestBook({
           <div className="field">
             <label>{guestMode ? 'Which pieces you like' : 'Pieces they liked'}</label>
             <div className="chip-row gb-filters">
-              <FilterChip id="show" current={filter} onPick={setFilter} count={inShow.length}>
+              <FilterChip id="show" current={filter} onPick={setFilter} count={counts.show}>
                 Current show
               </FilterChip>
-              <FilterChip id="available" current={filter} onPick={setFilter} count={available.length}>
+              <FilterChip id="available" current={filter} onPick={setFilter} count={counts.available}>
                 Available
               </FilterChip>
-              <FilterChip id="all" current={filter} onPick={setFilter} count={photos.length}>
+              <FilterChip id="all" current={filter} onPick={setFilter} count={counts.all}>
                 Everything
               </FilterChip>
             </div>
@@ -287,17 +347,25 @@ function GuestBook({
               }}
             >
               {shownPhotos.map((photo) => {
-                const picked = draft.likedPhotoIds.includes(photo.id);
+                const isPicked = draft.likedPhotoIds.includes(photo.id);
                 const inShow = isInCurrentShow(photo);
+                const visible = isShownToVisitors(photo);
                 return (
                   <div key={photo.id} className="gb-pick-wrap">
                     <button
                       type="button"
                       className="gb-pick"
-                      data-picked={picked}
-                      aria-pressed={picked}
-                      onClick={() => setDraft(togglePhotoLike(draft, photo.id))}
-                      title={photo.title}
+                      data-picked={isPicked}
+                      data-hidden={!visible}
+                      aria-pressed={isPicked}
+                      onClick={() => setDraft((current) => togglePhotoLike(current, photo.id))}
+                      /* A double click opens the picture itself, so its price
+                         or status can be changed without going to find it.
+                         The two clicks underneath toggle the like on and
+                         straight back off again, so the visitor's picks are
+                         where they were. */
+                      onDoubleClick={() => onOpenPhoto(photo.id)}
+                      title={`${photo.title} — double click to open it`}
                     >
                       {imageUrls[photo.imageId] ? (
                         <img src={imageUrls[photo.imageId]} alt={photo.title} />
@@ -308,8 +376,31 @@ function GuestBook({
                       <span className="gb-pick-detail">
                         {describeStatus(photo) ?? describePrice(photo)}
                       </span>
-                      {picked && <span className="gb-tick" aria-hidden="true">✓</span>}
+                      {isPicked && <span className="gb-tick" aria-hidden="true">✓</span>}
                     </button>
+
+                    {/* The artist's eye, over the corner of the thumbnail: it
+                        takes a picture out of what a visitor is shown without
+                        deleting anything. Dimmed here, gone in guest mode. */}
+                    {!guestMode && (
+                      <button
+                        type="button"
+                        className="gb-eye"
+                        data-off={!visible}
+                        aria-pressed={!visible}
+                        onClick={() => onSetVisible(photo.id, !visible)}
+                        title={
+                          visible
+                            ? `Hide ${photo.title} from visitors`
+                            : `Show ${photo.title} to visitors again`
+                        }
+                      >
+                        <Icon name={visible ? 'eye' : 'eye-off'} size={15} />
+                        <span className="sr-only">
+                          {visible ? 'Shown to visitors' : 'Hidden from visitors'}
+                        </span>
+                      </button>
+                    )}
 
                     {/* Only the artist sees this: putting a piece in the show
                         is studio work, not something a visitor should do. */}
@@ -337,19 +428,51 @@ function GuestBook({
                 <p className="hint gb-picks-empty">
                   {importing
                     ? 'Adding…'
-                    : filter === 'show'
-                      ? 'Nothing is marked as being in the current show yet. Open a picture and tick “In the current show”, or drop photographs here.'
-                      : filter === 'available'
-                        ? 'Nothing is marked available yet. Open a picture and set its status.'
-                        : 'No pictures yet. Drop photographs here, or use Add images on the desktop.'}
+                    : photos.length > 0 && filterCounts(photos, { guestMode: false })[filter] > 0
+                      ? 'Every picture here is hidden from visitors at the moment. Turn one back on with the eye in its corner.'
+                      : filter === 'show'
+                        ? 'Nothing is marked as being in the current show yet. Open a picture and tick “In the current show”, or drop photographs here.'
+                        : filter === 'available'
+                          ? 'Nothing is marked available yet. Open a picture and set its status.'
+                          : 'No pictures yet. Drop photographs here, or use Add images on the desktop.'}
                 </p>
               )}
             </div>
-            <span className="hint">
-              {draft.likedPhotoIds.length === 0
-                ? 'Tap any you like. Tap again to change your mind. Photographs can be dropped here too.'
-                : `${draft.likedPhotoIds.length} picked`}
-            </span>
+            {picked.length === 0 ? (
+              <span className="hint">
+                Tap any you like. Tap again to change your mind. Double click one to open it.
+                Photographs can be dropped here too.
+              </span>
+            ) : (
+              <div className="gb-picked">
+                <span className="hint">
+                  {countPhrase(picked.length, 'picture')} picked: {picked.map((p) => p.title).join(', ')}
+                </span>
+                <div className="chip-row">
+                  <button
+                    className="btn"
+                    data-variant="quiet"
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void takePicked()}
+                  >
+                    {sending ? 'Getting them ready…' : takeLabel}
+                  </button>
+                  <button
+                    className="btn"
+                    data-variant="quiet"
+                    type="button"
+                    onClick={() => setDraft({ ...draft, likedPhotoIds: [] })}
+                  >
+                    Clear the picks
+                  </button>
+                </div>
+                <span className="hint">
+                  Nothing is sent from here. This hands the pictures to your own phone or saves
+                  them; signing the book keeps the list with the visitor’s details.
+                </span>
+              </div>
+            )}
           </div>
         )}
 

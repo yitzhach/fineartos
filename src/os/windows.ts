@@ -90,9 +90,12 @@ export function defaultSize(
   const width = wide ? 1180 : medium ? 860 : 700;
   const height = wide ? 760 : medium ? 680 : 560;
 
+  // The viewport here is the desktop area a window actually lives in — the
+  // system bar and the dock are already off it — so the margin left over is
+  // breathing room, not an allowance for chrome that is somewhere else.
   return {
     width: Math.min(width, Math.max(MIN_WIDTH, viewport.width - 80)),
-    height: Math.min(height, Math.max(MIN_HEIGHT, viewport.height - 150)),
+    height: Math.min(height, Math.max(MIN_HEIGHT, viewport.height - 80)),
   };
 }
 
@@ -119,8 +122,12 @@ export function cascadeRect(
     Math.max(16, Math.round(viewport.width * 0.12) + offset),
     Math.max(16, viewport.width - width - 16),
   );
+  // The same for the bottom, which is the edge that actually bit: the desktop
+  // clips what hangs past it, so a window walked down by the cascade lost its
+  // bottom border and its resize grip with no scrollbar to get them back.
+  const y = Math.min(44 + offset, Math.max(8, viewport.height - height - 16));
 
-  return { x, y: 44 + offset, width, height };
+  return { x, y, width, height };
 }
 
 /**

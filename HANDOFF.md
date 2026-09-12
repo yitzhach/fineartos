@@ -58,11 +58,12 @@ calculation or a rule inside a component, put it in one of these instead.
 | `src/os/desktopLayout.ts` | Icon grid, snapping, clamping, auto-arrange, hit-testing |
 | `src/os/trash.ts` | What the Trash hides, what emptying would destroy |
 | `src/os/undo.ts` | The undo stack and what counts as the undo key |
-| `src/photo/photo.ts` | A picture: size, price, status, current show |
+| `src/photo/photo.ts` | A picture: size, price, status, current show, hiding |
 | `src/project/project.ts` | Folders: they hold ids, never copies |
 | `src/commission/calc.ts` | The one money calculation, integer minor units |
 | `src/invoice/invoice.ts` | Invoices as child records of a commission |
 | `src/connect/guestbook.ts` | Guest entries, consent, CSV, signature paths |
+| `src/connect/picker.ts` | Which pictures a visitor is shown, and which they picked |
 | `src/connect/contact.ts` | vCard for the QR code |
 
 `src/App.tsx` is the shell that wires them together. `src/os/icons.tsx` is
@@ -105,7 +106,7 @@ event must be a ref.
 ```bash
 npm install
 npm run dev            # http://localhost:5173
-npm test               # 307 tests
+npm test               # 319 tests
 npm run build          # typecheck + dist/
 npm run preview        # serve dist on 4173
 ```

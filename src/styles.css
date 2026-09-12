@@ -2659,7 +2659,35 @@ fieldset.section > legend {
 .photo-details .check { padding: 6px 0; }
 
 /* A picture in the picker, with the artist's "in the show" toggle under it. */
-.gb-pick-wrap { display: flex; flex-direction: column; gap: 4px; }
+.gb-pick-wrap { position: relative; display: flex; flex-direction: column; gap: 4px; }
+
+/* The eye sits over the corner of the thumbnail, where it belongs to the
+   picture rather than to the row. A hidden picture goes dim rather than
+   disappearing, because the artist still has to be able to put it back. */
+.gb-eye {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--ink);
+  cursor: pointer;
+}
+:root[data-theme='light'] .gb-eye { background: rgba(255, 255, 255, 0.82); }
+.gb-eye:hover { border-color: var(--line-strong); }
+.gb-eye:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gb-eye[data-off='true'] { color: var(--ink-faint); }
+
+.gb-pick[data-hidden='true'] { opacity: 0.42; }
+.gb-pick[data-hidden='true']:hover { opacity: 0.7; }
+
+.gb-picked { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
 
 .gb-show-toggle {
   width: 104px;

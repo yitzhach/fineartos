@@ -92,6 +92,17 @@ describe('opening', () => {
     expect(rect.x + rect.width).toBeLessThanOrEqual(narrow.width);
   });
 
+  it('opens inside the desktop, not past the bottom of it', () => {
+    // The desktop clips: a window past its bottom edge loses its border and
+    // its resize grip with no scrollbar to reach them with.
+    const stage = { width: 1512, height: 700 };
+    for (let count = 0; count < 8; count += 1) {
+      const kind = { type: 'tool' as const, tool: 'connect' };
+      const rect = cascadeRect(count, stage, defaultSize(kind, stage));
+      expect(rect.y + rect.height).toBeLessThanOrEqual(stage.height);
+    }
+  });
+
   it('gives a project more room than a preview tool', () => {
     const project = defaultSize({ type: 'commission', docId: 'a' }, VIEW);
     const tool = defaultSize({ type: 'tool', tool: 'calendar' }, VIEW);
