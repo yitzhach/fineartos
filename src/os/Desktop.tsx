@@ -485,13 +485,13 @@ function AddImages({
           e.stopPropagation();
           inputRef.current?.click();
         }}
-        title="Add images — click to choose, or drop files here"
+        title="Add images — click to choose a file, or drop files here"
       >
         <span className="thumb blank" aria-hidden="true">
           <span className="plus">{importing ? '…' : '＋'}</span>
         </span>
         <span className="label">{importing ? 'Adding…' : 'Add images'}</span>
-        <span className="caption">click or drop</span>
+        <span className="caption">click or drop a file</span>
       </button>
       <input
         ref={inputRef}

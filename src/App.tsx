@@ -122,6 +122,7 @@ import { crossfadeSeconds, emptySlideshow, readySlides, secondsPerSlide } from '
 import { SHIPPED_PHOTOGRAPHS } from './lib/photographs';
 import { Repository, type StoredDocument } from './persistence/repository';
 import { onDbProblem, type DbProblem } from './persistence/db';
+import { onAppUpdate } from './lib/appUpdate';
 import {
   isUndoKey,
   nextUndoLabel,
@@ -205,6 +206,12 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
   /** Set when the database cannot be opened — never left silent. */
   const [dockHeight, setDockHeight] = useState(84);
+  /**
+   * True once a newer build is being served. A tab left open at a show goes
+   * on running the JavaScript it loaded, which looks exactly like a deploy
+   * that did not happen. Never reloads on its own — see src/lib/appUpdate.ts.
+   */
+  const [updateReady, setUpdateReady] = useState(false);
   const [dbProblem, setDbProblem] = useState<DbProblem | null>(null);
   /**
    * What Cmd/Ctrl+Z would put back. Only reversible things go on here —
@@ -308,6 +315,7 @@ export default function App() {
   }, [trash]);
 
   useEffect(() => onDbProblem(setDbProblem), []);
+  useEffect(() => onAppUpdate(() => setUpdateReady(true)), []);
 
   const refresh = useCallback(async () => {
     let documentRows: StoredDocument[];
@@ -1778,6 +1786,22 @@ export default function App() {
           <span>{dbProblem.message}</span>
           <button className="btn" data-variant="primary" onClick={() => window.location.reload()}>
             Reload
+          </button>
+        </div>
+      )}
+
+      {updateReady && (
+        <div className="update-ready no-print" role="status">
+          <strong>Newer version</strong>
+          <span>
+            This tab is still running the build it opened with. Reload to pick up the new one —
+            nothing you have saved is affected.
+          </span>
+          <button className="btn" data-variant="primary" onClick={() => window.location.reload()}>
+            Reload
+          </button>
+          <button className="btn" data-variant="quiet" onClick={() => setUpdateReady(false)}>
+            Later
           </button>
         </div>
       )}

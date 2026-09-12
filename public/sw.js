@@ -10,7 +10,14 @@
  * online, because a browser makes no promise to run anything while it is shut.
  */
 
-const CACHE = 'artist-os-shell-v4';
+/**
+ * The build this worker was registered for — see the registration in
+ * src/main.tsx. Naming the cache after it means a deploy gets a clean shell
+ * cache and the activate handler below throws the previous one away, so an
+ * offline reload opens the build that was actually deployed.
+ */
+const VERSION = new URL(self.location.href).searchParams.get('v') ?? 'dev';
+const CACHE = `artist-os-shell-${VERSION}`;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
