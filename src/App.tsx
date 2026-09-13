@@ -122,9 +122,11 @@ import {
   createPhoto,
   describePhoto,
   editPhoto,
+  sourceImageId,
   titleFromFileName,
   type Photo,
 } from './photo/photo';
+import type { Adjustments } from './photo/adjust';
 import { PhotoWindow } from './photo/ui/PhotoWindow';
 import { PicturePreview } from './photo/ui/PicturePreview';
 import { ImageEditor } from './photo/ui/ImageEditor';
@@ -503,7 +505,12 @@ export default function App() {
       if (row.document.studio.logoImageId) ids.add(row.document.studio.logoImageId);
     }
     for (const project of projects) if (project.coverImageId) ids.add(project.coverImageId);
-    for (const photo of photos) ids.add(photo.imageId);
+    for (const photo of photos) {
+      ids.add(photo.imageId);
+      // The editor works from the photograph, which is a second blob once an
+      // edit has been saved over it.
+      ids.add(sourceImageId(photo));
+    }
     return [...ids].sort().join(',');
   }, [rows, projects, photos]);
 
@@ -1096,7 +1103,9 @@ export default function App() {
       try {
         // The same resize the wallpapers use, at a smaller edge: this is a
         // picture to show a client, not a backdrop.
-        const prepared = await prepareWallpaper(file, 2000);
+        // 2560 on the longest edge, the same as a desktop picture: enough
+        // for a print and small enough to keep the app quick.
+        const prepared = await prepareWallpaper(file, 2560);
         const imageId = newId();
         await repo.putImage(imageId, prepared.blob);
         let photo = createPhoto({
@@ -1232,7 +1241,7 @@ export default function App() {
     for (const id of ids) {
       const storedPhoto = await repo.loadPhoto(id);
       if (storedPhoto) {
-        removedImages.push(storedPhoto.imageId);
+        removedImages.push(storedPhoto.imageId, sourceImageId(storedPhoto));
         await repo.deletePhoto(id);
         continue;
       }
@@ -1254,7 +1263,7 @@ export default function App() {
     const [remaining, remainingPhotos] = await Promise.all([repo.list(), repo.listPhotos()]);
     const stillUsed = new Set<string>([
       ...remaining.flatMap((row) => row.document.artwork.referenceImageIds),
-      ...remainingPhotos.map((photo) => photo.imageId),
+      ...remainingPhotos.flatMap((photo) => [photo.imageId, sourceImageId(photo)]),
       ...wallpaperLibrary.map((picture) => picture.imageId),
     ]);
     for (const imageId of orphanImageIds(removedImages, stillUsed)) {
@@ -1405,7 +1414,49 @@ export default function App() {
   };
 
   /**
-   * An edit saved as a new picture. The original is never written over: an
+   * An edit saved over what the studio shows.
+   *
+   * The photograph itself is kept as a second blob and the numbers are stored
+   * on the record, so the edit can be reopened, changed or undone, and the
+   * editor always starts from the photograph rather than from the last edit.
+   * Everything else in the app goes on reading `imageId` and knows nothing
+   * about any of this.
+   */
+  const savePhotoEdit = async (
+    photo: Photo,
+    blob: Blob,
+    adjustments: Adjustments,
+    size: { width: number; height: number },
+  ) => {
+    const original = sourceImageId(photo);
+    const rendered = newId();
+    await repo.putImage(rendered, blob);
+    // The blob this replaces was itself an edit; only the photograph is kept.
+    if (photo.imageId !== original) await repo.deleteImage(photo.imageId);
+    await savePhotoRecord(
+      editPhoto(photo, {
+        imageId: rendered,
+        originalImageId: original,
+        edit: adjustments,
+        pixelWidth: size.width,
+        pixelHeight: size.height,
+      }),
+    );
+    setMessage('Edit saved. The photograph underneath it is kept — Back to the photograph undoes this.');
+  };
+
+  /** Puts the photograph back on show and forgets the numbers. */
+  const revertPhotoEdit = async (photo: Photo) => {
+    const original = sourceImageId(photo);
+    if (photo.imageId !== original) await repo.deleteImage(photo.imageId);
+    await savePhotoRecord(
+      editPhoto(photo, { imageId: original, originalImageId: null, edit: null }),
+    );
+    setMessage('Back to the photograph as it came in.');
+  };
+
+  /**
+   * An edit saved as a second picture. The original is never written over: an
    * edit is an opinion, and the photograph under it is the only copy there is.
    */
   const savePhotoCopy = async (source: Photo, blob: Blob, changes: string[]) => {
@@ -1825,8 +1876,10 @@ export default function App() {
       return (
         <ImageEditor
           photo={photo}
-          url={imageUrls[photo.imageId]}
+          url={imageUrls[sourceImageId(photo)]}
+          onSaveEdit={(blob, adjustments, size) => savePhotoEdit(photo, blob, adjustments, size)}
           onSaveCopy={(blob, changes) => savePhotoCopy(photo, blob, changes)}
+          onRevert={() => revertPhotoEdit(photo)}
           onMessage={setMessage}
         />
       );

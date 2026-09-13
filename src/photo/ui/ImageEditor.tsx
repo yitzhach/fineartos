@@ -4,17 +4,27 @@ import {
   applyAdjustments,
   describeAdjustments,
   isNeutral,
+  mergeAdjustments,
   neutralAdjustments,
   type Adjustments,
   type BandName,
 } from '../adjust';
-import type { Photo } from '../photo';
+import { isEdited, type Photo } from '../photo';
 
 interface Props {
   photo: Photo;
+  /** The *original* photograph's URL. An edit is never applied twice. */
   url: string | undefined;
-  /** Saves the edited pixels as a new picture in the studio. */
+  /** Saves over what the studio shows, keeping the original and the numbers. */
+  onSaveEdit: (
+    blob: Blob,
+    adjustments: Adjustments,
+    size: { width: number; height: number },
+  ) => Promise<void> | void;
+  /** Saves the edited pixels as a second picture in the studio. */
   onSaveCopy: (blob: Blob, changes: string[]) => Promise<void> | void;
+  /** Puts the photograph back and forgets the numbers. */
+  onRevert: () => Promise<void> | void;
   onMessage: (text: string) => void;
 }
 
@@ -30,13 +40,16 @@ const PREVIEW_EDGE = 1400;
  * a copy no bigger than 1400px, and a move is coalesced into the next
  * animation frame rather than redrawing per pixel of slider travel.
  *
- * **The original is never written over.** Saving makes a new picture in the
- * studio, and says in its note where it came from and what was changed. That
- * is deliberate: an edit is an opinion, and the photograph underneath it is
- * the only copy the artist has.
+ * **The photograph is never written over.** Saving an edit keeps the original
+ * beside the picture and stores the numbers that made it, so the edit can be
+ * changed or undone months later and nothing is ever applied twice — the
+ * editor always works from the original, whatever is on show. Save as a new
+ * picture makes a second one instead. An edit is an opinion, and the
+ * photograph underneath it is the only copy the artist has.
  */
-export function ImageEditor({ photo, url, onSaveCopy, onMessage }: Props) {
-  const [adjustments, setAdjustments] = useState<Adjustments>(neutralAdjustments);
+export function ImageEditor({ photo, url, onSaveEdit, onSaveCopy, onRevert, onMessage }: Props) {
+  // Opens where the last edit left off, read from the picture's own record.
+  const [adjustments, setAdjustments] = useState<Adjustments>(() => mergeAdjustments(photo.edit));
   const [band, setBand] = useState<BandName>('yellow');
   const [ready, setReady] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -55,6 +68,17 @@ export function ImageEditor({ photo, url, onSaveCopy, onMessage }: Props) {
 
   const changes = useMemo(() => describeAdjustments(adjustments), [adjustments]);
   const untouched = isNeutral(adjustments);
+
+  const draw = useCallback((settings: Adjustments) => {
+    const canvas = canvasRef.current;
+    const original = originalRef.current;
+    const working = workingRef.current;
+    if (!canvas || !original || !working) return;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) return;
+    applyAdjustments(original.data, settings, working.data);
+    context.putImageData(working, 0, 0);
+  }, []);
 
   // Load the picture once, at a size that can be re-processed in a frame.
   useEffect(() => {
@@ -81,6 +105,12 @@ export function ImageEditor({ photo, url, onSaveCopy, onMessage }: Props) {
       originalRef.current = context.getImageData(0, 0, width, height);
       workingRef.current = context.createImageData(width, height);
       setReady(true);
+      // Painted here rather than left to the effect below. Loading again with
+      // `ready` already true — which is what happens the moment an edit is
+      // saved, because the picture's URL changes — sets no state, so nothing
+      // would re-run and the canvas would sit there showing the untouched
+      // photograph while the sliders said otherwise.
+      draw(pendingRef.current);
     };
     image.onerror = () => {
       if (!cancelled) setProblem('That picture could not be opened for editing.');
@@ -89,23 +119,15 @@ export function ImageEditor({ photo, url, onSaveCopy, onMessage }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [url]);
+  }, [draw, url]);
 
-  const draw = useCallback((settings: Adjustments) => {
-    const canvas = canvasRef.current;
-    const original = originalRef.current;
-    const working = workingRef.current;
-    if (!canvas || !original || !working) return;
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    if (!context) return;
-    applyAdjustments(original.data, settings, working.data);
-    context.putImageData(working, 0, 0);
-  }, []);
 
   // One redraw per animation frame, whatever the sliders are doing.
   useEffect(() => {
-    if (!ready) return undefined;
+    // Kept current even before the picture has loaded, because that is what
+    // the loader paints with the moment it has something to paint on.
     pendingRef.current = compare ? neutralAdjustments() : adjustments;
+    if (!ready) return undefined;
     if (frameRef.current !== null) return undefined;
     frameRef.current = requestAnimationFrame(() => {
       frameRef.current = null;
@@ -143,7 +165,22 @@ export function ImageEditor({ photo, url, onSaveCopy, onMessage }: Props) {
     return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
   };
 
-  const save = async () => {
+  const saveOver = async () => {
+    setBusy(true);
+    try {
+      const blob = await renderFull();
+      const image = sourceRef.current;
+      if (!blob || !image) {
+        onMessage('That edit could not be rendered. Nothing was saved.');
+        return;
+      }
+      await onSaveEdit(blob, adjustments, { width: image.width, height: image.height });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveCopy = async () => {
     setBusy(true);
     try {
       const blob = await renderFull();
@@ -322,12 +359,21 @@ export function ImageEditor({ photo, url, onSaveCopy, onMessage }: Props) {
             className="btn"
             data-variant="primary"
             disabled={busy || untouched || !ready}
-            onClick={() => void save()}
+            onClick={() => void saveOver()}
           >
-            {busy ? 'Working…' : 'Save as a new picture'}
+            {busy ? 'Working…' : 'Save the edit'}
+          </button>
+          <button
+            className="btn"
+            disabled={busy || untouched || !ready}
+            onClick={() => void saveCopy()}
+          >
+            Save as a new picture
           </button>
           <button className="btn" disabled={busy || !ready} onClick={() => void download()}>
-            Download
+            Download{ready && sourceRef.current
+              ? ` · ${sourceRef.current.width} × ${sourceRef.current.height}`
+              : ''}
           </button>
           <button
             className="btn"
@@ -337,10 +383,21 @@ export function ImageEditor({ photo, url, onSaveCopy, onMessage }: Props) {
           >
             Reset
           </button>
+          {isEdited(photo) && (
+            <button
+              className="btn"
+              data-variant="quiet"
+              disabled={busy}
+              onClick={() => void onRevert()}
+            >
+              Back to the photograph
+            </button>
+          )}
         </div>
         <span className="hint">
-          Saving adds a new picture to the studio and leaves this one exactly as it is. The new one
-          can be sent from Connect like any other.
+          Save the edit changes what the studio shows and keeps the photograph underneath it, so
+          this can be reopened and changed — or put back — at any point. Save as a new picture
+          leaves this one alone and adds a second. Download writes a JPEG at the size above.
         </span>
       </div>
     </div>

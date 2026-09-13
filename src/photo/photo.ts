@@ -14,6 +14,7 @@
  */
 
 import { newId } from '../commission/document';
+import { isNeutral, type Adjustments } from './adjust';
 
 /**
  * Whether a piece can be bought. Null is the honest default: a photograph
@@ -52,6 +53,21 @@ export interface Photo {
    * how a picture goes missing without anyone noticing.
    */
   hiddenFromVisitors: boolean;
+  /**
+   * The photograph as it came in, when an edit has been saved over it.
+   *
+   * `imageId` is always what the app shows, so the desktop, Connect and the
+   * preview need to know nothing about editing. This is the untouched
+   * original beside it, kept so an edit can be changed or undone later —
+   * re-editing works from here, which is what stops one edit being applied on
+   * top of the last. Absent means `imageId` *is* the original.
+   */
+  originalImageId?: string | null;
+  /**
+   * The darkroom settings that produced the picture on show. Absent means the
+   * picture has never been edited.
+   */
+  edit?: Adjustments | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -110,6 +126,16 @@ export function describeStatus(photo: Photo): string | null {
 /** Photos stored before status existed read as "not said". */
 export function statusOf(photo: Photo): PhotoStatus {
   return photo.status ?? null;
+}
+
+/** The untouched photograph: what the editor works from, always. */
+export function sourceImageId(photo: Photo): string {
+  return photo.originalImageId ?? photo.imageId;
+}
+
+/** Whether what is on show is an edit rather than the photograph itself. */
+export function isEdited(photo: Photo): boolean {
+  return Boolean(photo.edit) && !isNeutral(photo.edit!);
 }
 
 export function isInCurrentShow(photo: Photo): boolean {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { neutralAdjustments } from '../adjust';
 import {
   createPhoto,
   describePhoto,
@@ -7,7 +8,9 @@ import {
   describeStatus,
   editPhoto,
   isInCurrentShow,
+  isEdited,
   isShownToVisitors,
+  sourceImageId,
   statusOf,
   shareMessage,
   titleFromFileName,
@@ -155,5 +158,32 @@ describe('isShownToVisitors', () => {
     const older = { ...base() } as Partial<ReturnType<typeof base>>;
     delete older.hiddenFromVisitors;
     expect(isShownToVisitors(older as ReturnType<typeof base>)).toBe(true);
+  });
+});
+
+
+describe('an edited picture', () => {
+  it('is its own original until an edit is saved', () => {
+    const photo = base();
+    expect(sourceImageId(photo)).toBe(photo.imageId);
+    expect(isEdited(photo)).toBe(false);
+  });
+
+  it('keeps the photograph beside what is on show', () => {
+    const edited = editPhoto(base(), {
+      imageId: 'rendered-1',
+      originalImageId: 'img-1',
+      edit: { ...neutralAdjustments(), contrast: 20 },
+    });
+    // What everything else in the app draws.
+    expect(edited.imageId).toBe('rendered-1');
+    // What the editor works from, so an edit is never applied on top of itself.
+    expect(sourceImageId(edited)).toBe('img-1');
+    expect(isEdited(edited)).toBe(true);
+  });
+
+  it('does not call a set of untouched sliders an edit', () => {
+    const photo = editPhoto(base(), { edit: neutralAdjustments() });
+    expect(isEdited(photo)).toBe(false);
   });
 });

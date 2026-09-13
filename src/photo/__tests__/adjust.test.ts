@@ -6,6 +6,7 @@ import {
   describeAdjustments,
   hslToRgb,
   isNeutral,
+  mergeAdjustments,
   neutralAdjustments,
   rgbToHsl,
   wrapHue,
@@ -208,5 +209,27 @@ describe('describeAdjustments', () => {
     expect(said).toContain('Exposure +12');
     expect(said).toContain('Black and white');
     expect(said).toContain('yellow (hue -55, luminance +10)');
+  });
+});
+
+
+describe('mergeAdjustments', () => {
+  it('gives an empty edit the neutral numbers', () => {
+    expect(mergeAdjustments(null)).toEqual(neutralAdjustments());
+    expect(mergeAdjustments(undefined)).toEqual(neutralAdjustments());
+  });
+
+  it('keeps what was saved and fills in what a newer control added', () => {
+    const older = { exposure: 20, bands: { yellow: { hue: -30 } } } as never;
+    const merged = mergeAdjustments(older);
+    expect(merged.exposure).toBe(20);
+    expect(merged.bands.yellow).toEqual({ hue: -30, saturation: 0, luminance: 0 });
+    expect(merged.gamma).toBe(1);
+    expect(merged.bands.blue).toEqual({ hue: 0, saturation: 0, luminance: 0 });
+  });
+
+  it('is what the editor reopens with, so an edit is never applied twice', () => {
+    const saved = { ...neutralAdjustments(), contrast: 15 };
+    expect(mergeAdjustments(saved)).toEqual(saved);
   });
 });

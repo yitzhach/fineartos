@@ -119,6 +119,25 @@ export function neutralAdjustments(): Adjustments {
   };
 }
 
+/**
+ * A saved set of numbers, filled out with the defaults for anything missing.
+ *
+ * Settings are stored on the picture and read back by a later version of the
+ * app, which may have controls this one did not. Spreading over the neutral
+ * set means an old edit opens with the sliders it had and zeroes for the
+ * rest, rather than an editor full of undefined.
+ */
+export function mergeAdjustments(saved: Partial<Adjustments> | null | undefined): Adjustments {
+  const base = neutralAdjustments();
+  if (!saved) return base;
+  const bands = { ...base.bands };
+  for (const name of BAND_NAMES) {
+    const band = saved.bands?.[name];
+    if (band) bands[name] = { ...neutralBand(), ...band };
+  }
+  return { ...base, ...saved, bands };
+}
+
 /** True when the picture would come out exactly as it went in. */
 export function isNeutral(adjustments: Adjustments): boolean {
   const a = adjustments;
