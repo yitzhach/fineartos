@@ -272,6 +272,78 @@ export function pullOutTab(
   });
 }
 
+/**
+ * How deep into a frame a drop counts as "make this a tab", measured from its
+ * top edge. Roughly the titlebar and the strip under it: dropping anywhere
+ * else on a window is just a window landing on top of another one, which is
+ * what dragging has always done.
+ */
+export const TAB_DROP_HEIGHT = 74;
+
+/**
+ * The frame a dragged window would join if it were let go here, or null.
+ *
+ * Point is in the desktop's own coordinates, the same ones a rect is in. A
+ * window is never a drop target for itself or for anything already in its
+ * frame, and the topmost frame wins where two overlap — the one being dropped
+ * on is the one that can be seen.
+ */
+export function dropTargetAt(
+  windows: WindowState[],
+  draggedId: string,
+  point: { x: number; y: number },
+): WindowState | null {
+  const dragged = windows.find((w) => w.id === draggedId);
+  if (!dragged) return null;
+  const own = new Set(tabsOf(windows, draggedId).map((w) => w.id));
+
+  const candidates = windows.filter((w) => {
+    if (w.minimized || own.has(w.id)) return false;
+    const { x, y, width } = w.rect;
+    return point.x >= x && point.x <= x + width && point.y >= y && point.y <= y + TAB_DROP_HEIGHT;
+  });
+  if (candidates.length === 0) return null;
+  return candidates.reduce((top, w) => (w.z > top.z ? w : top));
+}
+
+/**
+ * Drops one window onto another as a tab. A dragged frame brings its own tabs
+ * with it — dropping a group onto a window merges both, which is the only
+ * reading that does not silently leave windows behind.
+ */
+export function mergeInto(
+  windows: WindowState[],
+  sourceId: string,
+  targetId: string,
+): WindowState[] {
+  const source = windows.find((w) => w.id === sourceId);
+  const target = windows.find((w) => w.id === targetId);
+  if (!source || !target || source.id === target.id) return windows;
+  if (source.groupId && source.groupId === target.groupId) return windows;
+
+  const groupId = target.groupId ?? `tabs-${Date.now().toString(36)}`;
+  const moving = new Set(tabsOf(windows, sourceId).map((w) => w.id));
+  const joining = new Set(tabsOf(windows, targetId).map((w) => w.id));
+  const base = topZ(windows) + 1;
+
+  return windows.map((w) => {
+    if (moving.has(w.id)) {
+      // The dropped window lands on top of the frame it joined; anything it
+      // brought with it sits behind, in the order it already had.
+      return {
+        ...w,
+        groupId,
+        rect: { ...target.rect },
+        restoreRect: target.restoreRect,
+        minimized: false,
+        z: w.id === sourceId ? base + 1 : base,
+      };
+    }
+    if (joining.has(w.id)) return { ...w, groupId };
+    return w;
+  });
+}
+
 /** The tab to move to, one step either way, wrapping round the strip. */
 export function stepTab(windows: WindowState[], id: string, by: number): string {
   const tabs = tabsOf(windows, id);
@@ -368,6 +440,92 @@ export function toggleZoom(
 
 export function isZoomed(window: WindowState): boolean {
   return window.restoreRect !== null;
+}
+
+/**
+ * The windows to put back after a reload.
+ *
+ * Two jobs. First, what came out of storage is untrusted: it can be hand
+ * edited, or written by an older version of the app, so anything that is not
+ * a window is dropped rather than crashing the desktop. Second, a window is a
+ * view onto a record — a commission that has since been deleted has nothing
+ * to show, so it is dropped too rather than opening onto an apology.
+ *
+ * `subjectExists` answers for the record kinds; tools and lists have no
+ * record behind them and are always kept.
+ */
+export function restorable(
+  stored: unknown,
+  subjectExists: (kind: WindowKind) => boolean,
+): WindowState[] {
+  if (!Array.isArray(stored)) return [];
+
+  const kept: WindowState[] = [];
+  for (const entry of stored) {
+    const window = asWindow(entry);
+    if (!window) continue;
+    if (!subjectExists(window.kind)) continue;
+    // A window whose subject is already in the list is a duplicate, not a
+    // second view of it.
+    if (kept.some((w) => keyFor(w.kind) === keyFor(window.kind))) continue;
+    kept.push(window);
+  }
+
+  // Renumbered from the order they were stacked in, so a stored z of 4,000
+  // after a long session does not carry over.
+  const ordered = [...kept].sort((a, b) => a.z - b.z);
+  const zOf = new Map(ordered.map((w, index) => [w.id, index + 1]));
+
+  // A group of one is not a group — its other tabs may not have survived.
+  const counts = new Map<string, number>();
+  for (const w of kept) if (w.groupId) counts.set(w.groupId, (counts.get(w.groupId) ?? 0) + 1);
+
+  return kept.map((w) => ({
+    ...w,
+    z: zOf.get(w.id) ?? 1,
+    groupId: w.groupId && (counts.get(w.groupId) ?? 0) > 1 ? w.groupId : null,
+  }));
+}
+
+/** Storage is untrusted input: anything not shaped like a window is dropped. */
+function asWindow(value: unknown): WindowState | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const w = value as Partial<WindowState>;
+  if (typeof w.id !== 'string' || typeof w.title !== 'string') return null;
+  if (!isRect(w.rect)) return null;
+  if (w.restoreRect !== null && w.restoreRect !== undefined && !isRect(w.restoreRect)) return null;
+  if (typeof w.kind !== 'object' || w.kind === null || typeof w.kind.type !== 'string') return null;
+  if (!KIND_TYPES.has(w.kind.type)) return null;
+  return {
+    id: w.id,
+    kind: w.kind,
+    title: w.title,
+    subtitle: typeof w.subtitle === 'string' ? w.subtitle : null,
+    rect: w.rect,
+    z: typeof w.z === 'number' && Number.isFinite(w.z) ? w.z : 1,
+    minimized: w.minimized === true,
+    restoreRect: w.restoreRect ?? null,
+    groupId: typeof w.groupId === 'string' ? w.groupId : null,
+  };
+}
+
+const KIND_TYPES = new Set<WindowKind['type']>([
+  'commission',
+  'invoice',
+  'folder',
+  'photo',
+  'photoEdit',
+  'list',
+  'settings',
+  'tool',
+]);
+
+function isRect(value: unknown): value is Rect {
+  if (typeof value !== 'object' || value === null) return false;
+  const rect = value as Partial<Rect>;
+  return (['x', 'y', 'width', 'height'] as const).every(
+    (key) => typeof rect[key] === 'number' && Number.isFinite(rect[key]),
+  );
 }
 
 /**

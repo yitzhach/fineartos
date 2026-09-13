@@ -23,6 +23,8 @@ interface Props {
   wallpaperError: string | null;
   askForSignature: boolean;
   onAskForSignature: (value: boolean) => void;
+  restoreWindows: boolean;
+  onRestoreWindows: (value: boolean) => void;
 }
 
 const nullable = (value: string): string | null => (value.trim() === '' ? null : value);
@@ -173,6 +175,22 @@ export function Settings(props: Props) {
             client to guess.
           </div>
         )}
+      </fieldset>
+
+      <fieldset className="section">
+        <legend>Windows</legend>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={props.restoreWindows}
+            onChange={(e) => props.onRestoreWindows(e.target.checked)}
+          />
+          <span>Open the windows that were open last time</span>
+        </label>
+        <span className="hint">
+          Only the arrangement is remembered — sizes, positions and which tabs were together.
+          A window whose commission or picture has since been deleted is not put back.
+        </span>
       </fieldset>
 
       <fieldset className="section">

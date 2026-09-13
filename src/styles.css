@@ -482,6 +482,16 @@ body {
   min-width: 0;
 }
 
+/* Lit up while a window dragged by its titlebar is over its top edge: let go
+   here and the two become one frame of tabs. */
+.frame[data-drop-target='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-quiet), var(--shadow-window);
+}
+.frame[data-drop-target='true'] .frame-bar {
+  background: var(--accent-quiet);
+}
+
 .frame[data-focused='true'] {
   border-color: var(--line-strong);
   box-shadow: var(--shadow-window);

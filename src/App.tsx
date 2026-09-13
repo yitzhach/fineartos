@@ -40,7 +40,9 @@ import {
   closeWindow,
   focused as focusedWindow,
   focusWindow,
+  dropTargetAt,
   mergeAll,
+  mergeInto,
   minimizedWindows,
   minimizeWindow,
   moveWindow,
@@ -49,6 +51,7 @@ import {
   openWindow,
   toggleWindow,
   resizeWindow,
+  restorable,
   stepTab,
   tabsOf,
   toggleZoom,
@@ -151,7 +154,9 @@ import {
   loadTrash,
   loadTrashPosition,
   loadAskForSignature,
+  loadRestoreWindows,
   loadWallpaperLibrary,
+  loadWindows,
   savePaymentInstructions,
   saveStudioDefaults,
   saveTheme,
@@ -162,7 +167,9 @@ import {
   saveTrash,
   saveTrashPosition,
   saveAskForSignature,
+  saveRestoreWindows,
   saveWallpaperLibrary,
+  saveWindows,
   type PaymentInstructions,
   type StudioDefaults,
   type Theme,
@@ -229,6 +236,16 @@ export default function App() {
   const [preview, setPreview] = useState<{ ids: string[]; index: number } | null>(null);
   /** Read by the tab shortcuts, which must not fight the preview's arrows. */
   const previewOpenRef = useRef(false);
+  /**
+   * The frame a window being dragged would join as a tab if it were let go
+   * now, and the element the pointer is measured against — a rect is in the
+   * desktop's coordinates and a pointer is in the page's.
+   */
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const dropTargetRef = useRef<string | null>(null);
+  const desktopRef = useRef<HTMLElement>(null);
+  /** The arrangement is put back once, on the first read of the studio. */
+  const restoredRef = useRef(false);
   const [dbProblem, setDbProblem] = useState<DbProblem | null>(null);
   /**
    * What Cmd/Ctrl+Z would put back. Only reversible things go on here —
@@ -276,6 +293,7 @@ export default function App() {
   const [wallpaper, setWallpaper] = useState<WallpaperChoice>(loadWallpaper);
   const [studio, setStudio] = useState<StudioDefaults>(loadStudioDefaults);
   const [askForSignature, setAskForSignature] = useState<boolean>(loadAskForSignature);
+  const [restoreWindowsOn, setRestoreWindowsOn] = useState<boolean>(loadRestoreWindows);
   const [payment, setPayment] = useState<PaymentInstructions>(loadPaymentInstructions);
 
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
@@ -297,6 +315,18 @@ export default function App() {
   useEffect(() => saveTrashPosition(trashPosition), [trashPosition]);
   useEffect(() => saveStudioDefaults(studio), [studio]);
   useEffect(() => saveAskForSignature(askForSignature), [askForSignature]);
+  useEffect(() => saveRestoreWindows(restoreWindowsOn), [restoreWindowsOn]);
+
+  /**
+   * The arrangement, kept so a reload picks the work back up. Written on a
+   * short delay because a drag changes the windows on every frame, and there
+   * is no reason to write to storage sixty times a second.
+   */
+  useEffect(() => {
+    if (!loaded) return undefined;
+    const timer = setTimeout(() => saveWindows(restoreWindowsOn ? windows : []), 400);
+    return () => clearTimeout(timer);
+  }, [loaded, restoreWindowsOn, windows]);
   useEffect(() => savePaymentInstructions(payment), [payment]);
 
   useEffect(() => {
@@ -338,6 +368,11 @@ export default function App() {
   useEffect(() => {
     previewOpenRef.current = preview !== null;
   }, [preview]);
+  // Read during a drag, which must see the windows as they are now.
+  const windowsRef = useRef(windows);
+  useEffect(() => {
+    windowsRef.current = windows;
+  }, [windows]);
 
   const refresh = useCallback(async () => {
     let documentRows: StoredDocument[];
@@ -367,6 +402,37 @@ export default function App() {
     setInvoices(invoiceRows.filter((invoice) => !hidden.has(invoice.id)));
     setPhotos(photoRows.filter((photo) => !hidden.has(photo.id)));
     setLoaded(true);
+
+    // First read of the studio: put back the windows that were open, now that
+    // there is something to check them against.
+    if (!restoredRef.current) {
+      restoredRef.current = true;
+      if (loadRestoreWindows()) {
+        const live = {
+          documents: new Set(documentRows.map((row) => row.id)),
+          invoices: new Set(invoiceRows.map((invoice) => invoice.id)),
+          projects: new Set(projectRows.map((project) => project.id)),
+          photos: new Set(photoRows.map((photo) => photo.id)),
+        };
+        const back = restorable(loadWindows(), (kind) => {
+          if (hidden.has(subjectIdOf(kind) ?? '')) return false;
+          switch (kind.type) {
+            case 'commission':
+              return live.documents.has(kind.docId);
+            case 'invoice':
+              return live.invoices.has(kind.invoiceId);
+            case 'folder':
+              return live.projects.has(kind.projectId);
+            case 'photo':
+            case 'photoEdit':
+              return live.photos.has(kind.photoId);
+            default:
+              return true;
+          }
+        });
+        if (back.length > 0) setWindows(back);
+      }
+    }
   }, [repo]);
 
   useEffect(() => {
@@ -1405,6 +1471,34 @@ export default function App() {
   const minimizeWin = (id: string) => setWindows((c) => minimizeWindow(c, id));
   const zoomWin = (id: string) => setWindows((c) => toggleZoom(c, id, desktopViewportRef.current));
 
+  /**
+   * A window being dragged by its titlebar. While the pointer is over the top
+   * of another frame that frame lights up, and letting go there makes the
+   * dragged window one of its tabs. Let go anywhere else and it is what it
+   * always was: a window that has been moved.
+   */
+  const onDragWindow = useCallback((id: string, point: { x: number; y: number } | null) => {
+    const surface = desktopRef.current?.getBoundingClientRect();
+
+    // Let go: take whatever was lit up, and stop pointing at anything.
+    if (!point || !surface) {
+      const target = dropTargetRef.current;
+      dropTargetRef.current = null;
+      setDropTarget(null);
+      if (target) setWindows((current) => mergeInto(current, id, target));
+      return;
+    }
+
+    const found = dropTargetAt(windowsRef.current, id, {
+      x: point.x - surface.left,
+      y: point.y - surface.top,
+    });
+    if (found?.id !== dropTargetRef.current) {
+      dropTargetRef.current = found?.id ?? null;
+      setDropTarget(found?.id ?? null);
+    }
+  }, []);
+
   const statusRow =
     top && top.kind.type === 'commission'
       ? rows.find((row) => row.id === (top.kind as { docId: string }).docId)
@@ -1772,6 +1866,8 @@ export default function App() {
           }
           askForSignature={askForSignature}
           onAskForSignature={setAskForSignature}
+          restoreWindows={restoreWindowsOn}
+          onRestoreWindows={setRestoreWindowsOn}
           wallpaperBusy={wallpaperBusy}
           wallpaperError={wallpaperError}
         />
@@ -1969,7 +2065,7 @@ export default function App() {
         </div>
       )}
 
-      <main className="desktop">
+      <main className="desktop" ref={desktopRef}>
         <Desktop
           items={desktopItems}
           imageUrls={imageUrls}
@@ -2027,6 +2123,8 @@ export default function App() {
               onZoom={() => zoomWin(win.id)}
               onMove={(x, y) => setWindows((c) => moveWindow(c, win.id, x, y))}
               onResize={(w, h) => setWindows((c) => resizeWindow(c, win.id, w, h))}
+              onDragTo={(point) => onDragWindow(win.id, point)}
+              dropTarget={tabs.some((tab) => tab.id === dropTarget)}
             >
               {message && top?.id === win.id && (
                 <div className="notice no-print">
@@ -2125,6 +2223,23 @@ export default function App() {
         onChange={(changes) => void handleChange(doc.id, changes)}
       />
     );
+  }
+}
+
+/** The record a window is a view onto, when it is a view onto one. */
+function subjectIdOf(kind: WindowKind): string | null {
+  switch (kind.type) {
+    case 'commission':
+      return kind.docId;
+    case 'invoice':
+      return kind.invoiceId;
+    case 'folder':
+      return kind.projectId;
+    case 'photo':
+    case 'photoEdit':
+      return kind.photoId;
+    default:
+      return null;
   }
 }
 

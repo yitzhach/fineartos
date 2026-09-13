@@ -9,6 +9,7 @@
  */
 
 import type { DesktopLayout, IconPosition } from '../os/desktopLayout';
+import type { WindowState } from '../os/windows';
 import type { Trash } from '../os/trash';
 import type { GuestEntry } from '../connect/guestbook';
 import type { CustomWallpaper, WallpaperFit } from './wallpapers';
@@ -153,6 +154,8 @@ const KEYS = {
   guests: 'artistOS.guestBook',
   siteUrl: 'artistOS.siteUrl',
   askForSignature: 'artistOS.askForSignature',
+  windows: 'artistOS.windows',
+  restoreWindows: 'artistOS.restoreWindows',
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -215,6 +218,22 @@ export const saveWallpaper = (value: WallpaperChoice): void => write(KEYS.wallpa
  */
 export const loadAskForSignature = (): boolean => read<boolean>(KEYS.askForSignature, true);
 export const saveAskForSignature = (value: boolean): void => write(KEYS.askForSignature, value);
+
+/**
+ * The windows that were open, so a reload picks the work back up where it was
+ * left rather than on an empty desktop. Only the arrangement is kept — what
+ * is *in* a window is read from the records, so a window whose subject has
+ * since been deleted is dropped on the way in rather than opening empty.
+ */
+export const loadWindows = (): WindowState[] => {
+  const stored = read<WindowState[]>(KEYS.windows, []);
+  return Array.isArray(stored) ? stored : [];
+};
+export const saveWindows = (value: WindowState[]): void => write(KEYS.windows, value);
+
+/** Whether to put them back at all. Some people want an empty desk. */
+export const loadRestoreWindows = (): boolean => read<boolean>(KEYS.restoreWindows, true);
+export const saveRestoreWindows = (value: boolean): void => write(KEYS.restoreWindows, value);
 
 export const loadWallpaperLibrary = (): CustomWallpaper[] =>
   read<CustomWallpaper[]>(KEYS.wallpaperLibrary, []);

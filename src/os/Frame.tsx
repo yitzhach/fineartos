@@ -26,6 +26,14 @@ interface Props {
   onZoom: () => void;
   onMove: (x: number, y: number) => void;
   onResize: (width: number, height: number) => void;
+  /**
+   * Where the pointer is during a titlebar drag, in client coordinates, and
+   * null the moment it is let go. The desktop uses it to work out whether
+   * this window is being dropped onto another one as a tab.
+   */
+  onDragTo?: (point: { x: number; y: number } | null) => void;
+  /** True while letting go here would make this frame's tabs take it in. */
+  dropTarget?: boolean;
 }
 
 /**
@@ -56,6 +64,8 @@ export function Frame({
   onZoom,
   onMove,
   onResize,
+  onDragTo,
+  dropTarget,
 }: Props) {
   const dragFrom = useRef<{ x: number; y: number } | null>(null);
   const resizeFrom = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -66,6 +76,7 @@ export function Frame({
     const move = (event: PointerEvent) => {
       if (dragFrom.current) {
         onMove(event.clientX - dragFrom.current.x, event.clientY - dragFrom.current.y);
+        onDragTo?.({ x: event.clientX, y: event.clientY });
       } else if (resizeFrom.current) {
         const from = resizeFrom.current;
         onResize(
@@ -75,6 +86,9 @@ export function Frame({
       }
     };
     const up = () => {
+      // Told even when nothing was being dragged: the desktop clears its drop
+      // target on any pointer up, which is one less way to leave it stuck on.
+      if (dragFrom.current) onDragTo?.(null);
       dragFrom.current = null;
       resizeFrom.current = null;
     };
@@ -85,7 +99,7 @@ export function Frame({
       globalThis.removeEventListener('pointermove', move);
       globalThis.removeEventListener('pointerup', up);
     };
-  }, [compact, onMove, onResize]);
+  }, [compact, onDragTo, onMove, onResize]);
 
   const startDrag = (event: React.PointerEvent) => {
     onFocus();
@@ -121,6 +135,7 @@ export function Frame({
       className="frame"
       data-focused={focused}
       data-compact={compact}
+      data-drop-target={dropTarget === true}
       style={style}
       role="dialog"
       aria-label={win.title}

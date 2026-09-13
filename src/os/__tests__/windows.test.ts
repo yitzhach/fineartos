@@ -14,9 +14,12 @@ import {
   minimizeWindow,
   mergeAll,
   minimizedWindows,
+  dropTargetAt,
+  mergeInto,
   moveWindow,
   openWindow,
   pullOutTab,
+  restorable,
   renderGroups,
   stepTab,
   tabsOf,
@@ -432,5 +435,125 @@ describe('tabs', () => {
     expect(again.windows).toHaveLength(3);
     expect(focused(again.windows)!.id).toBe(again.id);
     expect(activeTab(again.windows, merged[0]!.groupId!)!.id).toBe(again.id);
+  });
+});
+
+
+// --- Dropping one window onto another ---------------------------------------
+
+describe('drag to tab', () => {
+  const two = () => {
+    let windows = open([], { type: 'settings' }, 'Settings').windows;
+    windows = open(windows, { type: 'tool', tool: 'connect' }, 'Connect').windows;
+    return windows;
+  };
+
+  it('finds the frame under the pointer when it is over the titlebar', () => {
+    const windows = two();
+    const target = windows[0]!;
+    const point = { x: target.rect.x + 40, y: target.rect.y + 20 };
+    expect(dropTargetAt(windows, windows[1]!.id, point)?.id).toBe(target.id);
+  });
+
+  it('is not a drop when the pointer is over the body of a window', () => {
+    const windows = two();
+    const target = windows[0]!;
+    const point = { x: target.rect.x + 40, y: target.rect.y + 300 };
+    expect(dropTargetAt(windows, windows[1]!.id, point)).toBeNull();
+  });
+
+  it('never offers a window to itself, or a tab to its own frame', () => {
+    const windows = mergeAll(two());
+    const at = { x: windows[0]!.rect.x + 40, y: windows[0]!.rect.y + 20 };
+    expect(dropTargetAt(windows, windows[0]!.id, at)).toBeNull();
+    expect(dropTargetAt(windows, windows[1]!.id, at)).toBeNull();
+  });
+
+  it('takes the frame in front where two overlap', () => {
+    let windows = two();
+    // Put the second window exactly over the first, and raise it.
+    windows = moveWindow(windows, windows[1]!.id, windows[0]!.rect.x, windows[0]!.rect.y);
+    windows = focusWindow(windows, windows[1]!.id);
+    windows = open(windows, { type: 'list' }, 'Everything').windows;
+    const dragged = focused(windows)!.id;
+    const point = { x: windows[0]!.rect.x + 40, y: windows[0]!.rect.y + 20 };
+    expect(dropTargetAt(windows, dragged, point)?.id).toBe(windows[1]!.id);
+  });
+
+  it('makes the dropped window a tab, on top, in the target\'s place', () => {
+    const windows = two();
+    const merged = mergeInto(windows, windows[1]!.id, windows[0]!.id);
+    expect(renderGroups(merged)).toHaveLength(1);
+    expect(renderGroups(merged)[0]!.active.id).toBe(windows[1]!.id);
+    expect(merged.every((w) => w.rect.x === windows[0]!.rect.x)).toBe(true);
+  });
+
+  it('brings the tabs of a dragged frame with it', () => {
+    let windows = two();
+    windows = mergeAll(windows);
+    windows = open(windows, { type: 'list' }, 'Everything').windows;
+    const loose = focused(windows)!.id;
+    // Drop the pair onto the loose window: everything ends in one frame.
+    const merged = mergeInto(windows, windows[0]!.id, loose);
+    expect(renderGroups(merged)).toHaveLength(1);
+    expect(renderGroups(merged)[0]!.tabs).toHaveLength(3);
+  });
+
+  it('does nothing when the two are already in the same frame', () => {
+    const merged = mergeAll(two());
+    expect(mergeInto(merged, merged[0]!.id, merged[1]!.id)).toEqual(merged);
+  });
+});
+
+// --- Putting the arrangement back -------------------------------------------
+
+describe('restorable', () => {
+  const everythingExists = () => true;
+
+  it('puts back what was open', () => {
+    const windows = open(open([], { type: 'settings' }).windows, { type: 'list' }).windows;
+    const back = restorable(JSON.parse(JSON.stringify(windows)), everythingExists);
+    expect(back).toHaveLength(2);
+    expect(back.map((w) => w.kind.type)).toEqual(['settings', 'list']);
+  });
+
+  it('drops a window whose record has been deleted', () => {
+    const windows = open(
+      open([], { type: 'commission', docId: 'gone' }).windows,
+      { type: 'settings' },
+    ).windows;
+    const back = restorable(windows, (kind) => kind.type !== 'commission');
+    expect(back.map((w) => w.kind.type)).toEqual(['settings']);
+  });
+
+  it('refuses anything that is not a window, because storage can be edited', () => {
+    expect(restorable('nonsense', everythingExists)).toEqual([]);
+    expect(restorable([{ id: 5 }, null, {}, { id: 'a', title: 'a' }], everythingExists)).toEqual([]);
+    expect(
+      restorable([{ id: 'a', title: 'A', kind: { type: 'nope' }, rect: { x: 0, y: 0, width: 1, height: 1 } }], everythingExists),
+    ).toEqual([]);
+  });
+
+  it('keeps one window per subject', () => {
+    const windows = open([], { type: 'settings' }).windows;
+    const back = restorable([...windows, { ...windows[0]!, id: 'copy' }], everythingExists);
+    expect(back).toHaveLength(1);
+  });
+
+  it('renumbers the stack rather than carrying a session\'s worth of z', () => {
+    const windows = open(open([], { type: 'settings' }).windows, { type: 'list' }).windows.map(
+      (w, index) => ({ ...w, z: 4000 + index }),
+    );
+    expect(restorable(windows, everythingExists).map((w) => w.z)).toEqual([1, 2]);
+  });
+
+  it('keeps a group together, and frees one whose other tabs are gone', () => {
+    const merged = mergeAll(
+      open(open([], { type: 'settings' }).windows, { type: 'list' }).windows,
+    );
+    expect(restorable(merged, everythingExists).every((w) => w.groupId !== null)).toBe(true);
+
+    const half = merged.filter((w) => w.kind.type === 'settings');
+    expect(restorable(half, everythingExists)[0]!.groupId).toBeNull();
   });
 });
