@@ -40,12 +40,17 @@ import {
   closeWindow,
   focused as focusedWindow,
   focusWindow,
+  mergeAll,
   minimizedWindows,
   minimizeWindow,
   moveWindow,
+  pullOutTab,
+  renderGroups,
   openWindow,
   toggleWindow,
   resizeWindow,
+  stepTab,
+  tabsOf,
   toggleZoom,
   type WindowKind,
   type WindowState,
@@ -222,6 +227,8 @@ export default function App() {
    * preview is open does not leave a stale copy on screen.
    */
   const [preview, setPreview] = useState<{ ids: string[]; index: number } | null>(null);
+  /** Read by the tab shortcuts, which must not fight the preview's arrows. */
+  const previewOpenRef = useRef(false);
   const [dbProblem, setDbProblem] = useState<DbProblem | null>(null);
   /**
    * What Cmd/Ctrl+Z would put back. Only reversible things go on here —
@@ -328,6 +335,9 @@ export default function App() {
 
   useEffect(() => onDbProblem(setDbProblem), []);
   useEffect(() => onAppUpdate(() => setUpdateReady(true)), []);
+  useEffect(() => {
+    previewOpenRef.current = preview !== null;
+  }, [preview]);
 
   const refresh = useCallback(async () => {
     let documentRows: StoredDocument[];
@@ -810,6 +820,44 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [undoLast]);
+
+  /**
+   * Stepping through the tabs of the frame in front.
+   *
+   * Not Ctrl+Tab: browsers keep that one for their own tabs and a page cannot
+   * have it. Ctrl/⌘ with Alt and an arrow is reachable everywhere, and Alt
+   * with a number jumps straight to a tab.
+   */
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      // The preview owns the arrows while it is open.
+      if (previewOpenRef.current) return;
+      const stepping = (event.ctrlKey || event.metaKey) && event.altKey;
+      if (stepping && (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) {
+        event.preventDefault();
+        setWindows((current) => {
+          const front = focusedWindow(current);
+          if (!front) return current;
+          const next = stepTab(current, front.id, event.key === 'ArrowRight' ? 1 : -1);
+          return next === front.id ? current : focusWindow(current, next);
+        });
+        return;
+      }
+      if (event.altKey && !event.ctrlKey && !event.metaKey && /^[1-9]$/.test(event.key)) {
+        setWindows((current) => {
+          const front = focusedWindow(current);
+          if (!front) return current;
+          const tabs = tabsOf(current, front.id);
+          const wanted = tabs[Number(event.key) - 1];
+          if (!wanted || tabs.length < 2) return current;
+          event.preventDefault();
+          return focusWindow(current, wanted.id);
+        });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // --- Desktop ------------------------------------------------------------
 
@@ -1875,6 +1923,11 @@ export default function App() {
         theme={theme}
         onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
         onOpenSettings={() => open({ type: 'settings' }, 'Settings', null)}
+        openWindows={windows.filter((w) => !w.minimized).length}
+        onMergeWindows={() => {
+          setWindows((c) => mergeAll(c));
+          setMessage('Windows merged into tabs. ⧉ on a tab moves it back out.');
+        }}
         initials={initialsOf(studio.name)}
       />
 
@@ -1945,12 +1998,16 @@ export default function App() {
           onViewport={onDesktopViewport}
         />
 
-        {windows
-          .filter((w) => !w.minimized)
-          .map((win) => (
+        {renderGroups(windows.filter((w) => !w.minimized)).map(({ active: win, tabs }) => (
             <Frame
-              key={win.id}
+              key={win.groupId ?? win.id}
               window={win}
+              tabs={tabs}
+              onSelectTab={focusWin}
+              onCloseTab={closeWin}
+              onPullOutTab={(id) =>
+                setWindows((c) => pullOutTab(c, id, desktopViewportRef.current))
+              }
               focused={top?.id === win.id}
               compact={compact}
               toolbar={renderToolbar(win)}
@@ -1981,7 +2038,7 @@ export default function App() {
               )}
               {renderContent(win)}
             </Frame>
-          ))}
+        ))}
         {/* With no window open there is nowhere for a message to go, and an
             action like Move to Trash closes the window it was used in. */}
         {message && !top && (

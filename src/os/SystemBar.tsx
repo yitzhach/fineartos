@@ -12,6 +12,10 @@ interface Props {
   theme: Theme;
   onToggleTheme: () => void;
   onOpenSettings: () => void;
+  /** Collects the open windows into one frame of tabs. */
+  onMergeWindows: () => void;
+  /** How many windows are on screen: fewer than two, nothing to merge. */
+  openWindows: number;
   initials: string;
 }
 
@@ -153,6 +157,25 @@ export function SystemBar(props: Props) {
           </p>
           <p className="faint" style={{ margin: 0, fontSize: 12 }}>
             No account is connected. This build stores work on this device only.
+          </p>
+          <button
+            className="btn"
+            style={{ marginTop: 10, width: '100%' }}
+            disabled={props.openWindows < 2}
+            title={
+              props.openWindows < 2
+                ? 'Two or more windows are needed to merge them'
+                : 'Put every open window into one frame of tabs'
+            }
+            onClick={() => {
+              setOpen(null);
+              props.onMergeWindows();
+            }}
+          >
+            Merge windows into tabs
+          </button>
+          <p className="faint" style={{ margin: '6px 0 0', fontSize: 11.5 }}>
+            A tab moves back out with ⧉ on the tab, or by double clicking it.
           </p>
           <button
             className="btn"

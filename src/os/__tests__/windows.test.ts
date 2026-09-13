@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  activeTab,
   cascadeRect,
   defaultSize,
   clampToViewport,
@@ -11,9 +12,14 @@ import {
   MIN_HEIGHT,
   MIN_WIDTH,
   minimizeWindow,
+  mergeAll,
   minimizedWindows,
   moveWindow,
   openWindow,
+  pullOutTab,
+  renderGroups,
+  stepTab,
+  tabsOf,
   resizeWindow,
   toggleWindow,
   toggleZoom,
@@ -285,5 +291,146 @@ describe('toggleWindow', () => {
     const result = toggleWindow(away, spec, VIEW);
     expect(result.windows).toHaveLength(1);
     expect(result.windows[0]!.minimized).toBe(false);
+  });
+});
+
+
+// --- Tabs -------------------------------------------------------------------
+
+describe('tabs', () => {
+  /** Three windows open, the last one focused, as the artist would have them. */
+  const three = () => {
+    let windows = open([], { type: 'settings' }, 'Settings').windows;
+    windows = open(windows, { type: 'tool', tool: 'connect' }, 'Connect').windows;
+    windows = open(windows, { type: 'tool', tool: 'finder' }, 'Finder').windows;
+    return windows;
+  };
+
+  it('leaves a window on its own alone until it is merged', () => {
+    const windows = three();
+    expect(windows.every((w) => w.groupId === null)).toBe(true);
+    expect(renderGroups(windows)).toHaveLength(3);
+    expect(tabsOf(windows, windows[0]!.id)).toHaveLength(1);
+  });
+
+  it('merges every open window into one frame', () => {
+    const merged = mergeAll(three());
+    expect(renderGroups(merged)).toHaveLength(1);
+    expect(renderGroups(merged)[0]!.tabs).toHaveLength(3);
+    expect(new Set(merged.map((w) => w.groupId)).size).toBe(1);
+  });
+
+  it('gives them all the focused window\'s rect, which is the one that was arranged', () => {
+    let windows = three();
+    const front = focused(windows)!;
+    windows = moveWindow(windows, front.id, 210, 96);
+    const merged = mergeAll(windows);
+    expect(merged.every((w) => w.rect.x === 210 && w.rect.y === 96)).toBe(true);
+  });
+
+  it('needs two windows: merging one changes nothing', () => {
+    const one = open([], { type: 'settings' }).windows;
+    expect(mergeAll(one)).toEqual(one);
+  });
+
+  it('leaves a minimised window in the tray rather than dragging it back out', () => {
+    let windows = three();
+    const put = windows[0]!.id;
+    windows = minimizeWindow(windows, put);
+    const merged = mergeAll(windows);
+    expect(merged.find((w) => w.id === put)!.groupId).toBeNull();
+    expect(merged.find((w) => w.id === put)!.minimized).toBe(true);
+    expect(renderGroups(merged.filter((w) => !w.minimized))[0]!.tabs).toHaveLength(2);
+  });
+
+  it('shows the highest window in the group as the tab on top', () => {
+    const merged = mergeAll(three());
+    const groupId = merged[0]!.groupId!;
+    const wanted = merged[0]!.id;
+    const raised = focusWindow(merged, wanted);
+    expect(activeTab(raised, groupId)!.id).toBe(wanted);
+    expect(renderGroups(raised)[0]!.active.id).toBe(wanted);
+  });
+
+  it('raises the whole frame when one of its tabs is focused', () => {
+    let windows = mergeAll(three());
+    windows = open(windows, { type: 'list' }, 'Everything').windows;
+    const loose = focused(windows)!.id;
+    const tab = windows.find((w) => w.groupId !== null)!.id;
+    const raised = focusWindow(windows, tab);
+    const group = raised.filter((w) => w.groupId !== null);
+    // Every tab is above the window that was in front, not just the one clicked.
+    expect(Math.min(...group.map((w) => w.z))).toBeGreaterThan(
+      raised.find((w) => w.id === loose)!.z,
+    );
+  });
+
+  it('moves, resizes, zooms and minimises as one frame', () => {
+    const merged = mergeAll(three());
+    const one = merged[0]!.id;
+
+    const moved = moveWindow(merged, one, 120, 60);
+    expect(moved.every((w) => w.rect.x === 120 && w.rect.y === 60)).toBe(true);
+
+    const sized = resizeWindow(merged, one, 900, 600);
+    expect(sized.every((w) => w.rect.width === 900 && w.rect.height === 600)).toBe(true);
+
+    const zoomed = toggleZoom(merged, one, VIEW);
+    expect(zoomed.every(isZoomed)).toBe(true);
+
+    const away = minimizeWindow(merged, one);
+    expect(away.every((w) => w.minimized)).toBe(true);
+  });
+
+  it('puts a minimised group in the tray once, not once per tab', () => {
+    const merged = mergeAll(three());
+    expect(minimizedWindows(minimizeWindow(merged, merged[0]!.id))).toHaveLength(1);
+  });
+
+  it('takes a tab back out into a window of its own, stepped off the frame', () => {
+    const merged = mergeAll(three());
+    const id = merged[1]!.id;
+    const out = pullOutTab(merged, id, VIEW);
+    const pulled = out.find((w) => w.id === id)!;
+    expect(pulled.groupId).toBeNull();
+    expect(pulled.rect.x).toBeGreaterThan(merged[1]!.rect.x);
+    expect(focused(out)!.id).toBe(id);
+    expect(renderGroups(out)).toHaveLength(2);
+  });
+
+  it('frees the tab left behind, because a group of one is not a group', () => {
+    let windows = mergeAll(three());
+    windows = pullOutTab(windows, windows[0]!.id, VIEW);
+    windows = pullOutTab(windows, windows[1]!.id, VIEW);
+    expect(windows.every((w) => w.groupId === null)).toBe(true);
+    expect(renderGroups(windows)).toHaveLength(3);
+  });
+
+  it('closing a tab leaves the rest of the frame alone', () => {
+    const merged = mergeAll(three());
+    const left = closeWindow(merged, merged[0]!.id);
+    expect(renderGroups(left)).toHaveLength(1);
+    expect(renderGroups(left)[0]!.tabs).toHaveLength(2);
+  });
+
+  it('steps through the tabs and wraps at both ends', () => {
+    const merged = mergeAll(three());
+    const [first, second, third] = merged.map((w) => w.id) as [string, string, string];
+    expect(stepTab(merged, first, 1)).toBe(second);
+    expect(stepTab(merged, third, 1)).toBe(first);
+    expect(stepTab(merged, first, -1)).toBe(third);
+  });
+
+  it('has nowhere to step in a window on its own', () => {
+    const windows = three();
+    expect(stepTab(windows, windows[0]!.id, 1)).toBe(windows[0]!.id);
+  });
+
+  it('opens a tool that is already a tab as that tab, rather than a second copy', () => {
+    const merged = mergeAll(three());
+    const again = openWindow(merged, { kind: { type: 'tool', tool: 'connect' }, title: 'Connect' }, VIEW);
+    expect(again.windows).toHaveLength(3);
+    expect(focused(again.windows)!.id).toBe(again.id);
+    expect(activeTab(again.windows, merged[0]!.groupId!)!.id).toBe(again.id);
   });
 });

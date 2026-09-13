@@ -3,6 +3,16 @@ import { isZoomed, MIN_HEIGHT, MIN_WIDTH, type WindowState } from './windows';
 
 interface Props {
   window: WindowState;
+  /**
+   * Every window drawn in this frame. One entry is a plain window and no
+   * strip is drawn; more than one is a group of tabs, and `window` above is
+   * whichever of them is on top.
+   */
+  tabs?: WindowState[];
+  onSelectTab?: (id: string) => void;
+  onCloseTab?: (id: string) => void;
+  /** Takes one tab back out into a window of its own. */
+  onPullOutTab?: (id: string) => void;
   focused: boolean;
   /** True on a phone: the frame becomes a full-screen sheet, not a window. */
   compact: boolean;
@@ -30,6 +40,10 @@ interface Props {
  */
 export function Frame({
   window: win,
+  tabs,
+  onSelectTab,
+  onCloseTab,
+  onPullOutTab,
   focused,
   compact,
   toolbar,
@@ -146,6 +160,43 @@ export function Frame({
           Done
         </button>
       </header>
+
+      {/* The strip only exists when there is more than one thing in the
+          frame: a single tab is just a window with a redundant label. */}
+      {tabs && tabs.length > 1 && (
+        <div className="frame-tabs" role="tablist" aria-label={`Tabs in ${win.title}`}>
+          {tabs.map((tab) => (
+            <div key={tab.id} className="frame-tab" data-active={tab.id === win.id}>
+              <button
+                className="frame-tab-name"
+                role="tab"
+                aria-selected={tab.id === win.id}
+                title={tab.subtitle ? `${tab.title} — ${tab.subtitle}` : tab.title}
+                onClick={() => onSelectTab?.(tab.id)}
+                onDoubleClick={() => onPullOutTab?.(tab.id)}
+              >
+                {tab.title}
+              </button>
+              <button
+                className="frame-tab-out"
+                onClick={() => onPullOutTab?.(tab.id)}
+                aria-label={`Move ${tab.title} to its own window`}
+                title="Move to its own window"
+              >
+                ⧉
+              </button>
+              <button
+                className="frame-tab-close"
+                onClick={() => onCloseTab?.(tab.id)}
+                aria-label={`Close ${tab.title}`}
+                title="Close this tab"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {toolbar && <div className="frame-toolbar">{toolbar}</div>}
 

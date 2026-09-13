@@ -541,6 +541,90 @@ body {
    defined later in this file and would otherwise win on equal specificity. */
 .frame-bar .frame-done { display: none; margin-left: auto; }
 
+/* --- Tabs in a frame ------------------------------------------------------ */
+/* Under the titlebar, above the toolbar. Only drawn when a frame holds more
+   than one window, so a plain window is unchanged. */
+.frame-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 6px 8px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.10);
+}
+.frame-tabs::-webkit-scrollbar { display: none; }
+:root[data-theme='light'] .frame-tabs { background: rgba(36, 31, 25, 0.03); }
+
+.frame-tab {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 240px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 9px 9px 0 0;
+  background: transparent;
+}
+.frame-tab[data-active='true'] {
+  border-color: var(--line);
+  background: var(--panel-solid);
+}
+.frame-tab:hover:not([data-active='true']) { background: rgba(255, 255, 255, 0.05); }
+:root[data-theme='light'] .frame-tab:hover:not([data-active='true']) {
+  background: rgba(36, 31, 25, 0.05);
+}
+
+.frame-tab-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 4px 7px 11px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.frame-tab[data-active='true'] .frame-tab-name { color: var(--ink); }
+
+.frame-tab-out,
+.frame-tab-close {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  margin-right: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.frame-tab-out:hover,
+.frame-tab-close:hover { background: rgba(255, 255, 255, 0.12); color: var(--ink); }
+:root[data-theme='light'] .frame-tab-out:hover,
+:root[data-theme='light'] .frame-tab-close:hover { background: rgba(36, 31, 25, 0.10); }
+.frame-tab-out:focus-visible,
+.frame-tab-close:focus-visible,
+.frame-tab-name:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* On a phone the strip is the window switcher, so it stays and scrolls. */
+@media (max-width: 860px) {
+  .frame-tab { max-width: 150px; }
+  .frame-tab-out { display: none; }
+}
+
 .frame-toolbar {
   display: flex;
   align-items: center;
@@ -1917,7 +2001,10 @@ fieldset.section > legend {
 @media (max-width: 860px) {
   /* The system bar keeps identity, status and the controls a phone can use.
      Search moves into the lists, where there is room for it. */
-  .systembar { gap: 10px; padding: 0 10px; }
+  /* Above the sheets. A window is z-index 30 and fixed here, so at the
+     bar's usual 20 its own menu opened *behind* the window that was open —
+     which put Settings out of reach on a phone whenever anything was open. */
+  .systembar { gap: 10px; padding: 0 10px; z-index: 40; }
   .systembar .studio,
   .systembar .search,
   .systembar .clock { display: none; }

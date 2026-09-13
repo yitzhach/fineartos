@@ -54,7 +54,7 @@ calculation or a rule inside a component, put it in one of these instead.
 
 | Model (tested, no DOM) | What it owns |
 | --- | --- |
-| `src/os/windows.ts` | Stacking, focus, minimise, zoom, dock toggling |
+| `src/os/windows.ts` | Stacking, focus, minimise, zoom, tabs, dock toggling |
 | `src/os/desktopLayout.ts` | Icon grid, snapping, clamping, auto-arrange, hit-testing |
 | `src/os/trash.ts` | What the Trash hides, what emptying would destroy |
 | `src/os/undo.ts` | The undo stack and what counts as the undo key |
@@ -108,7 +108,7 @@ event must be a ref.
 ```bash
 npm install
 npm run dev            # http://localhost:5173
-npm test               # 362 tests
+npm test               # 377 tests
 npm run build          # typecheck + dist/
 npm run preview        # serve dist on 4173
 npm run wallpapers     # photographs in wallpaper-source/ → public/, resized
