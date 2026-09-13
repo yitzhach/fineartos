@@ -2181,6 +2181,7 @@ export default function App() {
               onZoom={() => zoomWin(win.id)}
               onMove={(x, y) => setWindows((c) => moveWindow(c, win.id, x, y))}
               onResize={(w, h) => setWindows((c) => resizeWindow(c, win.id, w, h))}
+              fills={win.kind.type === 'photoEdit'}
               onDragTo={(point) => onDragWindow(win.id, point)}
               dropTarget={tabs.some((tab) => tab.id === dropTarget)}
             >

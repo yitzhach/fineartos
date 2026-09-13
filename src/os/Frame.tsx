@@ -34,6 +34,12 @@ interface Props {
   onDragTo?: (point: { x: number; y: number } | null) => void;
   /** True while letting go here would make this frame's tabs take it in. */
   dropTarget?: boolean;
+  /**
+   * The content fills the frame and does its own scrolling — the darkroom,
+   * where the picture has to stay on screen while the tools are used. The
+   * body stops scrolling as a page and becomes a box to fill.
+   */
+  fills?: boolean;
 }
 
 /**
@@ -66,6 +72,7 @@ export function Frame({
   onResize,
   onDragTo,
   dropTarget,
+  fills,
 }: Props) {
   const dragFrom = useRef<{ x: number; y: number } | null>(null);
   const resizeFrom = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -217,7 +224,9 @@ export function Frame({
 
       <div className="frame-main">
         {sidebar}
-        <div className="frame-body">{children}</div>
+        <div className="frame-body" data-fills={fills === true}>
+          {children}
+        </div>
         {inspector}
       </div>
 

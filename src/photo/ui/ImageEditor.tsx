@@ -48,6 +48,9 @@ interface Props {
 /** The longest edge the live preview is worked at, for speed. */
 const PREVIEW_EDGE = 1400;
 
+/** Which set of tools is open. One at a time, phone or desktop. */
+type ToolGroup = 'crop' | 'light' | 'colour' | 'mix' | 'save';
+
 /**
  * The darkroom.
  *
@@ -70,11 +73,13 @@ export function ImageEditor({ photo, url, onSaveEdit, onSaveCopy, onRevert, onMe
   /** The crop and the straightening, which happen before any of the colour. */
   const [framing, setFraming] = useState<Framing>(() => photo.framing ?? neutralFraming());
   /**
-   * Cropping is a mode. In it the whole straightened picture is shown with
-   * the crop drawn over it, because you cannot choose what to cut off while
-   * looking only at what is left.
+   * The tools on show. One group at a time, the way a phone editor works:
+   * the picture keeps the screen and the panel under it changes. Cropping
+   * follows from it — the crop group *is* crop mode, because the whole
+   * straightened picture has to be visible to choose what to cut off.
    */
-  const [cropping, setCropping] = useState(false);
+  const [openGroup, setOpenGroup] = useState<ToolGroup | null>(null);
+  const cropping = openGroup === 'crop';
   const [aspect, setAspect] = useState<string>('free');
   const [band, setBand] = useState<BandName>('yellow');
   const [ready, setReady] = useState(false);
@@ -93,6 +98,13 @@ export function ImageEditor({ photo, url, onSaveEdit, onSaveCopy, onRevert, onMe
   const sourceRef = useRef<HTMLImageElement | null>(null);
   /** Bumped when the photograph has loaded, to rebuild what is drawn from it. */
   const [loaded, setLoaded] = useState(0);
+  /**
+   * The shape of what is on the canvas. The plate is given this as an
+   * aspect-ratio so it fits inside whatever room is left without
+   * letterboxing: the canvas fills the plate exactly, which is what keeps the
+   * crop overlay lined up with the picture rather than with a padded box.
+   */
+  const [baseSize, setBaseSize] = useState<{ width: number; height: number } | null>(null);
 
   const changes = useMemo(() => describeAdjustments(adjustments), [adjustments]);
   // A plain size, not the <img> itself: the model spreads and measures it.
@@ -107,6 +119,39 @@ export function ImageEditor({ photo, url, onSaveEdit, onSaveCopy, onRevert, onMe
     [framing, loaded],
   );
   const untouched = isNeutral(adjustments) && !isFramed(framing);
+  /** A dot on any group holding a change, so nothing hides behind a label. */
+  const touchedGroups = useMemo(() => {
+    const touched = new Set<ToolGroup>();
+    if (isFramed(framing)) touched.add('crop');
+    if (
+      adjustments.exposure !== 0 ||
+      adjustments.contrast !== 0 ||
+      adjustments.highlights !== 0 ||
+      adjustments.shadows !== 0 ||
+      adjustments.blackPoint !== 0 ||
+      adjustments.whitePoint !== 0 ||
+      adjustments.gamma !== 1
+    ) {
+      touched.add('light');
+    }
+    if (
+      adjustments.temperature !== 0 ||
+      adjustments.saturation !== 0 ||
+      adjustments.hue !== 0 ||
+      adjustments.blackAndWhite
+    ) {
+      touched.add('colour');
+    }
+    if (
+      BAND_NAMES.some((name) => {
+        const one = adjustments.bands[name];
+        return one.hue !== 0 || one.saturation !== 0 || one.luminance !== 0;
+      })
+    ) {
+      touched.add('mix');
+    }
+    return touched;
+  }, [adjustments, framing]);
   const allChanges = [...framingChanges, ...changes];
 
   const draw = useCallback((settings: Adjustments) => {
@@ -171,6 +216,7 @@ export function ImageEditor({ photo, url, onSaveEdit, onSaveCopy, onRevert, onMe
     context.drawImage(base, 0, 0);
     originalRef.current = context.getImageData(0, 0, base.width, base.height);
     workingRef.current = context.createImageData(base.width, base.height);
+    setBaseSize({ width: base.width, height: base.height });
     setReady(true);
     // Painted here rather than left to the effect below: rebuilding the base
     // sets no state that effect watches, and the canvas would otherwise sit
@@ -270,15 +316,21 @@ export function ImageEditor({ photo, url, onSaveEdit, onSaveCopy, onRevert, onMe
   };
 
   const current = adjustments.bands[band];
+  const openLabel = GROUPS.find((group) => group.id === openGroup)?.label ?? '';
 
   return (
-    <div className="ed">
+    <div className="ed" data-panel={openGroup ?? 'none'}>
       <div className="ed-stage">
-        <div className="ed-plate">
-          <canvas ref={canvasRef} className="ed-canvas" />
-          {cropping && (
-            <CropOverlay box={framing.crop} onBox={(crop) => setFraming({ ...framing, crop })} />
-          )}
+        <div className="ed-frame">
+          <div
+            className="ed-plate"
+            style={baseSize ? { aspectRatio: `${baseSize.width} / ${baseSize.height}` } : undefined}
+          >
+            <canvas ref={canvasRef} className="ed-canvas" />
+            {cropping && (
+              <CropOverlay box={framing.crop} onBox={(crop) => setFraming({ ...framing, crop })} />
+            )}
+          </div>
         </div>
         {!ready && !problem && <p className="hint">Opening the picture…</p>}
         {problem && <p className="notice">{problem}</p>}
@@ -303,251 +355,288 @@ export function ImageEditor({ photo, url, onSaveEdit, onSaveCopy, onRevert, onMe
         </div>
       </div>
 
-      <div className="ed-controls">
-        <fieldset className="section">
-          <legend>Crop and straighten</legend>
-          <div className="chip-row">
+      {/* One set of tools at a time, the way a phone editor works: the picture
+          keeps the room, and the panel is what changes. Scrolling to reach a
+          slider and losing sight of what it is doing is the thing to avoid. */}
+      <div className="ed-tools">
+        <div className="ed-groups" role="tablist" aria-label="Editing tools">
+          {GROUPS.map((group) => (
             <button
-              className="btn"
-              data-variant={cropping ? 'primary' : 'quiet'}
-              aria-pressed={cropping}
-              disabled={!ready}
-              onClick={() => setCropping(!cropping)}
+              key={group.id}
+              className="ed-group"
+              role="tab"
+              aria-selected={openGroup === group.id}
+              data-active={openGroup === group.id}
+              data-touched={touchedGroups.has(group.id)}
+              disabled={!ready && group.id !== 'save'}
+              onClick={() => setOpenGroup(openGroup === group.id ? null : group.id)}
             >
-              {cropping ? 'Done cropping' : 'Crop'}
+              <span className="ed-group-mark" aria-hidden="true">{group.mark}</span>
+              {group.label}
             </button>
-            <button
-              className="btn"
-              data-variant="quiet"
-              disabled={!isFramed(framing)}
-              onClick={() => {
-                setFraming(neutralFraming());
-                setAspect('free');
-              }}
-            >
-              Whole picture
-            </button>
-          </div>
-
-          {cropping && (
-            <>
-              <div className="field">
-                <label>Shape</label>
-                <div className="chip-row">
-                  {ASPECTS.map((option) => (
-                    <button
-                      key={option.id}
-                      className="btn"
-                      data-variant={aspect === option.id ? 'primary' : 'quiet'}
-                      aria-pressed={aspect === option.id}
-                      onClick={() => {
-                        setAspect(option.id);
-                        // The crop is measured against the straightened
-                        // picture, so a shape in pixels is a shape in *its*
-                        // proportions — not the rotated box around it.
-                        const picture = source
-                          ? insideRect(source, framing.angle)
-                          : { width: 1, height: 1 };
-                        setFraming({
-                          ...framing,
-                          crop: withAspect(framing.crop, option.ratio, picture),
-                        });
-                      }}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <p className="hint">
-                Drag inside the picture to move the crop, or a corner to resize it. What is
-                greyed out is what goes.
-              </p>
-            </>
-          )}
-
-          <Slider
-            label="Straighten"
-            value={framing.angle}
-            min={-MAX_ANGLE}
-            max={MAX_ANGLE}
-            step={0.1}
-            onChange={(angle) => setFraming({ ...framing, angle })}
-          />
-          <span className="hint">
-            {source
-              ? `Finished size ${outputSize(source, framing).width} × ${
-                  outputSize(source, framing).height
-                }. `
-              : ''}
-            Straightening trims the corners rather than leaving them blank, so a heavy angle
-            costs a little of the picture.
-          </span>
-        </fieldset>
-
-        <fieldset className="section">
-          <legend>Light</legend>
-          <Slider label="Exposure" value={adjustments.exposure} onChange={(v) => set({ exposure: v })} />
-          <Slider label="Contrast" value={adjustments.contrast} onChange={(v) => set({ contrast: v })} />
-          <Slider label="Highlights" value={adjustments.highlights} onChange={(v) => set({ highlights: v })} />
-          <Slider label="Shadows" value={adjustments.shadows} onChange={(v) => set({ shadows: v })} />
-        </fieldset>
-
-        <fieldset className="section">
-          <legend>Levels</legend>
-          <Slider
-            label="Black point"
-            value={adjustments.blackPoint}
-            min={0}
-            max={100}
-            onChange={(v) => set({ blackPoint: v })}
-          />
-          <Slider
-            label="White point"
-            value={adjustments.whitePoint}
-            min={0}
-            max={100}
-            onChange={(v) => set({ whitePoint: v })}
-          />
-          <Slider
-            label="Midtones"
-            value={adjustments.gamma}
-            min={0.2}
-            max={2.5}
-            step={0.01}
-            onChange={(v) => set({ gamma: v })}
-          />
-        </fieldset>
-
-        <fieldset className="section">
-          <legend>Colour</legend>
-          <Slider
-            label="Temperature"
-            value={adjustments.temperature}
-            onChange={(v) => set({ temperature: v })}
-          />
-          <Slider label="Saturation" value={adjustments.saturation} onChange={(v) => set({ saturation: v })} />
-          <Slider
-            label="Hue"
-            value={adjustments.hue}
-            min={-180}
-            max={180}
-            onChange={(v) => set({ hue: v })}
-          />
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={adjustments.blackAndWhite}
-              onChange={(e) => set({ blackAndWhite: e.target.checked })}
-            />
-            <span>Black and white</span>
-          </label>
-          <span className="hint">
-            Applied last, so the colour bands below work as a channel mixer — dropping the blues
-            darkens a sky.
-          </span>
-        </fieldset>
-
-        <fieldset className="section">
-          <legend>One colour at a time</legend>
-          <p className="hint">
-            Pick a band and move it. Only pixels near that hue change, and greys are left alone —
-            so the yellows can go to red without the whole picture turning.
-          </p>
-          <div className="chip-row ed-bands">
-            {BAND_NAMES.map((name) => {
-              const touched =
-                adjustments.bands[name].hue !== 0 ||
-                adjustments.bands[name].saturation !== 0 ||
-                adjustments.bands[name].luminance !== 0;
-              return (
-                <button
-                  key={name}
-                  className="btn ed-band"
-                  data-variant={band === name ? 'primary' : 'quiet'}
-                  data-band={name}
-                  aria-pressed={band === name}
-                  onClick={() => setBand(name)}
-                >
-                  <span className="ed-swatch" aria-hidden="true" />
-                  {name}
-                  {touched && <span className="ed-band-dot" aria-hidden="true" />}
-                </button>
-              );
-            })}
-          </div>
-          <Slider
-            label={`${band}: hue`}
-            value={current.hue}
-            min={-180}
-            max={180}
-            onChange={(v) => setBandValue(band, { hue: v })}
-          />
-          <Slider
-            label={`${band}: saturation`}
-            value={current.saturation}
-            onChange={(v) => setBandValue(band, { saturation: v })}
-          />
-          <Slider
-            label={`${band}: luminance`}
-            value={current.luminance}
-            onChange={(v) => setBandValue(band, { luminance: v })}
-          />
-        </fieldset>
-
-        <div className="chip-row">
-          <button
-            className="btn"
-            data-variant="primary"
-            disabled={busy || untouched || !ready}
-            onClick={() => void saveOver()}
-          >
-            {busy ? 'Working…' : 'Save the edit'}
-          </button>
-          <button
-            className="btn"
-            disabled={busy || untouched || !ready}
-            onClick={() => void saveCopy()}
-          >
-            Save as a new picture
-          </button>
-          <button className="btn" disabled={busy || !ready} onClick={() => void download()}>
-            Download{ready && source
-              ? ` · ${outputSize(source, framing).width} × ${outputSize(source, framing).height}`
-              : ''}
-          </button>
-          <button
-            className="btn"
-            data-variant="quiet"
-            disabled={untouched}
-            onClick={() => {
-              setAdjustments(neutralAdjustments());
-              setFraming(neutralFraming());
-              setAspect('free');
-            }}
-          >
-            Reset
-          </button>
-          {isEdited(photo) && (
-            <button
-              className="btn"
-              data-variant="quiet"
-              disabled={busy}
-              onClick={() => void onRevert()}
-            >
-              Back to the photograph
-            </button>
-          )}
+          ))}
         </div>
-        <span className="hint">
-          Save the edit changes what the studio shows and keeps the photograph underneath it, so
-          this can be reopened and changed — or put back — at any point. Save as a new picture
-          leaves this one alone and adds a second. Download writes a JPEG at the size above.
-        </span>
+
+        {openGroup && (
+          <div className="ed-panel" role="tabpanel" aria-label={openLabel}>
+            <div className="ed-panel-head">
+              <strong>{openLabel}</strong>
+              <button className="btn" data-variant="quiet" onClick={() => setOpenGroup(null)}>
+                Done
+              </button>
+            </div>
+
+            {openGroup === 'crop' && (
+              <>
+                <div className="field">
+                  <label>Shape</label>
+                  <div className="chip-row">
+                    {ASPECTS.map((option) => (
+                      <button
+                        key={option.id}
+                        className="btn"
+                        data-variant={aspect === option.id ? 'primary' : 'quiet'}
+                        aria-pressed={aspect === option.id}
+                        onClick={() => {
+                          setAspect(option.id);
+                          // The crop is measured against the straightened
+                          // picture, so a shape in pixels is a shape in *its*
+                          // proportions — not the rotated box around it.
+                          const picture = source
+                            ? insideRect(source, framing.angle)
+                            : { width: 1, height: 1 };
+                          setFraming({
+                            ...framing,
+                            crop: withAspect(framing.crop, option.ratio, picture),
+                          });
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Slider
+                  label="Straighten"
+                  value={framing.angle}
+                  min={-MAX_ANGLE}
+                  max={MAX_ANGLE}
+                  step={0.1}
+                  onChange={(angle) => setFraming({ ...framing, angle })}
+                />
+                <div className="chip-row">
+                  <button
+                    className="btn"
+                    data-variant="quiet"
+                    disabled={!isFramed(framing)}
+                    onClick={() => {
+                      setFraming(neutralFraming());
+                      setAspect('free');
+                    }}
+                  >
+                    Whole picture
+                  </button>
+                  <span className="hint">
+                    {source
+                      ? `Finished size ${outputSize(source, framing).width} × ${
+                          outputSize(source, framing).height
+                        }.`
+                      : ''}
+                  </span>
+                </div>
+                <span className="hint">
+                  Drag inside the picture to move the crop, or a corner to resize it. What is
+                  greyed out is what goes. Straightening trims the corners rather than leaving
+                  them blank, so a heavy angle costs a little of the picture.
+                </span>
+              </>
+            )}
+
+            {openGroup === 'light' && (
+              <>
+                <Slider label="Exposure" value={adjustments.exposure} onChange={(v) => set({ exposure: v })} />
+                <Slider label="Contrast" value={adjustments.contrast} onChange={(v) => set({ contrast: v })} />
+                <Slider label="Highlights" value={adjustments.highlights} onChange={(v) => set({ highlights: v })} />
+                <Slider label="Shadows" value={adjustments.shadows} onChange={(v) => set({ shadows: v })} />
+                <Slider
+                  label="Black point"
+                  value={adjustments.blackPoint}
+                  min={0}
+                  max={100}
+                  onChange={(v) => set({ blackPoint: v })}
+                />
+                <Slider
+                  label="White point"
+                  value={adjustments.whitePoint}
+                  min={0}
+                  max={100}
+                  onChange={(v) => set({ whitePoint: v })}
+                />
+                <Slider
+                  label="Midtones"
+                  value={adjustments.gamma}
+                  min={0.2}
+                  max={2.5}
+                  step={0.01}
+                  onChange={(v) => set({ gamma: v })}
+                />
+              </>
+            )}
+
+            {openGroup === 'colour' && (
+              <>
+                <Slider
+                  label="Temperature"
+                  value={adjustments.temperature}
+                  onChange={(v) => set({ temperature: v })}
+                />
+                <Slider
+                  label="Saturation"
+                  value={adjustments.saturation}
+                  onChange={(v) => set({ saturation: v })}
+                />
+                <Slider
+                  label="Hue"
+                  value={adjustments.hue}
+                  min={-180}
+                  max={180}
+                  onChange={(v) => set({ hue: v })}
+                />
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={adjustments.blackAndWhite}
+                    onChange={(e) => set({ blackAndWhite: e.target.checked })}
+                  />
+                  <span>Black and white</span>
+                </label>
+                <span className="hint">
+                  Applied last, so Mix works as a channel mixer — dropping the blues darkens a
+                  sky.
+                </span>
+              </>
+            )}
+
+            {openGroup === 'mix' && (
+              <>
+                <div className="chip-row ed-bands">
+                  {BAND_NAMES.map((name) => {
+                    const touched =
+                      adjustments.bands[name].hue !== 0 ||
+                      adjustments.bands[name].saturation !== 0 ||
+                      adjustments.bands[name].luminance !== 0;
+                    return (
+                      <button
+                        key={name}
+                        className="btn ed-band"
+                        data-variant={band === name ? 'primary' : 'quiet'}
+                        data-band={name}
+                        aria-pressed={band === name}
+                        onClick={() => setBand(name)}
+                      >
+                        <span className="ed-swatch" aria-hidden="true" />
+                        {name}
+                        {touched && <span className="ed-band-dot" aria-hidden="true" />}
+                      </button>
+                    );
+                  })}
+                </div>
+                <Slider
+                  label={`${band}: hue`}
+                  value={current.hue}
+                  min={-180}
+                  max={180}
+                  onChange={(v) => setBandValue(band, { hue: v })}
+                />
+                <Slider
+                  label={`${band}: saturation`}
+                  value={current.saturation}
+                  onChange={(v) => setBandValue(band, { saturation: v })}
+                />
+                <Slider
+                  label={`${band}: luminance`}
+                  value={current.luminance}
+                  onChange={(v) => setBandValue(band, { luminance: v })}
+                />
+                <span className="hint">
+                  Only pixels near the chosen hue change, and greys are left alone — so the
+                  yellows can go to red without the whole picture turning.
+                </span>
+              </>
+            )}
+
+            {openGroup === 'save' && (
+              <>
+                <div className="chip-row">
+                  <button
+                    className="btn"
+                    data-variant="primary"
+                    disabled={busy || untouched || !ready}
+                    onClick={() => void saveOver()}
+                  >
+                    {busy ? 'Working…' : 'Save the edit'}
+                  </button>
+                  <button
+                    className="btn"
+                    disabled={busy || untouched || !ready}
+                    onClick={() => void saveCopy()}
+                  >
+                    Save as a new picture
+                  </button>
+                  <button className="btn" disabled={busy || !ready} onClick={() => void download()}>
+                    Download
+                    {ready && source
+                      ? ` · ${outputSize(source, framing).width} × ${
+                          outputSize(source, framing).height
+                        }`
+                      : ''}
+                  </button>
+                  <button
+                    className="btn"
+                    data-variant="quiet"
+                    disabled={untouched}
+                    onClick={() => {
+                      setAdjustments(neutralAdjustments());
+                      setFraming(neutralFraming());
+                      setAspect('free');
+                    }}
+                  >
+                    Reset
+                  </button>
+                  {isEdited(photo) && (
+                    <button
+                      className="btn"
+                      data-variant="quiet"
+                      disabled={busy}
+                      onClick={() => void onRevert()}
+                    >
+                      Back to the photograph
+                    </button>
+                  )}
+                </div>
+                <span className="hint">
+                  Save the edit changes what the studio shows and keeps the photograph underneath
+                  it, so this can be reopened and changed — or put back — at any point. Save as a
+                  new picture leaves this one alone and adds a second. Download writes a JPEG at
+                  the size above.
+                </span>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
+/** The tool groups, in the order they are worked in. */
+const GROUPS: { id: ToolGroup; label: string; mark: string }[] = [
+  { id: 'crop', label: 'Crop', mark: '⌗' },
+  { id: 'light', label: 'Light', mark: '◐' },
+  { id: 'colour', label: 'Colour', mark: '◑' },
+  { id: 'mix', label: 'Mix', mark: '◍' },
+  { id: 'save', label: 'Save', mark: '↧' },
+];
 
 /**
  * The photograph straightened and cut to its crop, as a canvas.

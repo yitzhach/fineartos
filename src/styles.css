@@ -2070,6 +2070,11 @@ fieldset.section > legend {
   .dock-item { width: 58px; }
   .dock-item .tile { width: 38px; height: 38px; transform: none; }
   .dock-item .name { font-size: 9.5px; max-width: 56px; }
+
+  /* A toolbar's explanatory line is the first thing to go on a phone: the
+     buttons still say what they do, and the room belongs to the work. */
+  .frame-toolbar .faint { display: none; }
+  .ed-group { font-size: 10.5px; padding: 7px 4px 6px; }
 }
 
 /* Tablet: windows still behave like windows, but the inspector folds away so
@@ -2596,21 +2601,56 @@ fieldset.section > legend {
 }
 
 /* --- The darkroom ---------------------------------------------------------- */
+/* The picture keeps the room and one set of tools is open at a time, the way
+   a phone editor works. Scrolling to reach a slider and losing sight of what
+   it is doing is the thing this layout exists to prevent — so the editor
+   fills its window (see .frame-body[data-fills]) and nothing here scrolls
+   except the open panel. */
 
 .ed {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.6fr);
-  gap: 18px;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  height: 100%;
 }
 
-.ed-stage { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ed-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+/* The picture, centred in whatever room is left over. */
+.ed-frame {
+  flex: 1 1 auto;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 /* The picture and the crop drawn over it share one box, so the overlay's
-   fractions and the canvas's pixels line up with no arithmetic. */
-.ed-plate { position: relative; line-height: 0; }
+   fractions and the canvas's pixels line up with no arithmetic. The plate
+   shrinks to the canvas rather than the other way round, which is what keeps
+   them lined up when the picture is letterboxed in a tall window. */
+/* Sized by the aspect-ratio the editor sets on it, held inside whatever room
+   is left. A percentage max-height on the canvas itself would not work — the
+   plate's height is not definite — and object-fit would letterbox inside the
+   element, which would put the crop overlay out of step with the picture. */
+.ed-plate {
+  position: relative;
+  line-height: 0;
+  max-width: 100%;
+  max-height: 100%;
+  min-height: 0;
+}
 .ed-canvas {
+  display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
   border-radius: 10px;
   border: 1px solid var(--line);
   background: var(--raised);
@@ -2664,9 +2704,108 @@ fieldset.section > legend {
 .ed-crop-grip[data-corner='ne'] { top: -3px; right: -3px; border-left: 0; border-bottom: 0; cursor: nesw-resize; }
 .ed-crop-grip[data-corner='sw'] { bottom: -3px; left: -3px; border-right: 0; border-top: 0; cursor: nesw-resize; }
 .ed-crop-grip[data-corner='se'] { bottom: -3px; right: -3px; border-left: 0; border-top: 0; cursor: nwse-resize; }
-.ed-stage-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+/* One line, always: on a phone this bar wrapping to three lines was taking
+   the room the picture needed. */
+.ed-stage-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.ed-stage-bar .hint {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-.ed-controls { display: flex; flex-direction: column; gap: 14px; }
+/* --- The tool groups ------------------------------------------------------- */
+
+/* The tools never take more than half the window: the picture is the point,
+   and a panel that squeezes it to a strip is the problem this layout is
+   fixing. The panel scrolls inside that, so a long group is reachable
+   without the picture leaving the screen. */
+.ed-tools {
+  flex: 0 1 auto;
+  max-height: 50%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.ed-groups {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.ed-groups::-webkit-scrollbar { display: none; }
+
+.ed-group {
+  position: relative;
+  flex: 1 1 0;
+  /* No minimum: five of these have to fit across a phone without the labels
+     being clipped, and they are the only way into the tools. */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 6px 7px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--raised);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 11.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ed-group:hover:not(:disabled) { border-color: var(--line-strong); color: var(--ink); }
+.ed-group:disabled { opacity: 0.45; cursor: default; }
+.ed-group[data-active='true'] {
+  border-color: var(--accent);
+  background: var(--accent-quiet);
+  color: var(--ink);
+}
+.ed-group:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ed-group-mark { font-size: 15px; line-height: 1; }
+.ed-group span:not(.ed-group-mark) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* A dot means this group is holding a change — five labels and forty sliders
+   is a lot of places for one to hide. */
+.ed-group[data-touched='true']::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.ed-panel {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-solid);
+}
+.ed-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ed-panel-head strong { font-family: var(--serif); font-size: 14px; }
 .ed-slider { gap: 2px; }
 .ed-slider label {
   display: flex;
@@ -2708,9 +2847,34 @@ fieldset.section > legend {
   background: var(--accent);
 }
 
-@media (max-width: 1180px) {
-  .ed { grid-template-columns: minmax(0, 1fr); }
+/* A wide screen has room to keep the panel beside the picture rather than
+   under it; the behaviour is the same either way, so nothing has to be
+   learned twice. */
+@media (min-width: 1100px) {
+  .ed {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-areas: 'stage tools';
+    gap: 18px;
+  }
+  .ed-stage { grid-area: stage; }
+  .ed-tools { grid-area: tools; min-height: 0; }
+  .ed-groups { flex-wrap: wrap; overflow: visible; }
+  .ed-group { flex: 1 1 84px; }
+  /* Still capped, so a long panel scrolls inside itself rather than
+     overflowing a window that no longer scrolls. */
+  .ed-tools { max-height: 100%; }
 }
+
+/* The body of the window is a box to fill rather than a page to scroll: the
+   picture has to stay on screen while the tools are used. */
+.frame-body[data-fills='true'] {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 14px;
+}
+.frame-body[data-fills='true'] > * { min-height: 0; }
 
 .photo-missing {
   display: grid;
