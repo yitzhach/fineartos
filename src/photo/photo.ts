@@ -15,6 +15,7 @@
 
 import { newId } from '../commission/document';
 import { isNeutral, type Adjustments } from './adjust';
+import { isFramed, type Framing } from './crop';
 
 /**
  * Whether a piece can be bought. Null is the honest default: a photograph
@@ -68,6 +69,12 @@ export interface Photo {
    * picture has never been edited.
    */
   edit?: Adjustments | null;
+  /**
+   * The crop and the straightening that produced the picture on show. Kept
+   * beside the colour numbers and for the same reason: so the frame can be
+   * changed later without the last crop being cut out of the last crop.
+   */
+  framing?: Framing | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -135,7 +142,9 @@ export function sourceImageId(photo: Photo): string {
 
 /** Whether what is on show is an edit rather than the photograph itself. */
 export function isEdited(photo: Photo): boolean {
-  return Boolean(photo.edit) && !isNeutral(photo.edit!);
+  const colour = Boolean(photo.edit) && !isNeutral(photo.edit!);
+  const frame = Boolean(photo.framing) && isFramed(photo.framing!);
+  return colour || frame;
 }
 
 export function isInCurrentShow(photo: Photo): boolean {

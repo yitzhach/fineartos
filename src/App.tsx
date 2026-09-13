@@ -127,6 +127,7 @@ import {
   type Photo,
 } from './photo/photo';
 import type { Adjustments } from './photo/adjust';
+import type { Framing } from './photo/crop';
 import { PhotoWindow } from './photo/ui/PhotoWindow';
 import { PicturePreview } from './photo/ui/PicturePreview';
 import { ImageEditor } from './photo/ui/ImageEditor';
@@ -1426,6 +1427,7 @@ export default function App() {
     photo: Photo,
     blob: Blob,
     adjustments: Adjustments,
+    framing: Framing,
     size: { width: number; height: number },
   ) => {
     const original = sourceImageId(photo);
@@ -1438,6 +1440,7 @@ export default function App() {
         imageId: rendered,
         originalImageId: original,
         edit: adjustments,
+        framing,
         pixelWidth: size.width,
         pixelHeight: size.height,
       }),
@@ -1450,7 +1453,7 @@ export default function App() {
     const original = sourceImageId(photo);
     if (photo.imageId !== original) await repo.deleteImage(photo.imageId);
     await savePhotoRecord(
-      editPhoto(photo, { imageId: original, originalImageId: null, edit: null }),
+      editPhoto(photo, { imageId: original, originalImageId: null, edit: null, framing: null }),
     );
     setMessage('Back to the photograph as it came in.');
   };
@@ -1738,7 +1741,7 @@ export default function App() {
             </button>
           )}
           <span className="faint" style={{ fontSize: 12 }}>
-            Edits are not saved over the original — Save makes a new picture.
+            The photograph is kept underneath — an edit can be undone at any point.
           </span>
         </>
       );
@@ -1877,7 +1880,9 @@ export default function App() {
         <ImageEditor
           photo={photo}
           url={imageUrls[sourceImageId(photo)]}
-          onSaveEdit={(blob, adjustments, size) => savePhotoEdit(photo, blob, adjustments, size)}
+          onSaveEdit={(blob, adjustments, framing, size) =>
+            savePhotoEdit(photo, blob, adjustments, framing, size)
+          }
           onSaveCopy={(blob, changes) => savePhotoCopy(photo, blob, changes)}
           onRevert={() => revertPhotoEdit(photo)}
           onMessage={setMessage}

@@ -2605,6 +2605,9 @@ fieldset.section > legend {
 }
 
 .ed-stage { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+/* The picture and the crop drawn over it share one box, so the overlay's
+   fractions and the canvas's pixels line up with no arithmetic. */
+.ed-plate { position: relative; line-height: 0; }
 .ed-canvas {
   width: 100%;
   height: auto;
@@ -2612,6 +2615,55 @@ fieldset.section > legend {
   border: 1px solid var(--line);
   background: var(--raised);
 }
+
+/* --- The crop ------------------------------------------------------------- */
+
+.ed-crop {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  cursor: crosshair;
+}
+/* What is being cut off is dimmed by a shadow the size of the picture, which
+   is one box rather than four rectangles kept in step. */
+.ed-crop-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+  cursor: move;
+}
+/* Thirds, the one guide worth having while straightening a horizon. */
+.ed-crop-box::before,
+.ed-crop-box::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.45;
+}
+.ed-crop-box::before {
+  background:
+    linear-gradient(to right, transparent 33.33%, rgba(255, 255, 255, 0.5) 33.33%, rgba(255, 255, 255, 0.5) calc(33.33% + 1px), transparent calc(33.33% + 1px)),
+    linear-gradient(to right, transparent 66.66%, rgba(255, 255, 255, 0.5) 66.66%, rgba(255, 255, 255, 0.5) calc(66.66% + 1px), transparent calc(66.66% + 1px));
+}
+.ed-crop-box::after {
+  background:
+    linear-gradient(to bottom, transparent 33.33%, rgba(255, 255, 255, 0.5) 33.33%, rgba(255, 255, 255, 0.5) calc(33.33% + 1px), transparent calc(33.33% + 1px)),
+    linear-gradient(to bottom, transparent 66.66%, rgba(255, 255, 255, 0.5) 66.66%, rgba(255, 255, 255, 0.5) calc(66.66% + 1px), transparent calc(66.66% + 1px));
+}
+
+.ed-crop-grip {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: 3px solid #fff;
+}
+.ed-crop-grip[data-corner='nw'] { top: -3px; left: -3px; border-right: 0; border-bottom: 0; cursor: nwse-resize; }
+.ed-crop-grip[data-corner='ne'] { top: -3px; right: -3px; border-left: 0; border-bottom: 0; cursor: nesw-resize; }
+.ed-crop-grip[data-corner='sw'] { bottom: -3px; left: -3px; border-right: 0; border-top: 0; cursor: nesw-resize; }
+.ed-crop-grip[data-corner='se'] { bottom: -3px; right: -3px; border-left: 0; border-top: 0; cursor: nwse-resize; }
 .ed-stage-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
 .ed-controls { display: flex; flex-direction: column; gap: 14px; }

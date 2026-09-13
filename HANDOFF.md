@@ -60,6 +60,7 @@ calculation or a rule inside a component, put it in one of these instead.
 | `src/os/undo.ts` | The undo stack and what counts as the undo key |
 | `src/photo/photo.ts` | A picture: size, price, status, current show, hiding |
 | `src/photo/adjust.ts` | The darkroom: tone, colour, and the eight hue bands |
+| `src/photo/crop.ts` | Cropping and straightening, and what fits inside a turn |
 | `src/project/project.ts` | Folders: they hold ids, never copies |
 | `src/commission/calc.ts` | The one money calculation, integer minor units |
 | `src/invoice/invoice.ts` | Invoices as child records of a commission |
@@ -108,7 +109,7 @@ event must be a ref.
 ```bash
 npm install
 npm run dev            # http://localhost:5173
-npm test               # 396 tests
+npm test               # 415 tests
 npm run build          # typecheck + dist/
 npm run preview        # serve dist on 4173
 npm run wallpapers     # photographs in wallpaper-source/ → public/, resized
