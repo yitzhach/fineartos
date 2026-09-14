@@ -1,6 +1,4 @@
-# HANDOFF
-
-Baton only. Rules, constraints, commands and gotchas live in `CLAUDE.md`.
+# HANDOFF — baton only. Rules and commands live in `CLAUDE.md`.
 
 ## Goal
 
