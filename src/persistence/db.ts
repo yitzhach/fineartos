@@ -8,7 +8,7 @@
  */
 
 const DB_NAME = 'artist-os';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 export const STORE_DOCUMENTS = 'documents';
 export const STORE_IMAGES = 'images';
@@ -18,6 +18,8 @@ export const STORE_PROJECTS = 'projects';
 export const STORE_INVOICES = 'invoices';
 /** Added in DB_VERSION 3: pictures that sit on the desktop as files. */
 export const STORE_PHOTOS = 'photos';
+/** Added in DB_VERSION 4: what the studio told a client, and what came back. */
+export const STORE_UPDATES = 'clientUpdates';
 
 export interface StoredImage {
   id: string;
@@ -130,6 +132,12 @@ export function openDb(): Promise<IDBDatabase> {
       // stored is touched, so an upgrade can never cost the artist work.
       if (!db.objectStoreNames.contains(STORE_PHOTOS)) {
         const store = db.createObjectStore(STORE_PHOTOS, { keyPath: 'id' });
+        store.createIndex('workspaceId', 'workspaceId');
+      }
+      // Version 4 adds client updates. Same rule again: an upgrade adds a
+      // shelf, it never touches what is already on the others.
+      if (!db.objectStoreNames.contains(STORE_UPDATES)) {
+        const store = db.createObjectStore(STORE_UPDATES, { keyPath: 'id' });
         store.createIndex('workspaceId', 'workspaceId');
       }
     };

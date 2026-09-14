@@ -128,6 +128,22 @@ import {
 } from './photo/photo';
 import type { Adjustments } from './photo/adjust';
 import type { Framing } from './photo/crop';
+import { milestonesOf } from './commission/milestones';
+import { UpdatesPane } from './commission/ui/UpdatesPane';
+import {
+  awaitingReply,
+  recordHandoff,
+  messageFor,
+  updatesFor,
+  type ClientUpdate,
+  type HandoffChannel,
+} from './commission/updates';
+import type { CardContext } from './commission/updateRender';
+import {
+  downloadUpdateCard,
+  downloadUpdatePage,
+  shareUpdateCard,
+} from './commission/updateDownload';
 import { PhotoWindow } from './photo/ui/PhotoWindow';
 import { PicturePreview } from './photo/ui/PicturePreview';
 import { ImageEditor } from './photo/ui/ImageEditor';
@@ -216,6 +232,7 @@ export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [clientUpdates, setClientUpdates] = useState<ClientUpdate[]>([]);
   const [importingImages, setImportingImages] = useState(false);
   const [guests, setGuests] = useState<GuestEntry[]>(loadGuests);
   const [siteUrl, setSiteUrl] = useState(loadSiteUrl);
@@ -382,12 +399,14 @@ export default function App() {
     let projectRows: Project[];
     let invoiceRows: Invoice[];
     let photoRows: Photo[];
+    let updateRows: ClientUpdate[];
     try {
-      [documentRows, projectRows, invoiceRows, photoRows] = await Promise.all([
+      [documentRows, projectRows, invoiceRows, photoRows, updateRows] = await Promise.all([
         repo.list(),
         repo.listProjects(),
         repo.listInvoices(),
         repo.listPhotos(),
+        repo.listUpdates(),
       ]);
     } catch (cause) {
       // The database reports its own problem through onDbProblem; this stops
@@ -404,6 +423,9 @@ export default function App() {
     setProjects(projectRows.filter((project) => !hidden.has(project.id)));
     setInvoices(invoiceRows.filter((invoice) => !hidden.has(invoice.id)));
     setPhotos(photoRows.filter((photo) => !hidden.has(photo.id)));
+    // An update belongs to its commission: one in the Trash takes its updates
+    // out of sight with it, and putting it back brings them back.
+    setClientUpdates(updateRows.filter((update) => !hidden.has(update.documentId)));
     setLoaded(true);
 
     // First read of the studio: put back the windows that were open, now that
@@ -1423,6 +1445,85 @@ export default function App() {
    * Everything else in the app goes on reading `imageId` and knows nothing
    * about any of this.
    */
+  // --- Client updates -------------------------------------------------------
+
+  const saveClientUpdate = async (update: ClientUpdate) => {
+    await repo.saveUpdate(update);
+    await refresh();
+  };
+
+  const deleteClientUpdate = async (id: string) => {
+    await repo.deleteUpdate(id);
+    await refresh();
+    setMessage('Update removed. What was already handed over is still out there.');
+  };
+
+  /**
+   * Renders an update and hands it over, then records that it was handed over
+   * — not that it was sent, which this app cannot know and never claims.
+   */
+  const handOverUpdate = async (
+    doc: CommissionDocument,
+    update: ClientUpdate,
+    channel: HandoffChannel,
+  ) => {
+    const context: CardContext = {
+      studioName: doc.studio.name || null,
+      studioEmail: doc.studio.email || null,
+      clientName: doc.client.name || null,
+      title: doc.title || null,
+      documentNumber: doc.documentNumber || null,
+      date: new Date().toISOString().slice(0, 10),
+      stage:
+        milestonesOf(doc).find((milestone) => milestone.id === update.milestoneId)?.label ?? null,
+    };
+    const chosen = update.photoIds
+      .map((id) => photos.find((photo) => photo.id === id))
+      .filter((photo): photo is Photo => Boolean(photo));
+    const urls = chosen
+      .map((photo) => imageUrls[photo.imageId])
+      .filter((url): url is string => Boolean(url));
+    const message = messageFor(update, {
+      studioName: doc.studio.name || null,
+      clientName: doc.client.name || null,
+      title: doc.title || null,
+    });
+
+    try {
+      if (channel === 'jpeg') {
+        await downloadUpdateCard(update, context, urls);
+        setMessage('Saved as a picture. Attach it to a text or an email — it is yours to send.');
+      } else if (channel === 'page') {
+        const blobs = await Promise.all(
+          chosen.map(async (photo) => ({
+            blob: (await repo.getImage(photo.imageId))?.blob ?? null,
+            title: photo.title,
+          })),
+        );
+        await downloadUpdatePage(update, context, blobs);
+        setMessage('Saved as one page, pictures and all. It opens anywhere, with or without a network.');
+      } else if (channel === 'copy') {
+        await navigator.clipboard?.writeText(message);
+        setMessage('Message copied. Paste it wherever you talk to this client.');
+      } else if (channel === 'share') {
+        const result = await shareUpdateCard(update, context, urls, message);
+        if (result === 'unsupported') {
+          setMessage('This browser has no share sheet — Save as a picture and attach it.');
+          return;
+        }
+        if (result === 'cancelled') return;
+        setMessage('Handed to your phone’s share sheet.');
+      }
+    } catch (cause) {
+      // eslint-disable-next-line no-console
+      console.warn('Could not hand the update over', cause);
+      setMessage('That could not be prepared. Nothing was recorded.');
+      return;
+    }
+
+    await saveClientUpdate(recordHandoff(update, channel));
+  };
+
   const savePhotoEdit = async (
     photo: Photo,
     blob: Blob,
@@ -1784,6 +1885,24 @@ export default function App() {
               onAddImages={(files) => void handleAddImages(doc.id, files)}
               onRemoveImage={(id) => void handleRemoveImage(doc.id, id)}
               imageError={imageError}
+            />
+          }
+          updatesWaiting={awaitingReply(updatesFor(clientUpdates, doc.id)).length}
+          updatesSlot={
+            <UpdatesPane
+              doc={doc}
+              updates={clientUpdates}
+              photos={photos}
+              imageUrls={imageUrls}
+              invoices={forDoc.map((invoice) => ({
+                id: invoice.id,
+                number: invoice.invoiceNumber,
+                issuedAt: invoice.issuedAt,
+              }))}
+              onSave={(update) => void saveClientUpdate(update)}
+              onDelete={(id) => void deleteClientUpdate(id)}
+              onHandoff={(update, channel) => handOverUpdate(doc, update, channel)}
+              onMessage={setMessage}
             />
           }
           documentSlot={

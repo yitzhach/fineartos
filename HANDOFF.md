@@ -63,6 +63,7 @@ calculation or a rule inside a component, put it in one of these instead.
 | `src/photo/crop.ts` | Cropping and straightening, and what fits inside a turn |
 | `src/project/project.ts` | Folders: they hold ids, never copies |
 | `src/commission/calc.ts` | The one money calculation, integer minor units |
+| `src/commission/updates.ts` | Client updates, replies, and the timeline they make |
 | `src/invoice/invoice.ts` | Invoices as child records of a commission |
 | `src/connect/guestbook.ts` | Guest entries, consent, CSV, signature paths |
 | `src/connect/picker.ts` | Which pictures a visitor is shown, and which they picked |
@@ -109,7 +110,7 @@ event must be a ref.
 ```bash
 npm install
 npm run dev            # http://localhost:5173
-npm test               # 415 tests
+npm test               # 442 tests
 npm run build          # typecheck + dist/
 npm run preview        # serve dist on 4173
 npm run wallpapers     # photographs in wallpaper-source/ → public/, resized

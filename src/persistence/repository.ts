@@ -7,6 +7,7 @@
 import type { CommissionDocument } from '../commission/types';
 import type { Invoice } from '../invoice/types';
 import type { Photo } from '../photo/photo';
+import type { ClientUpdate } from '../commission/updates';
 import type { Project } from '../project/project';
 import {
   STORE_DOCUMENTS,
@@ -15,6 +16,7 @@ import {
   STORE_PHOTOS,
   STORE_PROJECTS,
   STORE_QUEUE,
+  STORE_UPDATES,
   type PendingWrite,
   type StoredImage,
   get,
@@ -64,6 +66,12 @@ interface PhotoRow {
   id: string;
   workspaceId: string;
   photo: Photo;
+}
+
+interface UpdateRow {
+  id: string;
+  workspaceId: string;
+  update: ClientUpdate;
 }
 
 /**
@@ -209,6 +217,23 @@ export class Repository {
     const existing = await this.loadInvoice(id);
     if (!existing) return;
     await remove(STORE_INVOICES, id);
+  }
+
+  // --- Client updates -------------------------------------------------------
+
+  async listUpdates(): Promise<ClientUpdate[]> {
+    const rows = await listByWorkspace<UpdateRow>(STORE_UPDATES, this.workspaceId);
+    return rows
+      .map((row) => row.update)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async saveUpdate(update: ClientUpdate): Promise<void> {
+    await put(STORE_UPDATES, { id: update.id, workspaceId: this.workspaceId, update });
+  }
+
+  async deleteUpdate(id: string): Promise<void> {
+    await remove(STORE_UPDATES, id);
   }
 
   // --- Photos -------------------------------------------------------------

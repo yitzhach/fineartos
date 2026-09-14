@@ -17,6 +17,7 @@ export type ProjectTab =
   | 'files'
   | 'milestones'
   | 'invoices'
+  | 'updates'
   | 'notes';
 
 interface Props {
@@ -38,6 +39,10 @@ interface Props {
   editorSlot: ReactNode;
   /** The client-facing document, rendered in the Document tab. */
   documentSlot: ReactNode;
+  /** Client updates and the timeline, rendered in the Updates tab. */
+  updatesSlot: ReactNode;
+  /** How many updates asked for a sign-off and have no reply recorded. */
+  updatesWaiting: number;
 }
 
 const NO_DEPOSIT = { kind: 'percent' as const, value: null };
@@ -80,6 +85,7 @@ export function ProjectWindow(props: Props) {
     { id: 'files', label: 'Files', count: images.length },
     { id: 'milestones', label: 'Milestones', count: progress.total },
     { id: 'invoices', label: 'Invoices', count: invoices.length },
+    { id: 'updates', label: 'Client', count: props.updatesWaiting || undefined },
     { id: 'notes', label: 'Notes' },
   ];
 
@@ -307,6 +313,8 @@ export function ProjectWindow(props: Props) {
           )}
         </div>
       )}
+
+      {tab === 'updates' && <div className="pj-pane">{props.updatesSlot}</div>}
 
       {tab === 'notes' && (
         <div className="pj-pane">
