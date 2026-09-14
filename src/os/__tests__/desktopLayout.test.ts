@@ -1,19 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
-  autoArrange,
   CELL_HEIGHT,
   CELL_WIDTH,
-  clampToDesktop,
-  firstFreeSlot,
-  iconAt,
   MARGIN_LEFT,
   MARGIN_TOP,
+  autoArrange,
+  clampToDesktop,
+  defaultTrashSlot,
+  firstFreeSlot,
+  iconAt,
+  overlaps,
   pruneLayout,
   resolveLayout,
   rowsPerColumn,
   slotPosition,
   snapToGrid,
-  defaultTrashSlot,
   trashPositionOf,
   type DesktopLayout,
 } from '../desktopLayout';
@@ -185,5 +186,107 @@ describe('the Trash position', () => {
     const arranged = autoArrange(['a', 'b'], VIEW, [blocked]);
     expect(arranged.a).toEqual(slotPosition(0, VIEW));
     expect(arranged.b).toEqual(slotPosition(2, VIEW));
+  });
+});
+
+// --- Nothing lands on the Trash ---------------------------------------------
+
+describe('the Trash and the icons', () => {
+  const view = { width: 1440, height: 760 };
+
+  it('starts on the grid, not a few pixels off it', () => {
+    const trash = defaultTrashSlot(view);
+    const rows = rowsPerColumn(view);
+    // The bottom slot of the first column — a real slot, which is what makes
+    // it visible to every collision check.
+    expect(trash).toEqual(slotPosition(rows - 1, view));
+  });
+
+  it('knows when two icons would cover each other', () => {
+    expect(overlaps({ x: 16, y: 16 }, { x: 16, y: 16 })).toBe(true);
+    // Three pixels out is still on top of it.
+    expect(overlaps({ x: 16, y: 16 }, { x: 19, y: 13 })).toBe(true);
+    expect(overlaps({ x: 16, y: 16 }, { x: 16 + CELL_WIDTH, y: 16 })).toBe(false);
+  });
+
+  it('steps a new icon over the Trash instead of onto it', () => {
+    const trash = defaultTrashSlot(view);
+    const rows = rowsPerColumn(view);
+    // Exactly enough icons to fill the first column, including the Trash's slot.
+    const ids = Array.from({ length: rows }, (_, index) => `piece-${index}`);
+    const layout = resolveLayout(ids, {}, view, [trash]);
+    for (const id of ids) {
+      expect(overlaps(layout[id]!, trash)).toBe(false);
+    }
+    // And they are all still in different places from each other.
+    const seen = new Set(Object.values(layout).map((spot) => `${spot.x},${spot.y}`));
+    expect(seen.size).toBe(ids.length);
+  });
+
+  it('leaves an icon the artist dragged onto the Trash where they put it', () => {
+    const trash = defaultTrashSlot(view);
+    // Hand-placed wins: this was a choice, and moving it would be the app
+    // rearranging the desk on its own.
+    const layout = resolveLayout(['one'], { one: trash }, view, [trash]);
+    expect(layout.one).toEqual(trash);
+  });
+
+  it('tidies around it too', () => {
+    const trash = defaultTrashSlot(view);
+    const ids = Array.from({ length: 8 }, (_, index) => `piece-${index}`);
+    const tidied = autoArrange(ids, view, [trash]);
+    for (const id of ids) expect(overlaps(tidied[id]!, trash)).toBe(false);
+  });
+});
+
+describe('a window that shrinks', () => {
+  const big = { width: 1440, height: 900 };
+  const small = { width: 1100, height: 420 };
+
+  it('does not pile a column onto the last row', () => {
+    const ids = ['a', 'b', 'c', 'd', 'e', 'f'];
+    // Arranged down one column on a tall screen…
+    const arranged = autoArrange(ids, big);
+    // …then the window is made short, so most of them no longer fit.
+    const resolved = resolveLayout(ids, arranged, small);
+    for (const id of ids) {
+      for (const other of ids) {
+        if (id === other) continue;
+        expect(overlaps(resolved[id]!, resolved[other]!)).toBe(false);
+      }
+    }
+  });
+
+  it('puts them back when the window grows again, because it never rewrote them', () => {
+    const ids = ['a', 'b', 'c', 'd', 'e', 'f'];
+    const arranged = autoArrange(ids, big);
+    resolveLayout(ids, arranged, small);
+    // The stored layout is the artist's; only the view of it was nudged.
+    expect(resolveLayout(ids, arranged, big)).toEqual(arranged);
+  });
+});
+
+describe('the Trash on a small screen', () => {
+  const short = { width: 1100, height: 420 };
+
+  it('moves out from under an icon that was already there', () => {
+    const rows = rowsPerColumn(short);
+    // The whole first column is taken by work the artist placed.
+    const taken = Array.from({ length: rows }, (_, row) => slotPosition(row, short));
+    const trash = defaultTrashSlot(short, taken);
+    for (const spot of taken) expect(overlaps(trash, spot)).toBe(false);
+  });
+
+  it('carries on into the next column when the first has no room at all', () => {
+    const rows = rowsPerColumn(short);
+    // Two full columns, so it has to look further right.
+    const taken = Array.from({ length: rows * 2 }, (_, index) => slotPosition(index, short));
+    const trash = defaultTrashSlot(short, taken);
+    for (const spot of taken) expect(overlaps(trash, spot)).toBe(false);
+  });
+
+  it('still keeps a position the artist chose, even under something', () => {
+    const chosen = { x: 16, y: 16 };
+    expect(trashPositionOf(chosen, short, [chosen])).toEqual(chosen);
   });
 });

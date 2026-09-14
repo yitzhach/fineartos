@@ -290,9 +290,15 @@ body {
   gap: 8px;
 }
 
+/* One height for every icon, whatever its name is. A two-line label used to
+   make its icon 123px tall in a 116px cell, so every icon in a column bled
+   into the one below it and the bottom one covered the Trash. The label is
+   clamped to two lines instead — the full name is in the tooltip. */
 .desktop-icon {
   position: absolute;
   width: 112px;
+  height: 118px;
+  overflow: hidden;
   padding: 8px 6px 10px;
   border: 1px solid transparent;
   border-radius: 12px;
@@ -433,6 +439,10 @@ body {
   font-size: 11.5px;
   line-height: 1.32;
   overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   /* Legible over any wallpaper, dark or bright. */
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
@@ -442,6 +452,10 @@ body {
   font-size: 10.5px;
   color: var(--ink-soft);
   overflow-wrap: anywhere;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
 }
 :root[data-theme='light'] .desktop-icon .caption { text-shadow: none; }

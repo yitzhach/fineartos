@@ -12,6 +12,7 @@ import {
   firstFreeSlot,
   iconAt,
   resolveLayout,
+  settledPositions,
   snapToGrid,
   trashPositionOf,
   type DesktopLayout,
@@ -104,10 +105,13 @@ export function Desktop(props: Props) {
   }, [onViewport]);
 
   const ids = items.map((item) => item.id);
-  const resolved = resolveLayout(ids, props.layout, viewport);
-  const trash = trashPositionOf(props.trashPosition, viewport);
-  // The Trash takes part in hit-testing but not in the layout: it cannot be
-  // moved, and nothing is ever placed on top of it.
+  // Three steps, in this order, so the answer is the same every render:
+  // the icons the artist placed go where they were put; the Trash takes a
+  // spot clear of them; then everything without a home fills the gaps,
+  // stepping over the Trash rather than landing on it.
+  const settled = settledPositions(ids, props.layout, viewport);
+  const trash = trashPositionOf(props.trashPosition, viewport, settled);
+  const resolved = resolveLayout(ids, props.layout, viewport, [trash]);
   const targets = { ...resolved, [TRASH_ID]: trash };
 
   // While dragging, this icon follows the pointer instead of its stored spot.

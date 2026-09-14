@@ -22,9 +22,15 @@ export interface IconPosition {
 
 export type DesktopLayout = Record<string, IconPosition>;
 
-/** One grid cell. Matches the icon size in the stylesheet. */
+/**
+ * One grid cell. Matches the icon size in the stylesheet, which is the point:
+ * the cell was 116 while an icon with a two-line label rendered 123 tall, so
+ * every row overlapped the one below it by seven pixels and the bottom of a
+ * column sat on the Trash. The icon is now a fixed 118 and the cell leaves it
+ * air.
+ */
 export const CELL_WIDTH = 116;
-export const CELL_HEIGHT = 116;
+export const CELL_HEIGHT = 130;
 
 /**
  * Clear of the edges. Everything here is measured against the desktop surface,
@@ -76,15 +82,35 @@ export function slotPosition(index: number, viewport: Viewport): IconPosition {
 }
 
 /**
- * Where the Trash starts: bottom left, out of the way of the icons, which
- * fill from the top down. It can be dragged anywhere from there, and where
- * the artist leaves it is remembered — so this is a default, not a rule.
+ * Where the Trash starts: the bottom of the first column, out of the way of
+ * the icons, which fill from the top down. It can be dragged anywhere from
+ * there, and where the artist leaves it is remembered — so this is a default,
+ * not a rule.
+ *
+ * On the grid on purpose. It used to sit at `height − cell − margin`, which is
+ * a few pixels off every real slot, so the collision checks — which compared
+ * positions exactly — never saw it, and the icons filling the first column
+ * eventually landed on top of it.
  */
-export function defaultTrashSlot(viewport: Viewport): IconPosition {
-  return {
-    x: MARGIN_LEFT,
-    y: Math.max(MARGIN_TOP, viewport.height - CELL_HEIGHT - MARGIN_BOTTOM),
-  };
+export function defaultTrashSlot(viewport: Viewport, taken: IconPosition[] = []): IconPosition {
+  const rows = rowsPerColumn(viewport);
+  const bottom = Math.max(0, rows - 1);
+  const free = (spot: IconPosition) => !taken.some((one) => overlaps(one, spot));
+
+  // The Trash is the one thing here whose home depends on the size of the
+  // window, so when a window shrinks onto an icon it is the Trash that gives
+  // way rather than the work. Bottom left first, then up the column, then
+  // along the bottom of the columns to the right — a short window can have a
+  // first column with no room in it at all.
+  for (let row = bottom; row >= 0; row -= 1) {
+    const candidate = slotPosition(row, viewport);
+    if (free(candidate)) return candidate;
+  }
+  for (let column = 1; column < 40; column += 1) {
+    const candidate = slotPosition(column * rows + bottom, viewport);
+    if (free(candidate)) return candidate;
+  }
+  return slotPosition(bottom, viewport);
 }
 
 /**
@@ -95,18 +121,28 @@ export function defaultTrashSlot(viewport: Viewport): IconPosition {
 export function trashPositionOf(
   saved: IconPosition | null,
   viewport: Viewport,
+  /** Where the icons already are, so a default does not land on one. */
+  taken: IconPosition[] = [],
 ): IconPosition {
-  return saved ? clampToDesktop(saved, viewport) : defaultTrashSlot(viewport);
+  // A position the artist chose is kept even if something is on it: they put
+  // it there. Only the default gets out of the way.
+  return saved ? clampToDesktop(saved, viewport) : defaultTrashSlot(viewport, taken);
 }
 
-function samePlace(a: IconPosition, b: IconPosition): boolean {
-  return a.x === b.x && a.y === b.y;
+/**
+ * Whether two icons would sit on top of each other.
+ *
+ * Overlap rather than an exact match: clamping to a small screen can leave an
+ * icon a few pixels off the grid, and an icon that misses another one's
+ * position by three pixels is still covering it. Exact comparison is what let
+ * the Trash disappear under a picture.
+ */
+export function overlaps(a: IconPosition, b: IconPosition): boolean {
+  return Math.abs(a.x - b.x) < CELL_WIDTH && Math.abs(a.y - b.y) < CELL_HEIGHT;
 }
 
 function occupies(layout: DesktopLayout, position: IconPosition, ignoreId?: string): boolean {
-  return Object.entries(layout).some(
-    ([id, placed]) => id !== ignoreId && placed.x === position.x && placed.y === position.y,
-  );
+  return Object.entries(layout).some(([id, placed]) => id !== ignoreId && overlaps(placed, position));
 }
 
 /**
@@ -125,6 +161,27 @@ export function firstFreeSlot(layout: DesktopLayout, viewport: Viewport): IconPo
 }
 
 /**
+ * The icons that will certainly stay where they are: placed by the artist and
+ * still on screen at this size. Everything else — clamped back on, or never
+ * placed at all — is going to be given a spot, so it is those the Trash's
+ * default has to keep clear of.
+ */
+export function settledPositions(
+  ids: string[],
+  layout: DesktopLayout,
+  viewport: Viewport,
+): IconPosition[] {
+  const settled: IconPosition[] = [];
+  for (const id of ids) {
+    const existing = layout[id];
+    if (!existing) continue;
+    const clamped = clampToDesktop(existing, viewport);
+    if (clamped.x === existing.x && clamped.y === existing.y) settled.push(existing);
+  }
+  return settled;
+}
+
+/**
  * Gives every id a position, leaving placed icons alone and slotting the rest
  * into the gaps. This runs on every render, so it must not reshuffle icons
  * that already have a home.
@@ -133,17 +190,48 @@ export function resolveLayout(
   ids: string[],
   layout: DesktopLayout,
   viewport: Viewport,
+  /** Places nothing may be auto-placed on. The Trash, in practice. */
+  blocked: IconPosition[] = [],
 ): DesktopLayout {
   const resolved: DesktopLayout = {};
   const placed: DesktopLayout = {};
+  // Held in the same map the free-slot scan reads, so a blocked spot is
+  // simply a spot that is taken. An icon the artist dragged there themselves
+  // is left where they put it — that was a choice, not an accident.
+  for (const [index, spot] of blocked.entries()) placed[`blocked-${index}`] = spot;
 
+  /**
+   * Two passes over the icons the artist has placed.
+   *
+   * An icon that still fits keeps its spot, always — that was a choice, and
+   * this includes one deliberately dropped on top of something else. An icon
+   * the clamp had to drag back on screen has already been moved by the app,
+   * so it takes a free slot rather than landing on a neighbour: shrinking the
+   * window used to pile a whole column onto the last row.
+   *
+   * The stored layout is never rewritten here, so making the window big again
+   * puts everything back exactly where it was left.
+   */
+  const fits: string[] = [];
+  const shifted: string[] = [];
   for (const id of ids) {
     const existing = layout[id];
-    if (existing) {
-      const position = clampToDesktop(existing, viewport);
-      resolved[id] = position;
-      placed[id] = position;
-    }
+    if (!existing) continue;
+    const clamped = clampToDesktop(existing, viewport);
+    (clamped.x === existing.x && clamped.y === existing.y ? fits : shifted).push(id);
+  }
+
+  for (const id of fits) {
+    const position = layout[id]!;
+    resolved[id] = position;
+    placed[id] = position;
+  }
+
+  for (const id of shifted) {
+    const clamped = clampToDesktop(layout[id]!, viewport);
+    const position = occupies(placed, clamped) ? firstFreeSlot(placed, viewport) : clamped;
+    resolved[id] = position;
+    placed[id] = position;
   }
 
   for (const id of ids) {
@@ -170,7 +258,7 @@ export function autoArrange(
   let slot = 0;
   for (const id of ids) {
     // Steps over the Trash rather than stacking an icon on top of it.
-    while (blocked.some((taken) => samePlace(taken, slotPosition(slot, viewport)))) slot += 1;
+    while (blocked.some((taken) => overlaps(taken, slotPosition(slot, viewport)))) slot += 1;
     layout[id] = slotPosition(slot, viewport);
     slot += 1;
   }
