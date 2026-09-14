@@ -24,10 +24,15 @@ session's own briefing refers to the other repository, not this one.
 ## What this is
 
 A desktop-OS-styled business suite for one working artist. One place instead
-of twenty apps: commissions, invoices, project folders, the artist's own
-pictures, a Finder, a Trash, and Connect (guest book, sharing, QR). It runs
-entirely in the browser with no server, and it is honest about that
-everywhere it matters.
+of twenty apps: commissions and their client updates, invoices, project
+folders, the artist's own pictures with a darkroom to edit them in, a
+catalogue of every piece and what it sold for, the books, a Finder, a Trash,
+and Connect (guest book, sharing, QR). It runs entirely in the browser with
+no server, and it is honest about that everywhere it matters.
+
+Built tools in the dock: New, Home, Projects, Invoices, Finder, Connect,
+**Artwork**, **Finance**, Trash. Still placeholders, subdued and opening
+nothing: **Shows** and **Visualizer**.
 
 - **Repo**: `yitzhach/fineartos`, branch `main`.
 - **Live**: https://fineartos.bobdylan2000.workers.dev — Cloudflare Workers
@@ -90,11 +95,31 @@ These came from real mistakes. Breaking them has broken the app before.
    opened, never painted onto the icon.
 4. **Nothing claims to have been sent.** Email and text hand off to the
    phone's own apps. The QR hands details out and cannot bring anything back.
+   A client update records that the artist *handed it over*, never that it
+   arrived, and an unanswered one says "No reply recorded", never "pending".
 5. **Never leave a failure silent.** See the hang below.
+6. **A total says what it could not see.** An amount nobody recorded is null,
+   never zero, and every figure is followed by how many rows were left out of
+   it — on screen, as a blank cell in a CSV, and at the foot of the profit
+   and loss. A number that is wrong on a tax return is worse than one that is
+   missing.
+7. **Nothing here is tax advice.** The word "deductible" does not appear in
+   the app. Categorising a row is bookkeeping; what it means on a return is
+   the accountant's to say, and the statement says so itself.
+8. **A dead control is worse than none.** No mileage rate ships with the app
+   (it changes yearly and by country), the dictation microphone is absent
+   where the browser cannot listen, and the client page drops its Approve
+   button when there is no studio address for it to write to.
+9. **An edit never writes over the photograph.** The darkroom keeps the
+   original beside the picture and stores the numbers that made it, so an
+   edit can be reopened, changed or undone, and is never applied twice.
 
 ## The bug worth knowing about
 
-Adding the `photos` store took IndexedDB to version 3. A browser will not
+Adding the `photos` store took IndexedDB to version 3. (It is version 5 now —
+4 added client updates, 5 added the books. Every upgrade adds a shelf and
+touches nothing already on the others, and every one is checked with a second
+tab open, which is exactly how version 3 hung.) A browser will not
 upgrade while another tab holds the old version open, and the app neither
 released its connection nor noticed being blocked — so the upgrade waited
 forever, every read waited behind it, and the app looked completely normal
@@ -151,13 +176,60 @@ when they want to skip the pipeline.
 
 ## Where to pick up
 
-Nothing is half-finished; the tree is green and deployed. The open threads,
-in the order they were asked for:
+The tree is green and deployed. Nothing is half-finished except the three
+small things at the top of this list, which are leftovers from work that
+otherwise landed.
 
-1. **Saving to Cloudflare**, and with it the guest book and a downloadable
-   project (pitch-deck PDF, working archive, or printable dossier — the
-   choice has not been made). All of it is blocked on sign-in; the decisions
-   each one needs are written out in `FUTURE_BUILD.md`.
-2. **The four preview tools** — Shows, Artwork, Visualizer, Finance. They sit
-   in the dock subdued and labelled, and open nothing.
-3. **Square integration** for taking payment, which needs the same gate.
+**Small, and owed:**
+
+1. **A PDF option for a client update.** The agreed set was JPEG by default
+   with PDF and HTML alongside; JPEG, the self-contained page, Share and Copy
+   shipped and PDF did not. The channel already exists in the model
+   (`HandoffChannel = 'pdf'`) with nothing using it.
+2. **Deleting a commission forever leaves its updates behind.** Emptying the
+   Trash removes the document, its invoices and its pictures, but not the
+   `clientUpdates` rows, which then sit unreferenced.
+3. **Export and import do not carry updates or expenses.**
+   `src/persistence/portable.ts` predates both.
+
+**Next, in the order they were talked about:**
+
+4. **An update from a milestone** — ticking a stage offers to tell the
+   client. It was in the design and was not built.
+5. **Client status on a commission's Overview tab** — last update, anything
+   unanswered — so the Client tab does not have to be opened to know.
+6. **Shows**, the fourth tool. Paused deliberately. When it comes back the
+   scope to settle is: name, venue, dates, booth fee, deadline and status,
+   plus which pieces went and the guest entries collected there. Artwork owns
+   the piece and where it is; Shows owns the event; Finance reads both. Build
+   them in another order and they will collide.
+7. **Visualizer**, the last placeholder. No design yet.
+
+**The gate on everything else:** sign-in. Cloud saving, the guest book
+online, real email, Square, and the version of the client page that can
+*receive* an approval instead of composing one are all behind it. The
+dependency chain and the decisions each step needs are written out in
+`FUTURE_BUILD.md`.
+
+## What was built in the session that wrote this
+
+For context on why the code looks the way it does, newest first:
+
+- **Finance** (`696d451`) — the books: money in from invoice payments and
+  piece sales kept apart, money out with receipts and mileage, a profit and
+  loss page on the studio's letterhead, three CSVs, and dictation.
+- **Desktop overlap** (`ff9c25b`) — icons were 123px in a 116px cell, the
+  collision checks compared positions exactly, and shrinking the window piled
+  a column onto one row. All three fixed; nothing overlaps now.
+- **Artwork** (`a75c973`) — the catalogue: a wall, a list edited in place, a
+  sales ledger, CSVs, and a client view that shows prices but never what
+  something sold for.
+- **Client updates** (`e7d8344`) — updates and replies as child records of a
+  commission, with a timeline built from the records rather than kept as its
+  own log.
+- **The darkroom** (`9832f71`, `edbc3f7`, `a90cf53`, `994d9f8`, `b39fd0e`) —
+  preview and fullscreen, tone and colour with eight hue bands, crop and
+  straighten, non-destructive re-editing, a phone-first tool-group layout,
+  and the two-speed rendering that made it keep up with a slider.
+- **Window tabs** (`767a8ca`, `d86f34a`) — merge windows into tabs, drag one
+  onto another, and the desk remembers itself across a reload.
