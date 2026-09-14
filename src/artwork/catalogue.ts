@@ -64,6 +64,12 @@ export interface Sale {
   /** What the gallery or show took, in minor units. Null = not recorded. */
   fee: Minor | null;
   note: string | null;
+  /**
+   * True when this sale was also invoiced. The books then count the invoice
+   * payment rather than this row, because they are the same money and
+   * nothing in the app can work that out on its own.
+   */
+  invoiced?: boolean;
 }
 
 export function emptySale(date = new Date().toISOString().slice(0, 10)): Sale {

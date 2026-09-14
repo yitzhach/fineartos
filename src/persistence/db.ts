@@ -8,7 +8,7 @@
  */
 
 const DB_NAME = 'artist-os';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 export const STORE_DOCUMENTS = 'documents';
 export const STORE_IMAGES = 'images';
@@ -20,6 +20,8 @@ export const STORE_INVOICES = 'invoices';
 export const STORE_PHOTOS = 'photos';
 /** Added in DB_VERSION 4: what the studio told a client, and what came back. */
 export const STORE_UPDATES = 'clientUpdates';
+/** Added in DB_VERSION 5: the books — what was spent, and on what. */
+export const STORE_EXPENSES = 'expenses';
 
 export interface StoredImage {
   id: string;
@@ -138,6 +140,12 @@ export function openDb(): Promise<IDBDatabase> {
       // shelf, it never touches what is already on the others.
       if (!db.objectStoreNames.contains(STORE_UPDATES)) {
         const store = db.createObjectStore(STORE_UPDATES, { keyPath: 'id' });
+        store.createIndex('workspaceId', 'workspaceId');
+      }
+      // Version 5 adds the books. Same rule as every upgrade before it: a new
+      // shelf, and nothing already on the others is touched.
+      if (!db.objectStoreNames.contains(STORE_EXPENSES)) {
+        const store = db.createObjectStore(STORE_EXPENSES, { keyPath: 'id' });
         store.createIndex('workspaceId', 'workspaceId');
       }
     };

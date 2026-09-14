@@ -3632,3 +3632,139 @@ fieldset.section > legend {
   .art-ledger-where,
   .art-ledger-money { grid-column: 1 / -1; }
 }
+
+
+/* --- The books -------------------------------------------------------------- */
+/* Figures first, then the rows behind them. Every total in here is followed by
+   what it could not count, so the two are never read apart. */
+
+.fin { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.fin-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+.fin-overview { display: flex; flex-direction: column; gap: 14px; }
+.fin-figures { display: flex; gap: 26px; flex-wrap: wrap; }
+.fin-figures div { display: flex; flex-direction: column; gap: 2px; min-width: 150px; }
+.fin-figures .k { font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-faint); }
+.fin-figures strong {
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.fin-figures strong[data-negative='true'] { color: var(--danger); }
+.fin-figures .hint { font-size: 11px; }
+
+.fin-cats { display: flex; flex-direction: column; gap: 7px; }
+.fin-cats h4 {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.fin-cat {
+  display: grid;
+  grid-template-columns: minmax(90px, 130px) minmax(0, 1fr) 96px;
+  grid-template-areas: 'name bar money' 'note note note';
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 12.5px;
+}
+.fin-cat-name { grid-area: name; }
+.fin-cat-bar { grid-area: bar; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.fin-cat-bar span { display: block; height: 100%; background: var(--accent); }
+.fin-cat-money { grid-area: money; text-align: right; font-variant-numeric: tabular-nums; }
+.fin-cat-note { grid-area: note; font-size: 11px; color: var(--ink-faint); }
+
+.fin-out { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 20px; align-items: start; }
+.fin-add {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--raised);
+}
+.fin-add h4 { margin: 0; font-family: var(--serif); font-size: 15px; font-weight: 400; }
+
+/* A field with a microphone beside it. */
+.fin-with-mic { display: flex; align-items: center; gap: 6px; }
+.fin-with-mic input { flex: 1 1 auto; min-width: 0; }
+.dictate {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--raised);
+  color: var(--ink-soft);
+  font-size: 14px;
+  cursor: pointer;
+}
+.dictate:hover { border-color: var(--line-strong); color: var(--ink); }
+.dictate[data-on='true'] { border-color: var(--danger); color: var(--danger); }
+.dictate:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.fin-receipt { width: 42px; height: 42px; object-fit: cover; border-radius: 7px; border: 1px solid var(--line); }
+
+.fin-list { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.fin-rate {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+}
+.fin-rate label { font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-faint); }
+.fin-rate input { max-width: 140px; }
+
+.fin-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.fin-rows li {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.fin-when { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.fin-what { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.fin-money { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fin-receipts { display: flex; gap: 4px; }
+.fin-receipts img { width: 30px; height: 30px; object-fit: cover; border-radius: 5px; border: 1px solid var(--line); }
+
+.fin-invoiced { font-size: 12.5px; color: var(--ink-soft); }
+.fin-invoiced h4 {
+  margin: 0 0 4px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.fin-invoiced ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.fin-invoiced li { display: flex; align-items: center; gap: 10px; }
+
+.fin-statement { display: flex; flex-direction: column; gap: 12px; }
+.fin-preview {
+  width: 100%;
+  height: 540px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+@media (max-width: 1100px) {
+  .fin-out { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 860px) {
+  .fin-rows li { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; }
+  .fin-when { grid-column: 2; text-align: right; }
+  .fin-money { grid-column: 1 / -1; }
+  .fin-preview { height: 420px; }
+}

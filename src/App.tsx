@@ -130,6 +130,8 @@ import type { Adjustments } from './photo/adjust';
 import type { Framing } from './photo/crop';
 import { milestonesOf } from './commission/milestones';
 import { ArtworkWindow } from './artwork/ui/ArtworkWindow';
+import { FinanceWindow } from './finance/ui/FinanceWindow';
+import type { Expense } from './finance/ledger';
 import { UpdatesPane } from './commission/ui/UpdatesPane';
 import {
   awaitingReply,
@@ -174,6 +176,7 @@ import {
   loadTrash,
   loadTrashPosition,
   loadAskForSignature,
+  loadMileageRate,
   loadRestoreWindows,
   loadWallpaperLibrary,
   loadWindows,
@@ -187,6 +190,7 @@ import {
   saveTrash,
   saveTrashPosition,
   saveAskForSignature,
+  saveMileageRate,
   saveRestoreWindows,
   saveWallpaperLibrary,
   saveWindows,
@@ -224,6 +228,7 @@ registerModule({ id: 'invoices', name: 'Invoices', icon: 'invoices', available: 
 registerModule({ id: 'finder', name: 'Finder', icon: 'finder', available: true, group: 'tool' });
 registerModule({ id: 'connect', name: 'Connect', icon: 'connect', available: true, group: 'tool' });
 registerModule({ id: 'artwork', name: 'Artwork', icon: 'artwork', available: true, group: 'tool' });
+registerModule({ id: 'finance', name: 'Finance', icon: 'finance', available: true, group: 'tool' });
 // Last in the dock, the way the Trash is always last.
 registerModule({ id: 'trash', name: 'Trash', icon: 'trash', available: true, group: 'trash' });
 
@@ -235,6 +240,8 @@ export default function App() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [clientUpdates, setClientUpdates] = useState<ClientUpdate[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [mileageRate, setMileageRate] = useState<number | null>(loadMileageRate);
   const [importingImages, setImportingImages] = useState(false);
   const [guests, setGuests] = useState<GuestEntry[]>(loadGuests);
   const [siteUrl, setSiteUrl] = useState(loadSiteUrl);
@@ -338,6 +345,7 @@ export default function App() {
   useEffect(() => saveStudioDefaults(studio), [studio]);
   useEffect(() => saveAskForSignature(askForSignature), [askForSignature]);
   useEffect(() => saveRestoreWindows(restoreWindowsOn), [restoreWindowsOn]);
+  useEffect(() => saveMileageRate(mileageRate), [mileageRate]);
 
   /**
    * The arrangement, kept so a reload picks the work back up. Written on a
@@ -402,13 +410,15 @@ export default function App() {
     let invoiceRows: Invoice[];
     let photoRows: Photo[];
     let updateRows: ClientUpdate[];
+    let expenseRows: Expense[];
     try {
-      [documentRows, projectRows, invoiceRows, photoRows, updateRows] = await Promise.all([
+      [documentRows, projectRows, invoiceRows, photoRows, updateRows, expenseRows] = await Promise.all([
         repo.list(),
         repo.listProjects(),
         repo.listInvoices(),
         repo.listPhotos(),
         repo.listUpdates(),
+        repo.listExpenses(),
       ]);
     } catch (cause) {
       // The database reports its own problem through onDbProblem; this stops
@@ -428,6 +438,7 @@ export default function App() {
     // An update belongs to its commission: one in the Trash takes its updates
     // out of sight with it, and putting it back brings them back.
     setClientUpdates(updateRows.filter((update) => !hidden.has(update.documentId)));
+    setExpenses(expenseRows);
     setLoaded(true);
 
     // First read of the studio: put back the windows that were open, now that
@@ -530,6 +541,7 @@ export default function App() {
       if (row.document.studio.logoImageId) ids.add(row.document.studio.logoImageId);
     }
     for (const project of projects) if (project.coverImageId) ids.add(project.coverImageId);
+    for (const expense of expenses) for (const id of expense.receiptImageIds) ids.add(id);
     for (const photo of photos) {
       ids.add(photo.imageId);
       // The editor works from the photograph, which is a second blob once an
@@ -537,7 +549,7 @@ export default function App() {
       ids.add(sourceImageId(photo));
     }
     return [...ids].sort().join(',');
-  }, [rows, projects, photos]);
+  }, [rows, projects, photos, expenses]);
 
   useEffect(() => {
     const ids = neededImageIds ? neededImageIds.split(',') : [];
@@ -1452,6 +1464,41 @@ export default function App() {
    * Everything else in the app goes on reading `imageId` and knows nothing
    * about any of this.
    */
+  // --- The books ------------------------------------------------------------
+
+  const saveExpenseRecord = async (expense: Expense) => {
+    await repo.saveExpense(expense);
+    await refresh();
+  };
+
+  const deleteExpenseRecord = async (id: string) => {
+    await repo.deleteExpense(id);
+    await refresh();
+    setMessage('Row removed.');
+  };
+
+  /**
+   * Receipts, resized like every other picture the app stores. A photograph
+   * of a petrol receipt off a phone is four megabytes of paper.
+   */
+  const addReceipts = async (files: File[]): Promise<string[]> => {
+    const ids: string[] = [];
+    for (const file of files) {
+      try {
+        const prepared = await prepareWallpaper(file, 1600);
+        const imageId = newId();
+        await repo.putImage(imageId, prepared.blob);
+        ids.push(imageId);
+      } catch (cause) {
+        // eslint-disable-next-line no-console
+        console.warn('Could not read that receipt', file.name, cause);
+        setMessage(`${file.name} could not be read as an image.`);
+      }
+    }
+    if (ids.length > 0) await refresh();
+    return ids;
+  };
+
   // --- Client updates -------------------------------------------------------
 
   const saveClientUpdate = async (update: ClientUpdate) => {
@@ -1836,6 +1883,30 @@ export default function App() {
       );
     }
 
+    if (kind.type === 'tool' && kind.tool === 'finance') {
+      return (
+        <FinanceWindow
+          photos={photos}
+          invoices={invoices}
+          expenses={expenses}
+          imageUrls={imageUrls}
+          studio={studio}
+          mileageRate={mileageRate}
+          onMileageRate={setMileageRate}
+          onSaveExpense={(expense) => void saveExpenseRecord(expense)}
+          onDeleteExpense={(id) => void deleteExpenseRecord(id)}
+          onAddReceipts={addReceipts}
+          onMarkInvoiced={(photoId, invoiced) => {
+            const photo = photos.find((one) => one.id === photoId);
+            if (photo?.sale) {
+              void savePhotoRecord(editPhoto(photo, { sale: { ...photo.sale, invoiced } }));
+            }
+          }}
+          onMessage={setMessage}
+        />
+      );
+    }
+
     if (kind.type === 'tool' && kind.tool === 'trash') {
       return (
         <span className="faint" style={{ fontSize: 12 }}>
@@ -1856,6 +1927,14 @@ export default function App() {
       return (
         <span className="faint" style={{ fontSize: 12 }}>
           Every picture in the studio. Edits here are the same records the desktop shows.
+        </span>
+      );
+    }
+
+    if (kind.type === 'tool' && kind.tool === 'finance') {
+      return (
+        <span className="faint" style={{ fontSize: 12 }}>
+          Your own records, for your accountant. Nothing here is tax advice.
         </span>
       );
     }
@@ -2028,6 +2107,14 @@ export default function App() {
       );
     }
 
+    if (kind.type === 'tool' && kind.tool === 'finance') {
+      return (
+        <span className="faint" style={{ fontSize: 12 }}>
+          Your own records, for your accountant. Nothing here is tax advice.
+        </span>
+      );
+    }
+
     if (kind.type === 'photoEdit') {
       const photo = photos.find((p) => p.id === kind.photoId);
       if (!photo) return <p className="hint">This picture has been deleted.</p>;
@@ -2139,6 +2226,30 @@ export default function App() {
           onChange={(photo, changes) => void savePhotoRecord(editPhoto(photo, changes))}
           onPreview={openPreview}
           onEdit={openEditor}
+          onMessage={setMessage}
+        />
+      );
+    }
+
+    if (kind.type === 'tool' && kind.tool === 'finance') {
+      return (
+        <FinanceWindow
+          photos={photos}
+          invoices={invoices}
+          expenses={expenses}
+          imageUrls={imageUrls}
+          studio={studio}
+          mileageRate={mileageRate}
+          onMileageRate={setMileageRate}
+          onSaveExpense={(expense) => void saveExpenseRecord(expense)}
+          onDeleteExpense={(id) => void deleteExpenseRecord(id)}
+          onAddReceipts={addReceipts}
+          onMarkInvoiced={(photoId, invoiced) => {
+            const photo = photos.find((one) => one.id === photoId);
+            if (photo?.sale) {
+              void savePhotoRecord(editPhoto(photo, { sale: { ...photo.sale, invoiced } }));
+            }
+          }}
           onMessage={setMessage}
         />
       );
@@ -2435,6 +2546,8 @@ export default function App() {
                   ? { kind: { type: 'tool' as const, tool: 'finder' }, title: 'Finder', subtitle: 'Everything in the studio' }
                   : id === 'artwork'
                   ? { kind: { type: 'tool' as const, tool: 'artwork' }, title: 'Artwork', subtitle: 'The catalogue' }
+                  : id === 'finance'
+                  ? { kind: { type: 'tool' as const, tool: 'finance' }, title: 'Finance', subtitle: 'The books' }
                   : { kind: { type: 'tool' as const, tool: id }, title: MOCK_TOOL_NAMES[id] ?? id, subtitle: 'Preview' };
           setWindows((c) => toggleWindow(c, spec, desktopViewportRef.current).windows);
         }}

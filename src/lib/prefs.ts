@@ -154,6 +154,7 @@ const KEYS = {
   guests: 'artistOS.guestBook',
   siteUrl: 'artistOS.siteUrl',
   askForSignature: 'artistOS.askForSignature',
+  mileageRate: 'artistOS.mileageRate',
   windows: 'artistOS.windows',
   restoreWindows: 'artistOS.restoreWindows',
 } as const;
@@ -234,6 +235,17 @@ export const saveWindows = (value: WindowState[]): void => write(KEYS.windows, v
 /** Whether to put them back at all. Some people want an empty desk. */
 export const loadRestoreWindows = (): boolean => read<boolean>(KEYS.restoreWindows, true);
 export const saveRestoreWindows = (value: boolean): void => write(KEYS.restoreWindows, value);
+
+/**
+ * What a mile is worth, in minor units, as the artist has set it.
+ *
+ * Null by default and no number ships with the app: the rate changes every
+ * year, is different in every country, and one baked into a build would be
+ * wrong within months and wrong on somebody's tax return. Until it is set, a
+ * mileage row records the miles and says it has no figure.
+ */
+export const loadMileageRate = (): number | null => read<number | null>(KEYS.mileageRate, null);
+export const saveMileageRate = (value: number | null): void => write(KEYS.mileageRate, value);
 
 export const loadWallpaperLibrary = (): CustomWallpaper[] =>
   read<CustomWallpaper[]>(KEYS.wallpaperLibrary, []);

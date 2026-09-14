@@ -8,9 +8,11 @@ import type { CommissionDocument } from '../commission/types';
 import type { Invoice } from '../invoice/types';
 import type { Photo } from '../photo/photo';
 import type { ClientUpdate } from '../commission/updates';
+import type { Expense } from '../finance/ledger';
 import type { Project } from '../project/project';
 import {
   STORE_DOCUMENTS,
+  STORE_EXPENSES,
   STORE_IMAGES,
   STORE_INVOICES,
   STORE_PHOTOS,
@@ -72,6 +74,12 @@ interface UpdateRow {
   id: string;
   workspaceId: string;
   update: ClientUpdate;
+}
+
+interface ExpenseRow {
+  id: string;
+  workspaceId: string;
+  expense: Expense;
 }
 
 /**
@@ -234,6 +242,21 @@ export class Repository {
 
   async deleteUpdate(id: string): Promise<void> {
     await remove(STORE_UPDATES, id);
+  }
+
+  // --- The books ------------------------------------------------------------
+
+  async listExpenses(): Promise<Expense[]> {
+    const rows = await listByWorkspace<ExpenseRow>(STORE_EXPENSES, this.workspaceId);
+    return rows.map((row) => row.expense).sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  async saveExpense(expense: Expense): Promise<void> {
+    await put(STORE_EXPENSES, { id: expense.id, workspaceId: this.workspaceId, expense });
+  }
+
+  async deleteExpense(id: string): Promise<void> {
+    await remove(STORE_EXPENSES, id);
   }
 
   // --- Photos -------------------------------------------------------------

@@ -99,7 +99,8 @@ export function defaultSize(
     kind.type === 'commission' ||
     kind.type === 'photoEdit' ||
     // The catalogue is a wall of pictures; at the small size it is a column.
-    (kind.type === 'tool' && (kind.tool === 'connect' || kind.tool === 'artwork'));
+    (kind.type === 'tool' &&
+      (kind.tool === 'connect' || kind.tool === 'artwork' || kind.tool === 'finance'));
   const medium =
     kind.type === 'photo' ||
     kind.type === 'invoice' ||
