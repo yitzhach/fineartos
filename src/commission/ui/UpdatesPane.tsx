@@ -242,6 +242,9 @@ export function UpdatesPane(props: Props) {
                   <button className="btn" data-variant="quiet" onClick={() => void props.onHandoff(update, 'page')}>
                     Save as a page
                   </button>
+                  <button className="btn" data-variant="quiet" onClick={() => void props.onHandoff(update, 'pdf')}>
+                    Print / Save as PDF
+                  </button>
                   <button className="btn" data-variant="quiet" onClick={() => void props.onHandoff(update, 'copy')}>
                     Copy the message
                   </button>

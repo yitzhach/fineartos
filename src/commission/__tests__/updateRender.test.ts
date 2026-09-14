@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { cardFileStem, renderUpdateHtml, type CardContext } from '../updateRender';
+import {
+  cardFileStem,
+  renderUpdateHtml,
+  renderUpdatePrintHtml,
+  type CardContext,
+} from '../updateRender';
 import { createUpdate, emptyDraft } from '../updates';
 
 const context: CardContext = {
@@ -73,6 +78,50 @@ describe('the file name', () => {
   it('survives a title with punctuation in it', () => {
     expect(cardFileStem(update({ headline: 'Stage 2: "the wall"' }), context)).toBe(
       'lobby-triptych-stage-2-the-wall-2026-03-04',
+    );
+  });
+});
+
+describe('the update, laid out for paper', () => {
+  it('says the same things the page says', () => {
+    const html = renderUpdatePrintHtml(update(), context, []);
+    expect(html).toContain('Underpainting');
+    expect(html).toContain('The ground is down.');
+    expect(html).toContain('Lobby triptych');
+    expect(html).toContain('March 4, 2026');
+  });
+
+  it('inlines its pictures, so the sheet needs no network to print', () => {
+    const html = renderUpdatePrintHtml(update(), context, [
+      { src: 'data:image/jpeg;base64,AAAA', title: 'Panel one' },
+    ]);
+    expect(html).toContain('src="data:image/jpeg;base64,AAAA"');
+    expect(html).toContain('Panel one');
+  });
+
+  it('never prints a button, because paper cannot be clicked', () => {
+    const html = renderUpdatePrintHtml(update({ asksApproval: true }), context, []);
+    expect(html).not.toContain('mailto:');
+    expect(html).not.toContain('Approve</a>');
+    // The address is printed as words instead, so there is something to answer.
+    expect(html).toContain('studio@example.com');
+  });
+
+  it('asks for the sign-off only when one was asked for', () => {
+    expect(renderUpdatePrintHtml(update(), context, [])).not.toContain('carry on from here');
+    expect(renderUpdatePrintHtml(update({ asksApproval: true }), context, [])).toContain(
+      'carry on from here',
+    );
+  });
+
+  it('still asks for a reply when the studio has no address', () => {
+    const html = renderUpdatePrintHtml(update({ asksApproval: true }), { ...context, studioEmail: null }, []);
+    expect(html).toContain('Reply however you normally reach');
+  });
+
+  it('claims nothing about having been read', () => {
+    expect(renderUpdatePrintHtml(update(), context, [])).toContain(
+      'Nobody is told whether you read it',
     );
   });
 });

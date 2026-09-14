@@ -8,7 +8,13 @@
  */
 
 import { blobToDataUrl } from '../invoice/download';
-import { cardFileStem, drawUpdateCard, renderUpdateHtml, type CardContext } from './updateRender';
+import {
+  cardFileStem,
+  drawUpdateCard,
+  renderUpdateHtml,
+  renderUpdatePrintHtml,
+  type CardContext,
+} from './updateRender';
 import type { ClientUpdate } from './updates';
 
 function triggerDownload(blob: Blob, filename: string): void {
@@ -97,5 +103,66 @@ export async function shareUpdateCard(
     // A cancelled share throws too, and that is not a failure worth shouting
     // about — the artist changed their mind.
     return (cause as Error)?.name === 'AbortError' ? 'cancelled' : 'unsupported';
+  }
+}
+
+/**
+ * The same update, handed to the browser's own print dialog — which is where
+ * every desktop and phone browser keeps "Save as PDF".
+ *
+ * The sheet is built in a hidden frame from the records, not from the screen,
+ * so nothing on screen can end up on the paper. The frame is kept until the
+ * dialog closes: taking it away too early cancels the print in some browsers.
+ * Returns 'unsupported' rather than throwing when the browser has no print —
+ * the caller says so plainly and leaves Save as a page to do the job.
+ */
+export async function printUpdatePage(
+  update: ClientUpdate,
+  context: CardContext,
+  pictures: { blob: Blob | null; title: string }[],
+): Promise<'printed' | 'unsupported'> {
+  const inlined = [];
+  for (const picture of pictures) {
+    if (!picture.blob) continue;
+    inlined.push({ src: await blobToDataUrl(picture.blob), title: picture.title });
+  }
+  const html = renderUpdatePrintHtml(update, context, inlined);
+
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;';
+  document.body.appendChild(frame);
+
+  const remove = () => {
+    if (frame.parentNode) frame.parentNode.removeChild(frame);
+  };
+
+  try {
+    await new Promise<void>((resolve) => {
+      frame.addEventListener('load', () => resolve(), { once: true });
+      frame.srcdoc = html;
+    });
+    const view = frame.contentWindow;
+    if (!view || typeof view.print !== 'function') {
+      remove();
+      return 'unsupported';
+    }
+    // The pictures are data: URIs and decode in the frame; printing before
+    // they are ready prints blank boxes.
+    await Promise.all(
+      Array.from(frame.contentDocument?.images ?? []).map((image) =>
+        image.complete ? Promise.resolve() : image.decode().catch(() => undefined),
+      ),
+    );
+    // Some browsers fire afterprint, some do not; whichever comes first wins,
+    // and the frame never outlives the dialog by more than a minute.
+    view.addEventListener?.('afterprint', remove, { once: true });
+    setTimeout(remove, 60000);
+    view.focus();
+    view.print();
+    return 'printed';
+  } catch (cause) {
+    remove();
+    throw cause;
   }
 }

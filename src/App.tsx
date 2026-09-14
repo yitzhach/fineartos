@@ -145,6 +145,7 @@ import type { CardContext } from './commission/updateRender';
 import {
   downloadUpdateCard,
   downloadUpdatePage,
+  printUpdatePage,
   shareUpdateCard,
 } from './commission/updateDownload';
 import { PhotoWindow } from './photo/ui/PhotoWindow';
@@ -1547,15 +1548,24 @@ export default function App() {
       if (channel === 'jpeg') {
         await downloadUpdateCard(update, context, urls);
         setMessage('Saved as a picture. Attach it to a text or an email — it is yours to send.');
-      } else if (channel === 'page') {
+      } else if (channel === 'page' || channel === 'pdf') {
         const blobs = await Promise.all(
           chosen.map(async (photo) => ({
             blob: (await repo.getImage(photo.imageId))?.blob ?? null,
             title: photo.title,
           })),
         );
-        await downloadUpdatePage(update, context, blobs);
-        setMessage('Saved as one page, pictures and all. It opens anywhere, with or without a network.');
+        if (channel === 'page') {
+          await downloadUpdatePage(update, context, blobs);
+          setMessage('Saved as one page, pictures and all. It opens anywhere, with or without a network.');
+        } else {
+          const printed = await printUpdatePage(update, context, blobs);
+          if (printed === 'unsupported') {
+            setMessage('This browser cannot print — Save it as a page instead. Nothing was recorded.');
+            return;
+          }
+          setMessage('The print dialog is open. Choose Save as PDF there to keep a copy.');
+        }
       } else if (channel === 'copy') {
         await navigator.clipboard?.writeText(message);
         setMessage('Message copied. Paste it wherever you talk to this client.');

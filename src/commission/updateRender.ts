@@ -262,3 +262,93 @@ function wrap(text: string, width: number): string[] {
   // A dozen lines is a letter, not an update; the page carries the rest.
   return lines.slice(0, 12);
 }
+
+/**
+ * The same update, laid out for paper.
+ *
+ * A printed sheet has nothing to click, so the two reply buttons come off and
+ * the studio's address is printed as words instead — a dead button on paper
+ * is worse than none. Everything else is the page: white ground, the pictures
+ * inlined, and page breaks told where not to fall.
+ */
+export function renderUpdatePrintHtml(
+  update: ClientUpdate,
+  context: CardContext,
+  pictures: CardPicture[],
+): string {
+  const subject = [context.title, update.headline].filter(Boolean).join(' — ');
+  const images = pictures
+    .map(
+      (picture) =>
+        `<figure><img src="${escapeHtml(picture.src)}" alt="${escapeHtml(picture.title)}" />` +
+        `<figcaption>${escapeHtml(picture.title)}</figcaption></figure>`,
+    )
+    .join('\n');
+  const reachUs = context.studioEmail
+    ? `Reply to ${escapeHtml(context.studioEmail)}, or however you normally reach ${escapeHtml(
+        context.studioName ?? 'the studio',
+      )} — a yes is enough.`
+    : `Reply however you normally reach ${escapeHtml(
+        context.studioName ?? 'the studio',
+      )} — a yes is enough.`;
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>${escapeHtml(subject || 'Update')}</title>
+<style>
+  @page { margin: 16mm; }
+  :root { color-scheme: light; }
+  body {
+    margin: 0;
+    background: #ffffff;
+    color: #000000;
+    font: 11.5pt/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  main { max-width: 7in; margin: 0 auto; }
+  .who { display: flex; justify-content: space-between; font-size: 9pt; color: #4a453d; letter-spacing: 0.06em; text-transform: uppercase; }
+  h1 { font-family: Georgia, "Times New Roman", serif; font-size: 22pt; margin: 10pt 0 2pt; font-weight: 400; break-after: avoid; }
+  .sub { color: #4a453d; font-size: 10pt; margin: 0 0 16pt; }
+  figure { margin: 0 0 12pt; break-inside: avoid; }
+  img { width: 100%; height: auto; display: block; }
+  figcaption { font-size: 9pt; color: #4a453d; padding-top: 4pt; }
+  .note { font-family: Georgia, "Times New Roman", serif; font-size: 12pt; white-space: pre-wrap; orphans: 3; widows: 3; }
+  .ask { margin: 18pt 0 0; padding: 10pt 12pt; border: 1pt solid #c9c1b3; break-inside: avoid; }
+  .ask p { margin: 0 0 6pt; }
+  .ask p:last-child { margin: 0; }
+  footer { margin-top: 22pt; padding-top: 8pt; border-top: 1pt solid #c9c1b3; font-size: 9pt; color: #4a453d; break-inside: avoid; }
+</style>
+</head>
+<body>
+<main>
+  <div class="who">
+    <span>${escapeHtml(context.studioName ?? 'Studio')}</span>
+    <span>${escapeHtml(formatDate(context.date))}</span>
+  </div>
+  <h1>${escapeHtml(update.headline)}</h1>
+  <p class="sub">${escapeHtml(
+    [context.title, context.stage, context.documentNumber].filter(Boolean).join(' · '),
+  )}</p>
+  ${images}
+  ${update.note ? `<p class="note">${escapeHtml(update.note)}</p>` : ''}
+  ${
+    update.asksApproval
+      ? `<div class="ask">
+    <p>Happy for me to carry on from here?</p>
+    <p class="sub">${reachUs}</p>
+  </div>`
+      : ''
+  }
+  <footer>
+    ${
+      [context.studioName, context.studioEmail].filter(Boolean).length
+        ? `${escapeHtml([context.studioName, context.studioEmail].filter(Boolean).join(' · '))}<br />`
+        : ''
+    }
+    Printed from the studio's own records. Nobody is told whether you read it.
+  </footer>
+</main>
+</body>
+</html>`;
+}

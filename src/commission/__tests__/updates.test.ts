@@ -57,6 +57,13 @@ describe('handing it over', () => {
     expect(describeChannel('share')).toBe('Handed to the share sheet');
   });
 
+  it('records a print the same way, and claims nothing more', () => {
+    let update = createUpdate('doc-1', draft(), at('2026-03-01T10:00:00Z'));
+    update = recordHandoff(update, 'pdf', at('2026-03-01T10:07:00Z'));
+    expect(update.handoffs.map((h) => h.channel)).toEqual(['pdf']);
+    expect(describeChannel('pdf')).toBe('Printed or saved as a PDF');
+  });
+
   it('knows when anything last went out', () => {
     const bare = createUpdate('doc-1', draft());
     expect(lastHandoffAt([bare])).toBeNull();
