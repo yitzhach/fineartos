@@ -217,9 +217,27 @@ export function applyAdjustments(
   const gamma = a.gamma > 0 ? a.gamma : 1;
   const range = Math.max(0.001, white - black);
   const saturation = 1 + a.saturation / 100;
-  const bandsUsed = BAND_NAMES.filter((name) => {
+  /**
+   * The bands in use, with everything they need worked out once.
+   *
+   * This used to call `bandWeight` per pixel per band, and that called
+   * `spanTowards`, which walks all eight bands — eight lookups and a loop for
+   * every pixel of every band. The maths below is identical; it is the doing
+   * of it a million times that had to go.
+   */
+  const bandTable = BAND_NAMES.filter((name) => {
     const band = a.bands[name];
     return band.hue !== 0 || band.saturation !== 0 || band.luminance !== 0;
+  }).map((name) => {
+    const band = a.bands[name];
+    return {
+      centre: BAND_HUES[name],
+      up: spanTowards(name, 1),
+      down: spanTowards(name, -1),
+      hue: band.hue,
+      saturation: band.saturation / 100,
+      luminance: band.luminance / 100,
+    };
   });
 
   for (let i = 0; i < source.length; i += 4) {
@@ -272,23 +290,44 @@ export function applyAdjustments(
     g = clamp01(g);
     b = clamp01(b);
 
-    const colourWork = saturation !== 1 || a.hue !== 0 || bandsUsed.length > 0;
+    const colourWork = saturation !== 1 || a.hue !== 0 || bandTable.length > 0;
     if (colourWork) {
-      let [h, s, l] = rgbToHsl(r, g, b);
+      // The conversions are inlined rather than called. `rgbToHsl` and
+      // `hslToRgb` each build an array, and two allocations per pixel is a
+      // million allocations a frame — the arithmetic here is theirs, exactly.
+      const max = r > g ? (r > b ? r : b) : g > b ? g : b;
+      const min = r < g ? (r < b ? r : b) : g < b ? g : b;
+      let l = (max + min) / 2;
+      let h = 0;
+      let s = 0;
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+        else if (max === g) h = ((b - r) / d + 2) * 60;
+        else h = ((r - g) / d + 4) * 60;
+      }
 
-      if (bandsUsed.length > 0 && s > 0) {
+      if (bandTable.length > 0 && s > 0) {
         let hueShift = 0;
         let satShift = 0;
         let lumShift = 0;
-        for (const name of bandsUsed) {
-          // Scaled by how colourful the pixel is: a near-grey has a hue, but
-          // it is not meaningfully "a yellow", and tinting it looks wrong.
-          const weight = bandWeight(h, name) * Math.min(1, s * 2);
+        // Scaled by how colourful the pixel is: a near-grey has a hue, but it
+        // is not meaningfully "a yellow", and tinting it looks wrong.
+        const colourful = s * 2 < 1 ? s * 2 : 1;
+        for (let index = 0; index < bandTable.length; index += 1) {
+          const band = bandTable[index]!;
+          let offset = (h - band.centre) % 360;
+          if (offset < 0) offset += 360;
+          if (offset > 180) offset -= 360;
+          const span = offset >= 0 ? band.up : band.down;
+          const distance = offset < 0 ? -offset : offset;
+          if (distance >= span) continue;
+          const weight = 0.5 * (1 + Math.cos((Math.PI * distance) / span)) * colourful;
           if (weight === 0) continue;
-          const band = a.bands[name];
           hueShift += weight * band.hue;
-          satShift += weight * (band.saturation / 100);
-          lumShift += weight * (band.luminance / 100);
+          satShift += weight * band.saturation;
+          lumShift += weight * band.luminance;
         }
         h = wrapHue(h + hueShift);
         s = clamp01(satShift >= 0 ? s + (1 - s) * satShift : s * (1 + satShift));
@@ -298,7 +337,18 @@ export function applyAdjustments(
       if (a.hue !== 0) h = wrapHue(h + a.hue);
       if (saturation !== 1) s = clamp01(s * saturation);
 
-      [r, g, b] = hslToRgb(h, s, l);
+      if (s === 0) {
+        r = l;
+        g = l;
+        b = l;
+      } else {
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        const hue = wrapHue(h) / 360;
+        r = hueToChannel(p, q, hue + 1 / 3);
+        g = hueToChannel(p, q, hue);
+        b = hueToChannel(p, q, hue - 1 / 3);
+      }
     }
 
     if (a.blackAndWhite) {

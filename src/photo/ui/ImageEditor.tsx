@@ -45,8 +45,23 @@ interface Props {
   onMessage: (text: string) => void;
 }
 
-/** The longest edge the live preview is worked at, for speed. */
+/** The longest edge the finished preview is worked at. */
 const PREVIEW_EDGE = 1400;
+
+/**
+ * The longest edge used *while a control is moving*.
+ *
+ * The pipeline is per-pixel JavaScript, so its cost is the pixel count: a
+ * 1400px preview is around 1.5 million of them, which is too many to redo
+ * sixty times a second. Dragging works on a quarter-size copy — a fifth of
+ * the pixels — drawn scaled up, and the full-size pass runs once the control
+ * settles. The difference is invisible on a moving slider and obvious in how
+ * quickly the picture answers.
+ */
+const FAST_EDGE = 620;
+
+/** How long after the last move the full-size pass runs. */
+const SETTLE_MS = 140;
 
 /** Which set of tools is open. One at a time, phone or desktop. */
 type ToolGroup = 'crop' | 'light' | 'colour' | 'mix' | 'save';
@@ -88,13 +103,26 @@ export function ImageEditor({ photo, url, onSaveEdit, onSaveCopy, onRevert, onMe
   const [compare, setCompare] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  /** The picture as it came in, at preview size. Never written to. */
-  const originalRef = useRef<ImageData | null>(null);
-  /** Where the pipeline writes: one buffer, reused every frame. */
-  const workingRef = useRef<ImageData | null>(null);
+  /**
+   * Everything the drawing needs, at both sizes: the picture as it came in
+   * (never written to), a buffer the pipeline writes into, and a small canvas
+   * to blit the quarter-size pass from. Built once per frame change.
+   */
+  const baseRef = useRef<{
+    full: ImageData;
+    fullOut: ImageData;
+    fast: ImageData;
+    fastOut: ImageData;
+    fastCanvas: HTMLCanvasElement;
+  } | null>(null);
   const frameRef = useRef<number | null>(null);
   /** The adjustments a queued frame should draw — a ref, so it is never stale. */
   const pendingRef = useRef<Adjustments>(adjustments);
+  /** Whether that frame should be the quick pass. */
+  const pendingFastRef = useRef(false);
+  /** True while a control is being moved, cleared once it settles. */
+  const movingRef = useRef(false);
+  const settleRef = useRef<number | null>(null);
   const sourceRef = useRef<HTMLImageElement | null>(null);
   /** Bumped when the photograph has loaded, to rebuild what is drawn from it. */
   const [loaded, setLoaded] = useState(0);
@@ -154,16 +182,69 @@ export function ImageEditor({ photo, url, onSaveEdit, onSaveCopy, onRevert, onMe
   }, [adjustments, framing]);
   const allChanges = [...framingChanges, ...changes];
 
-  const draw = useCallback((settings: Adjustments) => {
+  /**
+   * Paints the canvas. `'photograph'` is the picture with nothing applied,
+   * which is a straight blit rather than a run of the pipeline over settings
+   * that do nothing — that is what makes Hold to compare answer at once.
+   */
+  const draw = useCallback((settings: Adjustments | 'photograph', fast: boolean) => {
     const canvas = canvasRef.current;
-    const original = originalRef.current;
-    const working = workingRef.current;
-    if (!canvas || !original || !working) return;
-    const context = canvas.getContext('2d', { willReadFrequently: true });
+    const base = baseRef.current;
+    if (!canvas || !base) return;
+    const context = canvas.getContext('2d');
     if (!context) return;
-    applyAdjustments(original.data, settings, working.data);
-    context.putImageData(working, 0, 0);
+
+    if (settings === 'photograph') {
+      context.putImageData(base.full, 0, 0);
+      return;
+    }
+    if (fast) {
+      applyAdjustments(base.fast.data, settings, base.fastOut.data);
+      const small = base.fastCanvas.getContext('2d');
+      if (!small) return;
+      small.putImageData(base.fastOut, 0, 0);
+      context.drawImage(base.fastCanvas, 0, 0, canvas.width, canvas.height);
+      return;
+    }
+    applyAdjustments(base.full.data, settings, base.fullOut.data);
+    context.putImageData(base.fullOut, 0, 0);
   }, []);
+
+  /** One paint per animation frame, whatever the sliders are doing. */
+  const schedule = useCallback(
+    (fast: boolean) => {
+      pendingFastRef.current = fast;
+      if (frameRef.current !== null) return;
+      frameRef.current = requestAnimationFrame(() => {
+        frameRef.current = null;
+        draw(pendingRef.current, pendingFastRef.current);
+      });
+    },
+    [draw],
+  );
+
+  /**
+   * Called by every control as it moves: draw quickly now, properly in a
+   * moment. Without it a slider would drag against a full-size repaint and
+   * feel like it was being pulled through treacle.
+   */
+  const touching = useCallback(() => {
+    movingRef.current = true;
+    if (settleRef.current !== null) clearTimeout(settleRef.current);
+    settleRef.current = window.setTimeout(() => {
+      settleRef.current = null;
+      movingRef.current = false;
+      schedule(false);
+    }, SETTLE_MS);
+  }, [schedule]);
+
+  useEffect(
+    () => () => {
+      if (settleRef.current !== null) clearTimeout(settleRef.current);
+      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+    },
+    [],
+  );
 
   // Load the photograph once. Everything below works from it.
   useEffect(() => {
@@ -193,64 +274,78 @@ export function ImageEditor({ photo, url, onSaveEdit, onSaveCopy, onRevert, onMe
    * In crop mode the whole straightened picture is used instead of the crop,
    * so the box can be dragged around over what it is cutting from.
    */
+  /**
+   * What the base depends on. In crop mode the base is the whole straightened
+   * picture, so the crop box itself does not come into it — which is what
+   * stops dragging the box rebuilding and re-rendering the picture on every
+   * pointer move.
+   */
+  const frameKey = cropping
+    ? `crop:${framing.angle}`
+    : `${framing.angle}:${framing.crop.x}:${framing.crop.y}:${framing.crop.width}:${framing.crop.height}`;
+
   useEffect(() => {
     const image = sourceRef.current;
     const canvas = canvasRef.current;
     if (!image || !canvas) return;
-    const base = renderFramed(
-      image,
-      cropping ? { angle: framing.angle, crop: { ...FULL_CROP } } : framing,
-      PREVIEW_EDGE,
-    );
-    if (!base) {
+    const wanted = cropping ? { angle: framing.angle, crop: { ...FULL_CROP } } : framing;
+
+    const full = renderFramed(image, wanted, PREVIEW_EDGE);
+    const fast = renderFramed(image, wanted, FAST_EDGE);
+    const fullContext = full?.getContext('2d', { willReadFrequently: true });
+    const fastContext = fast?.getContext('2d', { willReadFrequently: true });
+    if (!full || !fast || !fullContext || !fastContext) {
       setProblem('This browser did not provide a 2D canvas to work in.');
       return;
     }
-    canvas.width = base.width;
-    canvas.height = base.height;
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    if (!context) {
-      setProblem('This browser did not provide a 2D canvas to work in.');
-      return;
-    }
-    context.drawImage(base, 0, 0);
-    originalRef.current = context.getImageData(0, 0, base.width, base.height);
-    workingRef.current = context.createImageData(base.width, base.height);
-    setBaseSize({ width: base.width, height: base.height });
+
+    canvas.width = full.width;
+    canvas.height = full.height;
+    baseRef.current = {
+      full: fullContext.getImageData(0, 0, full.width, full.height),
+      fullOut: fullContext.createImageData(full.width, full.height),
+      fast: fastContext.getImageData(0, 0, fast.width, fast.height),
+      fastOut: fastContext.createImageData(fast.width, fast.height),
+      fastCanvas: fast,
+    };
+    setBaseSize({ width: full.width, height: full.height });
     setReady(true);
     // Painted here rather than left to the effect below: rebuilding the base
     // sets no state that effect watches, and the canvas would otherwise sit
     // showing the picture without its adjustments.
-    draw(pendingRef.current);
-  }, [cropping, draw, framing, loaded]);
+    draw(pendingRef.current, movingRef.current);
+    // `frameKey` stands in for the framing: see above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cropping, draw, frameKey, loaded]);
 
 
-  // One redraw per animation frame, whatever the sliders are doing.
   useEffect(() => {
     // Kept current even before the picture has loaded, because that is what
     // the loader paints with the moment it has something to paint on.
-    pendingRef.current = compare ? neutralAdjustments() : adjustments;
-    if (!ready) return undefined;
-    if (frameRef.current !== null) return undefined;
-    frameRef.current = requestAnimationFrame(() => {
-      frameRef.current = null;
-      draw(pendingRef.current);
-    });
-    return () => {
-      if (frameRef.current !== null) {
-        cancelAnimationFrame(frameRef.current);
-        frameRef.current = null;
-      }
-    };
-  }, [adjustments, compare, draw, ready]);
+    pendingRef.current = adjustments;
+    if (!ready) return;
+    // Comparing is a blit of the photograph, so it never waits for the
+    // pipeline; everything else draws quickly while a control is moving.
+    if (compare) draw('photograph', false);
+    else schedule(movingRef.current);
+  }, [adjustments, compare, draw, ready, schedule]);
 
-  const set = (changed: Partial<Adjustments>) =>
+  const set = (changed: Partial<Adjustments>) => {
+    touching();
     setAdjustments((current) => ({ ...current, ...changed }));
-  const setBandValue = (name: BandName, changed: Partial<Adjustments['bands'][BandName]>) =>
+  };
+  const setBandValue = (name: BandName, changed: Partial<Adjustments['bands'][BandName]>) => {
+    touching();
     setAdjustments((current) => ({
       ...current,
       bands: { ...current.bands, [name]: { ...current.bands[name], ...changed } },
     }));
+  };
+  /** Straightening rebuilds the base, so it wants the same quick pass. */
+  const setFramingLive = (next: Framing) => {
+    touching();
+    setFraming(next);
+  };
 
   /** Renders at full size, which is what gets saved or downloaded. */
   const renderFull = async (): Promise<Blob | null> => {
@@ -422,7 +517,7 @@ export function ImageEditor({ photo, url, onSaveEdit, onSaveCopy, onRevert, onMe
                   min={-MAX_ANGLE}
                   max={MAX_ANGLE}
                   step={0.1}
-                  onChange={(angle) => setFraming({ ...framing, angle })}
+                  onChange={(angle) => setFramingLive({ ...framing, angle })}
                 />
                 <div className="chip-row">
                   <button
