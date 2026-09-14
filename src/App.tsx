@@ -1888,6 +1888,7 @@ export default function App() {
         <FinanceWindow
           photos={photos}
           invoices={invoices}
+          documents={rows.map((row) => row.document)}
           expenses={expenses}
           imageUrls={imageUrls}
           studio={studio}
@@ -1902,6 +1903,8 @@ export default function App() {
               void savePhotoRecord(editPhoto(photo, { sale: { ...photo.sale, invoiced } }));
             }
           }}
+          onOpenInvoice={openInvoiceWindow}
+          onOpenDocument={openDocumentWindow}
           onMessage={setMessage}
         />
       );
@@ -2236,6 +2239,7 @@ export default function App() {
         <FinanceWindow
           photos={photos}
           invoices={invoices}
+          documents={rows.map((row) => row.document)}
           expenses={expenses}
           imageUrls={imageUrls}
           studio={studio}
@@ -2250,6 +2254,8 @@ export default function App() {
               void savePhotoRecord(editPhoto(photo, { sale: { ...photo.sale, invoiced } }));
             }
           }}
+          onOpenInvoice={openInvoiceWindow}
+          onOpenDocument={openDocumentWindow}
           onMessage={setMessage}
         />
       );

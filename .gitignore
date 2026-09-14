@@ -8,3 +8,4 @@ tsconfig.tsbuildinfo
 # Photographs waiting to be prepared: `npm run wallpapers` writes the web
 # versions into public/. The originals are the artist's, not the repo's.
 wallpaper-source
+owed-output

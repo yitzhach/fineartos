@@ -18,8 +18,8 @@ const spend = (over: Partial<Expense>): Expense => ({
 });
 
 const income: IncomeRow[] = [
-  { id: 'a', source: 'invoice', date: '2026-02-01', what: 'AO-0001', amount: 200000, fee: null, who: 'Ruiz' },
-  { id: 'b', source: 'piece', date: '2026-03-04', what: 'Harbour', amount: 120000, fee: 48000, who: null },
+  { id: 'a', source: 'invoice', date: '2026-02-01', what: 'AO-0001', amount: 200000, fee: null, who: 'Ruiz', invoiceId: 'inv-1', photoId: null },
+  { id: 'b', source: 'piece', date: '2026-03-04', what: 'Harbour', amount: 120000, fee: 48000, who: null, invoiceId: null, photoId: 'ph-1' },
 ];
 
 describe('the statement', () => {
@@ -40,7 +40,7 @@ describe('the statement', () => {
 
   it('says how many rows it could not count, at the bottom where it matters', () => {
     const html = renderStatement(
-      [...income, { id: 'c', source: 'piece', date: '2026-05-01', what: 'Kiln', amount: null, fee: null, who: null }],
+      [...income, { id: 'c', source: 'piece', date: '2026-05-01', what: 'Kiln', amount: null, fee: null, who: null, invoiceId: null, photoId: 'ph-1' }],
       [spend({ amount: null })],
       context,
     );

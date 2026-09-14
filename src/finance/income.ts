@@ -32,6 +32,8 @@ export function incomeFromInvoices(invoices: Invoice[]): IncomeRow[] {
       // A payment is what arrived; nothing is taken off it here.
       fee: null,
       who: invoice.client.name || null,
+      invoiceId: invoice.id,
+      photoId: null,
     })),
   );
 }
@@ -51,6 +53,8 @@ export function incomeFromPieces(photos: Photo[]): IncomeRow[] {
       amount: photo.sale!.amount,
       fee: photo.sale!.fee,
       who: photo.sale!.buyer ?? photo.sale!.where ?? null,
+      invoiceId: null,
+      photoId: photo.id,
     }));
 }
 

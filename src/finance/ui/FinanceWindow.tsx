@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { formatMoney, parseMoney } from '../../commission/calc';
+import type { CommissionDocument } from '../../commission/types';
 import type { Invoice } from '../../invoice/types';
 import type { StudioDefaults } from '../../lib/prefs';
 import type { Photo } from '../../photo/photo';
@@ -27,12 +28,15 @@ import {
   type ExpenseDraft,
 } from '../ledger';
 import { allIncome, invoicedPieces } from '../income';
+import { allOwed, daysWaiting, isOverdue, owedTotals } from '../owed';
 import { renderStatement, statementFileStem, type StatementContext } from '../statement';
 import { Dictate } from './Dictate';
 
 interface Props {
   photos: Photo[];
   invoices: Invoice[];
+  /** Commissions, so what is owed can show one that was never invoiced. */
+  documents: CommissionDocument[];
   expenses: Expense[];
   imageUrls: Record<string, string>;
   studio: StudioDefaults;
@@ -45,10 +49,13 @@ interface Props {
   onAddReceipts: (files: File[]) => Promise<string[]>;
   /** Marks a piece's sale as already invoiced, so it is not counted twice. */
   onMarkInvoiced: (photoId: string, invoiced: boolean) => void;
+  /** Opens the record a row stands for, in its own window. */
+  onOpenInvoice: (id: string) => void;
+  onOpenDocument: (id: string) => void;
   onMessage: (text: string) => void;
 }
 
-type View = 'overview' | 'in' | 'out' | 'statement';
+type View = 'overview' | 'in' | 'owed' | 'out' | 'statement';
 
 /**
  * The books.
@@ -64,7 +71,7 @@ type View = 'overview' | 'in' | 'out' | 'statement';
  * it: every total says how many it could not count.
  */
 export function FinanceWindow(props: Props) {
-  const { expenses, photos, invoices, studio } = props;
+  const { expenses, photos, invoices, documents, studio } = props;
   const [view, setView] = useState<View>('overview');
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [draft, setDraft] = useState<ExpenseDraft>(emptyExpenseDraft);
@@ -89,6 +96,12 @@ export function FinanceWindow(props: Props) {
   const figures = useMemo(() => books(yearIncome, yearSpend), [yearIncome, yearSpend]);
   const lines = useMemo(() => byCategory(yearSpend), [yearSpend]);
   const alsoInvoiced = useMemo(() => invoicedPieces(photos), [photos]);
+
+  // What is still owed is not filtered by year: money from two years ago that
+  // never arrived is exactly what this list is for.
+  const today = new Date().toISOString().slice(0, 10);
+  const owed = useMemo(() => allOwed({ invoices, documents }), [invoices, documents]);
+  const owedByCurrency = useMemo(() => owedTotals(owed), [owed]);
 
   const problem = draftProblem(draft);
   const isMileage = draft.category === 'mileage';
@@ -118,7 +131,7 @@ export function FinanceWindow(props: Props) {
     <div className="fin">
       <div className="fin-bar">
         <div className="chip-row">
-          {(['overview', 'in', 'out', 'statement'] as View[]).map((one) => (
+          {(['overview', 'in', 'owed', 'out', 'statement'] as View[]).map((one) => (
             <button
               key={one}
               className="btn"
@@ -130,9 +143,11 @@ export function FinanceWindow(props: Props) {
                 ? 'Overview'
                 : one === 'in'
                   ? 'Money in'
-                  : one === 'out'
-                    ? 'Money out'
-                    : 'Statement'}
+                  : one === 'owed'
+                    ? `Payment due${owed.length ? ` (${owed.length})` : ''}`
+                    : one === 'out'
+                      ? 'Money out'
+                      : 'Statement'}
             </button>
           ))}
         </div>
@@ -235,7 +250,17 @@ export function FinanceWindow(props: Props) {
                 <li key={row.id}>
                   <span className="fin-when">{row.date}</span>
                   <span className="fin-what">
-                    {row.what}
+                    {row.invoiceId ? (
+                      <button
+                        className="fin-open"
+                        title="Open this invoice"
+                        onClick={() => props.onOpenInvoice(row.invoiceId!)}
+                      >
+                        {row.what}
+                      </button>
+                    ) : (
+                      row.what
+                    )}
                     <span className="fnd-detail">
                       {row.source === 'invoice' ? 'Invoice payment' : 'Sale of a piece'}
                       {row.who ? ` · ${row.who}` : ''}
@@ -300,6 +325,123 @@ export function FinanceWindow(props: Props) {
               Export money in
             </button>
           </div>
+        </div>
+      )}
+
+      {view === 'owed' && (
+        <div className="fin-list">
+          <p className="hint">
+            Money asked for that has not arrived: invoices with a balance left on them, and
+            commissions that were issued and never invoiced. Nothing new is recorded here — every
+            row opens the invoice or the commission it stands for. It ignores the year, because
+            money owed from two years ago is exactly what this list is for.
+          </p>
+
+          {owed.length === 0 ? (
+            <div className="empty">
+              <h3>Nothing outstanding</h3>
+              <p>Every invoice is paid off, and no issued commission is waiting to be invoiced.</p>
+            </div>
+          ) : (
+            <>
+              <div className="fin-figures">
+                {owedByCurrency.map((total) => {
+                  const sent = total.rows - total.notYetSent;
+                  return (
+                    <div key={total.currency}>
+                      <span className="k">Due in {total.currency}</span>
+                      {/* Drafts are not in this figure, so when every row is a
+                          draft the honest headline is that nothing has been
+                          asked for — not $0.00, which reads as "all paid". */}
+                      <strong>
+                        {sent === 0 ? 'Nothing asked for yet' : formatMoney(total.due, total.currency)}
+                      </strong>
+                      <span className="hint">
+                        {sent > 0
+                          ? `${sent} ${sent === 1 ? 'record' : 'records'} sent and unpaid`
+                          : 'Nothing has been given to a client yet'}
+                        {total.notYetSent > 0
+                          ? ` · ${total.notYetSent} draft ${
+                              total.notYetSent === 1 ? 'invoice' : 'invoices'
+                            } worth ${formatMoney(
+                              total.notYetSentDue,
+                              total.currency,
+                            )} left out, because nobody has been sent them`
+                          : ''}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              {owedByCurrency.length > 1 && (
+                <p className="notice">
+                  These are in different currencies and are not added together: nothing in this app
+                  knows an exchange rate, and one figure across both would be invented.
+                </p>
+              )}
+
+              <ul className="fin-rows">
+                {owed.map((row) => {
+                  const late = isOverdue(row, today);
+                  const waiting = daysWaiting(row, today);
+                  return (
+                    <li key={row.id}>
+                      <span className="fin-when">{row.since}</span>
+                      <span className="fin-what">
+                        <button
+                          className="fin-open"
+                          title={
+                            row.source === 'invoice'
+                              ? 'Open this invoice'
+                              : 'Open this commission'
+                          }
+                          onClick={() =>
+                            row.source === 'invoice'
+                              ? props.onOpenInvoice(row.recordId)
+                              : props.onOpenDocument(row.recordId)
+                          }
+                        >
+                          {row.ref} · {row.what}
+                        </button>
+                        <span className="fnd-detail">
+                          {row.source === 'invoice' ? 'Invoice' : 'Commission, never invoiced'}
+                          {row.who ? ` · ${row.who}` : ''}
+                          {row.paid > 0
+                            ? ` · ${formatMoney(row.paid, row.currency)} of ${formatMoney(
+                                row.total,
+                                row.currency,
+                              )} paid`
+                            : ''}
+                          {row.notYetSent
+                            ? ' · still a draft, not sent'
+                            : row.dueDate === null
+                              ? ` · no due date set · waiting ${waiting} ${
+                                  waiting === 1 ? 'day' : 'days'
+                                }`
+                              : ` · due ${row.dueDate}`}
+                        </span>
+                      </span>
+                      <span className="fin-money">
+                        {formatMoney(row.due, row.currency)}
+                        {late && <span className="fin-late"> · overdue</span>}
+                      </span>
+                      <button
+                        className="btn"
+                        data-variant="quiet"
+                        onClick={() =>
+                          row.source === 'invoice'
+                            ? props.onOpenInvoice(row.recordId)
+                            : props.onOpenDocument(row.recordId)
+                        }
+                      >
+                        Open
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
         </div>
       )}
 

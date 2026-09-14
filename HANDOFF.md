@@ -66,6 +66,7 @@ calculation or a rule inside a component, put it in one of these instead.
 | `src/photo/photo.ts` | A picture: size, price, status, current show, hiding |
 | `src/artwork/catalogue.ts` | The catalogue: filters, sales, totals that admit gaps |
 | `src/finance/ledger.ts` | The books: what was spent, and what a total could not see |
+| `src/finance/owed.ts` | What is still owed, and what is left out of that total |
 | `src/finance/statement.ts` | The profit and loss page an accountant is handed |
 | `src/photo/adjust.ts` | The darkroom: tone, colour, and the eight hue bands |
 | `src/photo/crop.ts` | Cropping and straightening, and what fits inside a turn |
@@ -215,6 +216,10 @@ dependency chain and the decisions each step needs are written out in
 
 For context on why the code looks the way it does, newest first:
 
+- **Payment due** — a Finance tab listing invoices with a balance and
+  commissions issued but never invoiced, each row opening the record it stands
+  for, and the invoice rows on Money in made clickable the same way. Nothing
+  is stored: `src/finance/owed.ts` reads the records that already exist.
 - **Finance** (`696d451`) — the books: money in from invoice payments and
   piece sales kept apart, money out with receipts and mileage, a profit and
   loss page on the studio's letterhead, three CSVs, and dictation.

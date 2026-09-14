@@ -257,6 +257,13 @@ export interface IncomeRow {
   /** What a gallery or show took off it, where that was written down. */
   fee: Minor | null;
   who: string | null;
+  /**
+   * The invoice this payment landed on, so the row can be opened. Null on a
+   * sale written on a piece, which has no invoice behind it.
+   */
+  invoiceId: string | null;
+  /** The piece that was sold, for the same reason. Null on an invoice row. */
+  photoId: string | null;
 }
 
 export function incomeIn(rows: IncomeRow[], year?: number): IncomeRow[] {
