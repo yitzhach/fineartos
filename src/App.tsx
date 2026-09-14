@@ -129,6 +129,7 @@ import {
 import type { Adjustments } from './photo/adjust';
 import type { Framing } from './photo/crop';
 import { milestonesOf } from './commission/milestones';
+import { ArtworkWindow } from './artwork/ui/ArtworkWindow';
 import { UpdatesPane } from './commission/ui/UpdatesPane';
 import {
   awaitingReply,
@@ -222,6 +223,7 @@ registerModule({ id: 'commissions', name: 'Projects', icon: 'projects', availabl
 registerModule({ id: 'invoices', name: 'Invoices', icon: 'invoices', available: true, group: 'tool' });
 registerModule({ id: 'finder', name: 'Finder', icon: 'finder', available: true, group: 'tool' });
 registerModule({ id: 'connect', name: 'Connect', icon: 'connect', available: true, group: 'tool' });
+registerModule({ id: 'artwork', name: 'Artwork', icon: 'artwork', available: true, group: 'tool' });
 // Last in the dock, the way the Trash is always last.
 registerModule({ id: 'trash', name: 'Trash', icon: 'trash', available: true, group: 'trash' });
 
@@ -1431,8 +1433,13 @@ export default function App() {
     return ids.length > 0 ? ids : [photoId];
   };
 
-  const openPreview = (photoId: string) => {
-    const ids = previewSetFor(photoId);
+  /**
+   * `within` is the list the arrows should walk — what the catalogue is
+   * actually showing, when that is where the click came from. Stepping
+   * through a different order from the one on screen is disorienting.
+   */
+  const openPreview = (photoId: string, within?: string[]) => {
+    const ids = within && within.length > 0 ? within : previewSetFor(photoId);
     setPreview({ ids, index: Math.max(0, ids.indexOf(photoId)) });
   };
 
@@ -1816,6 +1823,19 @@ export default function App() {
       );
     }
 
+    if (kind.type === 'tool' && kind.tool === 'artwork') {
+      return (
+        <ArtworkWindow
+          photos={photos}
+          imageUrls={imageUrls}
+          onChange={(photo, changes) => void savePhotoRecord(editPhoto(photo, changes))}
+          onPreview={openPreview}
+          onEdit={openEditor}
+          onMessage={setMessage}
+        />
+      );
+    }
+
     if (kind.type === 'tool' && kind.tool === 'trash') {
       return (
         <span className="faint" style={{ fontSize: 12 }}>
@@ -1828,6 +1848,14 @@ export default function App() {
       return (
         <span className="faint" style={{ fontSize: 12 }}>
           Select a row, then Open. Drag an icon onto a folder on the desktop, or use Move to here.
+        </span>
+      );
+    }
+
+    if (kind.type === 'tool' && kind.tool === 'artwork') {
+      return (
+        <span className="faint" style={{ fontSize: 12 }}>
+          Every picture in the studio. Edits here are the same records the desktop shows.
         </span>
       );
     }
@@ -1992,6 +2020,14 @@ export default function App() {
       );
     }
 
+    if (kind.type === 'tool' && kind.tool === 'artwork') {
+      return (
+        <span className="faint" style={{ fontSize: 12 }}>
+          Every picture in the studio. Edits here are the same records the desktop shows.
+        </span>
+      );
+    }
+
     if (kind.type === 'photoEdit') {
       const photo = photos.find((p) => p.id === kind.photoId);
       if (!photo) return <p className="hint">This picture has been deleted.</p>;
@@ -2090,6 +2126,19 @@ export default function App() {
           askForSignature={askForSignature}
           siteUrl={siteUrl}
           onSiteUrl={setSiteUrl}
+          onMessage={setMessage}
+        />
+      );
+    }
+
+    if (kind.type === 'tool' && kind.tool === 'artwork') {
+      return (
+        <ArtworkWindow
+          photos={photos}
+          imageUrls={imageUrls}
+          onChange={(photo, changes) => void savePhotoRecord(editPhoto(photo, changes))}
+          onPreview={openPreview}
+          onEdit={openEditor}
           onMessage={setMessage}
         />
       );
@@ -2384,6 +2433,8 @@ export default function App() {
                   ? { kind: { type: 'tool' as const, tool: 'connect' }, title: 'Connect', subtitle: 'Guest book, sharing and QR' }
                   : id === 'finder'
                   ? { kind: { type: 'tool' as const, tool: 'finder' }, title: 'Finder', subtitle: 'Everything in the studio' }
+                  : id === 'artwork'
+                  ? { kind: { type: 'tool' as const, tool: 'artwork' }, title: 'Artwork', subtitle: 'The catalogue' }
                   : { kind: { type: 'tool' as const, tool: id }, title: MOCK_TOOL_NAMES[id] ?? id, subtitle: 'Preview' };
           setWindows((c) => toggleWindow(c, spec, desktopViewportRef.current).windows);
         }}

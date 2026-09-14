@@ -3420,3 +3420,201 @@ fieldset.section > legend {
   .upd { grid-template-columns: minmax(0, 1fr); }
   .upd-when { width: 108px; }
 }
+
+
+/* --- The catalogue ---------------------------------------------------------- */
+/* A wall of pictures first, because that is how an artist knows their own
+   work; the list and the ledger are the same records read another way. */
+
+.art { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.art-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.art-bar .fnd-search { flex: 1 1 200px; min-width: 0; }
+
+.art-filters { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.art-sort { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-faint); }
+.art-sort select { width: auto; }
+.art-count { margin-left: auto; }
+
+.art-clientbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--accent-quiet);
+}
+
+/* The wall. Rows of even height, pictures at their own shape inside them. */
+.art-wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 18px;
+}
+
+.art-piece { margin: 0; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.art-plate {
+  position: relative;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--raised);
+  cursor: zoom-in;
+  aspect-ratio: 1 / 1;
+  display: block;
+  width: 100%;
+}
+.art-plate img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.art-plate:hover { border-color: var(--line-strong); }
+.art-plate:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.art-piece[data-picked='true'] .art-plate {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-quiet);
+}
+/* Sold work stays in the wall rather than disappearing from it — it is part
+   of the record — but it reads as sold at a glance. */
+.art-piece[data-sold='true'] .art-plate img { opacity: 0.72; }
+
+.art-sold,
+.art-tick {
+  position: absolute;
+  top: 9px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.art-sold { left: 9px; background: rgba(0, 0, 0, 0.62); color: #f6f1e8; }
+:root[data-theme='light'] .art-sold { background: rgba(36, 31, 25, 0.78); }
+.art-tick {
+  right: 9px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.art-piece figcaption { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.art-piece figcaption strong { font-family: var(--serif); font-size: 14px; }
+.art-piece figcaption span {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.art-piece-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+.art-piece-actions .btn { padding: 4px 9px; font-size: 11.5px; }
+
+.art-sale-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  background: var(--panel-solid);
+}
+
+/* --- The list ------------------------------------------------------------- */
+
+.art-table-wrap { display: flex; flex-direction: column; gap: 10px; overflow-x: auto; }
+.art-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.art-table th,
+.art-table td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.art-table thead th {
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.art-table tbody tr:hover { background: rgba(255, 255, 255, 0.04); }
+:root[data-theme='light'] .art-table tbody tr:hover { background: rgba(36, 31, 25, 0.04); }
+.art-table th[scope='row'] { font-weight: 400; }
+
+.art-row-name {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+.art-row-name img { width: 34px; height: 34px; object-fit: cover; border-radius: 6px; flex: 0 0 auto; }
+.art-row-name:hover { color: var(--accent); }
+
+/* An editable cell that does not look like a form until you are in it. */
+.art-cell {
+  width: 100%;
+  min-width: 90px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+.art-cell:hover { border-color: var(--line); }
+.art-cell:focus { border-color: var(--accent); background: var(--raised); outline: none; }
+
+/* --- What sold ------------------------------------------------------------- */
+
+.art-sales { display: flex; flex-direction: column; gap: 12px; }
+
+.art-figures { display: flex; gap: 22px; flex-wrap: wrap; }
+.art-figures div { display: flex; flex-direction: column; gap: 2px; }
+.art-figures .k { font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-faint); }
+.art-figures strong { font-family: var(--serif); font-size: 22px; font-weight: 400; font-variant-numeric: tabular-nums; }
+
+.art-ledger { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.art-ledger li {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) 108px minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.art-ledger-when { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.art-ledger-where { color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.art-ledger-money { font-variant-numeric: tabular-nums; }
+
+.art-picks {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: var(--panel-solid);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.25);
+}
+.art-picks .fnd-search { flex: 1 1 180px; }
+
+@media (max-width: 860px) {
+  .art-wall { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+  .art-count { margin-left: 0; }
+  .art-ledger li { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; }
+  .art-ledger-when { grid-column: 2; text-align: right; }
+  .art-ledger-where,
+  .art-ledger-money { grid-column: 1 / -1; }
+}

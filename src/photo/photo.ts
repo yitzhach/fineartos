@@ -16,6 +16,7 @@
 import { newId } from '../commission/document';
 import { isNeutral, type Adjustments } from './adjust';
 import { isFramed, type Framing } from './crop';
+import type { PieceLocation, Sale } from '../artwork/catalogue';
 
 /**
  * Whether a piece can be bought. Null is the honest default: a photograph
@@ -46,6 +47,17 @@ export interface Photo {
   status: PhotoStatus;
   /** Hung at the show being worked right now. False until marked. */
   inCurrentShow: boolean;
+  /**
+   * Where the piece physically is — studio, a show, a gallery, a client's
+   * wall. Null until the artist says, like everything else here.
+   */
+  location?: PieceLocation | null;
+  /**
+   * What happened when it sold: the date, the figure, where and to whom.
+   * Kept on the piece because a piece sells once. Null means it has not — or
+   * that nobody has written it down yet, which is not the same as £0.
+   */
+  sale?: Sale | null;
   /**
    * Kept out of the picker a visitor is handed at a show. Not a property of
    * the work — a picture is hidden because it is sold, promised, or simply
