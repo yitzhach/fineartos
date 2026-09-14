@@ -42,6 +42,31 @@ settle. Do not spend tokens rebuilding project history.
 **When asked for a handoff**: update `HANDOFF.md` with deltas only, keep it
 under 90 lines, then stop unless told otherwise.
 
+**Cadence**: update the baton after every commit — a few edited lines while
+the work is fresh. Never save it up for one end-of-session write-up: that is
+the expensive way, and a session that dies before it loses everything.
+
+## Working cheaply
+
+Every turn re-sends the whole conversation, so cost grows with what the
+session has accumulated, not with what it is doing now. Asking for a handoff
+late in a long session pays for that whole session again.
+
+- **Keep sessions short.** Land a feature, update the baton, start fresh.
+  A new session reads 90 lines instead of replaying a hundred turns.
+- **Never read a whole file into the conversation when a grep would do.** A
+  600-line component opened once sits in context for every turn after it.
+  Search for the symbol, read the range around it.
+- **Run tests and builds so their output is short.** Pipe to a file and tail
+  it; a full suite dump is pure cost.
+- **Commit messages: about five lines.** What changed, and any decision that
+  would otherwise be easy to reverse. The diff is the record; no essays.
+- **Do not recap in chat what the files already say.**
+
+The SessionStart hook (`.claude/hooks/session-start.sh`) installs and runs the
+suite automatically, so a session opens already knowing the tree is green.
+Trust its line; do not re-run the suite to confirm it.
+
 ## Standing constraints
 
 - **Do not touch the Worker named `commission`, and do not sync the
@@ -121,5 +146,5 @@ These came from real mistakes. Breaking them has broken the app before.
 ## How to report back
 
 Short, plain, beginner-legible. Lead with what now works in one sentence. Say
-what broke or was skipped — never hide it to stay short. Detail belongs in the
-commit message and the docs, not the chat reply.
+what broke or was skipped — never hide it to stay short. Under ~150 words.
+Detail belongs in the commit message and the docs, not the chat reply.

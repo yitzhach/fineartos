@@ -87,4 +87,5 @@ Baton only. Rules, constraints, commands and gotchas live in `CLAUDE.md`.
   access="push")`, run the clone command it returns into `/home/user/fineartos`,
   then `register_repo_root` on that directory. A branch instruction in the
   session briefing belongs to the other repo; here it is `main`.
+- The SessionStart hook installs deps and runs the suite; trust its line.
 - Read `CLAUDE.md`, then execute Next #1.
