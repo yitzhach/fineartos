@@ -9,7 +9,8 @@
 
 - Tree green. 522 tests pass. Branch `claude/determined-rubin-q9irx9` (the
   session briefing named it; `CLAUDE.md` says `main` — not merged yet).
-- Nothing half-finished.
+- Nothing half-finished. Nothing from the Shows / backup scope is built —
+  it is written down in `FUTURE_BUILD.md` only.
 - Dock built: New, Home, Projects, Invoices, Finder, Connect, Artwork,
   Finance, Trash. Placeholders: Shows, Visualizer.
 
@@ -49,6 +50,9 @@
 
 ## Next (numbered)
 
+0. Agreed order for the newly scoped work, once it starts: backup and restore
+   → proportional Trash confirmation → contacts as their own records. Shows
+   ships as a hosted shell, never as records here. See `FUTURE_BUILD.md`.
 1. Deleting a commission forever orphans its `clientUpdates` rows. Emptying
    the Trash removes document, invoices and pictures, not those.
 2. Export/import does not carry updates or expenses (`persistence/portable.ts`
@@ -73,6 +77,8 @@
 - `scripts/check-update-pdf.mjs` — the browser check for it.
 - `src/persistence/portable.ts` — Next #2 lands here.
 - `src/commission/updates.ts` — Next #1 and #3 both touch it.
+- `FUTURE_BUILD.md` — Shows-as-a-shell, light sync rungs, and the backup
+  scope. Written this session, nothing built.
 
 ## Verify (tested / NOT tested)
 

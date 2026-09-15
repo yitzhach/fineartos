@@ -222,3 +222,122 @@ probably end up doing two of them. The invoice exporter
 (`src/invoice/download.ts`) already renders a self-contained HTML file, a
 JPEG through canvas, and a PDF through the print dialog, so whichever shape
 wins has somewhere to start.
+
+
+## Shows, as a shell around a tracker that already exists
+
+**Asked for:** the Shows tool, but light — because a much fuller show tracker
+already exists as its own app, and this suite must not get heavy re-creating
+it.
+
+The bundle only grows if the code ships inside it, so the answer is not to
+ship it. Three separable pieces, each usable without the next.
+
+### The shell
+
+A small registry — `src/os/externalTools.ts` — describing a hosted tool:
+name, icon, URL, and an honest line about what it can and cannot do. The
+Shows window loads that URL in an iframe, and only when it is opened. Cost to
+the bundle is a few hundred bytes and no dependency. The tracker keeps its
+own repository, its own deploy and its own data.
+
+What that does not buy, and must be said on screen rather than discovered:
+
+- **No shared database.** Cross-origin means Finance cannot read a booth fee
+  from it and Artwork cannot know a piece is at a fair.
+- **It needs a network.** Offline, the window says so; it never sits blank.
+- **The other app must allow framing.** A tracker that sets
+  `X-Frame-Options: DENY` or a restrictive `frame-ancestors` cannot be hosted
+  this way at all, and the fallback is a link that opens it in a tab.
+- **Rule 8 holds.** With no plan, the Shows icon is absent — not a teaser
+  with dead controls. If it appears at all, it explains what Shows is and
+  where it lives.
+
+### The genuinely light native part
+
+A show is not a record here. It is a *label*: a "shown at" name and dates on
+a piece in Artwork, and a show name on an expense in Finance. Two fields, no
+new store, no new tab — and between them they answer "where is this painting"
+and "what did that fair cost me" without a Shows tool existing at all. This
+is worth building whether or not the shell ever is.
+
+### Light syncing — the calendar and the list of shows
+
+Four rungs, cheapest first. Each is a decision about how much coupling is
+worth it; none of them needs a server except the last.
+
+1. **Nothing shared.** The iframe, and the two labels above. The artist reads
+   dates in one window and types a booth fee in the other. Honest, free, and
+   probably enough for a year.
+2. **Export and import a small file.** The tracker writes a `shows.json` —
+   name, venue, start and end dates, load-in, application deadline, status —
+   and Artist OS reads it into a read-only list plus calendar entries. No
+   coupling at all: the two apps never talk, and it works offline. The cost
+   is that the artist re-exports when something changes, so the app must
+   always say *when* it was imported and never imply it is current.
+3. **A `postMessage` handshake.** When the Shows window opens, the hosted
+   tracker posts a read-only summary of its shows to the parent, which caches
+   it. Roughly thirty lines on each side, still no server, and it removes the
+   manual re-export. It requires a change in the other app, an agreed message
+   shape, and a strict origin check on both ends — a page in an iframe is
+   untrusted input, exactly like an import file.
+4. **Real two-way sync.** Blocked on the same gate as everything else in this
+   document: sign-in. Not before.
+
+Rungs 2 and 3 share one rule, and it is the important one: **the tracker owns
+the show; Artist OS owns the money and the pieces.** Anything imported is
+read-only here, shown as belonging to the other tool, and never editable in
+two places. A show list that is partly imported and partly stale says how
+many rows it could not see, the same way every other total in this app does.
+
+### Still unknown
+
+The show tracker's data shape. A `claude.ai/code/session_…` link is a working
+session, not the app: it cannot be fetched or framed. What is needed before
+any of rungs 2–4 can be designed properly is the deployed URL, and whether
+its records already carry stable ids and ISO dates.
+
+
+## Losing everything: bulk deletion, contacts, and a real backup
+
+**Asked for:** it should be nearly impossible to wipe out the client records
+and the invoices by accident. One file is easy to lose and easy to live
+without; a folder holding dozens of invoices is not.
+
+Today the Trash never deletes, emptying asks twice and quotes the real total
+— a folder holding nine is "delete 10 records". That is good, and it has two
+gaps.
+
+### The second click is the same click at any size
+
+Confirming ten records and confirming two hundred look identical. The
+friction should be proportional to what is inside: past some weight, or any
+time client records or invoices are in the pile, the confirmation asks the
+artist to type the count rather than click again. Small change, and it is the
+difference between a slip and a decision.
+
+### There is no backup
+
+`src/persistence/portable.ts` exports one document. What protects the artist
+is **Save everything**: a single file holding every record, restored by
+*merging* rather than overwriting, with a quiet line somewhere saying when
+the last one was taken. Ids are already stable (`newId`), so a merge is
+tractable; images are the open question, exactly as in "Downloading a whole
+project" above.
+
+That also fixes the emptying dialog properly. Rule 2 stays intact — emptying
+is still not undoable — but with a backup in reach, the dialog can offer
+**Back up first** as its primary button, and the loss becomes recoverable
+without pretending it is reversible.
+
+### A person outlives the job
+
+Deleting a commission must never be able to take the client with it. Contacts
+belong in their own store, not inside the document that happens to mention
+them. This is the same root as the orphaned `clientUpdates` rows: child
+records and shared records are different things and are currently treated the
+same.
+
+**Order.** Backup and restore first — it protects everything else, and
+`portable.ts` has to be widened anyway to carry updates and expenses. Then
+the proportional confirmation. Then contacts as their own records.
