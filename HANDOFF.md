@@ -17,12 +17,10 @@
 ## Done
 
 - **PDF hand-off for a client update** — the last unused `HandoffChannel`.
-  A "Print / Save as PDF" button beside Save as a page; the sheet is built
-  from the records into a hidden iframe and handed to the browser's own print
-  dialog, which is where every browser keeps Save as PDF.
-- `renderUpdatePrintHtml` is the paper cut of the page: white, point sizes,
-  break-inside rules, and **no buttons** — the studio address is printed as
-  words, because a dead mailto button on paper is worse than none.
+  "Print / Save as PDF" builds the sheet from the records into a hidden
+  iframe and hands it to the browser's own print dialog.
+- `renderUpdatePrintHtml` is the paper cut of the page, with **no buttons**:
+  the studio address is printed as words, a dead mailto being worse than none.
 
 ## Decisions (keep)
 
@@ -85,10 +83,8 @@
 
 ## Resume
 
-- A fresh session starts in `yitzhach/newTEST`, an unrelated art show tracker.
-  Attach this repo first: `add_repo(owner="yitzhach", repo="fineartos",
-  access="push")`, run the clone command it returns into `/home/user/fineartos`,
-  then `register_repo_root` on that directory. A branch instruction in the
-  session briefing belongs to the other repo; here it is `main`.
+- A fresh session may start in `yitzhach/newTEST`. Attach this repo first:
+  `add_repo(owner="yitzhach", repo="fineartos", access="push")`, clone into
+  `/home/user/fineartos`, then `register_repo_root` on it.
 - The SessionStart hook installs deps and runs the suite; trust its line.
 - Read `CLAUDE.md`, then execute Next #1.
