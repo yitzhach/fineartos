@@ -32,15 +32,10 @@
   it straight after `print()` cancels the dialog in some browsers.
 - `printUpdatePage` returns `'unsupported'` rather than throwing when the
   browser has no print; nothing is recorded then, and the message says so.
-- Payment due counts nothing twice: once an invoice exists against a
-  commission, the commission drops out. Only uninvoiced commissions list.
-- Totals are one per currency — nothing in the app knows an exchange rate.
-- Draft invoices are excluded from the due total, counted beside it, named.
-  All-draft headline reads "Nothing asked for yet", never $0.00.
-- A commission has terms, not a due date → `dueDate: null`, never overdue.
-  An unsent draft is never overdue either.
-- Payment due ignores the year selector, on purpose.
-- Sale-of-a-piece rows stay plain text: no invoice behind them.
+- Payment due: nothing counted twice (an invoiced commission drops out),
+  one total per currency, drafts excluded but counted and named, a commission
+  has terms not a due date so it is never overdue, and the year selector is
+  ignored on purpose. Sale-of-a-piece rows have no invoice behind them.
 - `PROJECT_GUIDE.md` predates Finance and has no Finance section. Do not
   assume it is current.
 
@@ -60,10 +55,7 @@
 3. Update from a milestone: ticking a stage offers to tell the client.
 4. Client status on a commission's Overview tab — last update, anything
    unanswered — so the Client tab need not be opened.
-5. Shows, the 4th tool. Scope to settle first: name, venue, dates, booth fee,
-   deadline, status, which pieces went, guest entries collected. Artwork owns
-   the piece and where it is; Shows owns the event; Finance reads both. Other
-   orders collide.
+5. Shows — now scoped as a hosted shell, not records. `FUTURE_BUILD.md`.
 6. Visualizer. No design yet.
 7. Sign-in gates everything else: cloud saving, guest book online, real email,
    Square, a client page that can receive an approval. See `FUTURE_BUILD.md`.
@@ -88,9 +80,8 @@
   mailto, the hand-off records once, the second tab sees it, no console
   errors. `node scripts/check-update-pdf.mjs` against `npm run preview`.
 - **NOT tested**: a real print dialog (headless makes `print()` a no-op — the
-  frame it would print is what is checked). A picture inlined into the sheet:
-  the demo commission has none, so only the unit test covers that. Light mode,
-  tablet width, the deployed URL.
+  frame it would print is checked instead). A picture inlined into the sheet:
+  the demo commission has none. Light mode, tablet width, the deployed URL.
 
 ## Resume
 
