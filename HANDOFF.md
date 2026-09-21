@@ -3,7 +3,6 @@
 ## Goal
 
 - Artist OS: desktop-OS business suite for one artist. Browser-only, no server.
-- Ship to `main`; Cloudflare rebuilds in ~1 min.
 
 ## Now
 
