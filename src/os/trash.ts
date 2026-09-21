@@ -61,6 +61,28 @@ export function deletionTargets(entry: TrashEntry): string[] {
   return [entry.id, ...entry.contains];
 }
 
+/**
+ * A child record that belongs to a commission rather than standing on its own
+ * — a client update. It is never in the Trash by itself: it goes when the
+ * commission it belongs to goes, and until then it is only hidden.
+ *
+ * Structural on purpose, so the Trash need not know what an update is.
+ */
+export interface AttachedRecord {
+  id: string;
+  documentId: string;
+}
+
+/**
+ * The child records that would go with what is being deleted. Left behind,
+ * these are orphans: rows pointing at a commission that no longer exists,
+ * invisible in the app and still taking up room.
+ */
+export function attachedIds(targets: string[], attached: AttachedRecord[]): string[] {
+  const going = new Set(targets);
+  return attached.filter((record) => going.has(record.documentId)).map((record) => record.id);
+}
+
 export interface TrashSummary {
   entries: number;
   /** Records, counting what is inside a folder. This is the honest number. */
@@ -69,13 +91,15 @@ export interface TrashSummary {
   documents: number;
   invoices: number;
   pictures: number;
+  /** Client updates that would go with the commissions above. */
+  updates: number;
 }
 
 /**
  * What emptying would actually destroy. The confirmation quotes `records`,
  * not `entries`: "delete 1 item" would be a lie about a folder holding nine.
  */
-export function summarise(trash: Trash): TrashSummary {
+export function summarise(trash: Trash, attached: AttachedRecord[] = []): TrashSummary {
   let records = 0;
   let folders = 0;
   let documents = 0;
@@ -90,7 +114,20 @@ export function summarise(trash: Trash): TrashSummary {
     else invoices += 1;
   }
 
-  return { entries: trash.length, records, folders, documents, invoices, pictures };
+  // The updates go too, so the number the confirmation quotes has to count
+  // them: "delete 4 records" that turns out to be seven is the lie rule 2
+  // exists to prevent.
+  const updates = attachedIds(trash.flatMap(deletionTargets), attached).length;
+
+  return {
+    entries: trash.length,
+    records: records + updates,
+    folders,
+    documents,
+    invoices,
+    pictures,
+    updates,
+  };
 }
 
 /** "3 items", "1 item" — never a bare number with no noun. */

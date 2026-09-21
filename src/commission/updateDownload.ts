@@ -60,13 +60,79 @@ export async function downloadUpdatePage(
   context: CardContext,
   pictures: { blob: Blob | null; title: string }[],
 ): Promise<void> {
+  const html = renderUpdateHtml(update, context, await inlinePictures(pictures));
+  triggerDownload(new Blob([html], { type: 'text/html' }), `${cardFileStem(update, context)}.html`);
+}
+
+/** The pictures an update carries, ready to be inlined into the page. */
+async function inlinePictures(
+  pictures: { blob: Blob | null; title: string }[],
+): Promise<{ src: string; title: string }[]> {
   const inlined = [];
   for (const picture of pictures) {
     if (!picture.blob) continue;
     inlined.push({ src: await blobToDataUrl(picture.blob), title: picture.title });
   }
-  const html = renderUpdateHtml(update, context, inlined);
-  triggerDownload(new Blob([html], { type: 'text/html' }), `${cardFileStem(update, context)}.html`);
+  return inlined;
+}
+
+/**
+ * The same page, handed to the browser's own print dialog — which is where
+ * "Save as PDF" lives on every desktop and on the phone. Nothing here writes a
+ * PDF itself: the browser does, and the artist chooses the printer or the file.
+ *
+ * It is printed from a hidden iframe rather than a new tab, because a popup
+ * blocker eats the tab and the artist is left wondering what happened. A
+ * browser with no print at all says so rather than recording a hand-off that
+ * never took place.
+ */
+export async function printUpdatePage(
+  update: ClientUpdate,
+  context: CardContext,
+  pictures: { blob: Blob | null; title: string }[],
+): Promise<'printed' | 'unsupported'> {
+  const html = renderUpdateHtml(update, context, await inlinePictures(pictures), {
+    forPrint: true,
+  });
+
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.title = 'Printing';
+  frame.style.cssText =
+    'position:fixed;right:0;bottom:0;width:1px;height:1px;opacity:0;border:0;pointer-events:none';
+  document.body.appendChild(frame);
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      frame.onload = () => resolve();
+      frame.onerror = () => reject(new Error('The page could not be prepared for printing.'));
+      frame.srcdoc = html;
+    });
+
+    const view = frame.contentWindow;
+    const doc = frame.contentDocument;
+    if (!view || !doc || typeof view.print !== 'function') return 'unsupported';
+
+    // Data URIs still decode asynchronously, and printing before they land
+    // prints the gaps where the pictures should be.
+    await Promise.all(
+      Array.from(doc.images).map((image) =>
+        image.complete
+          ? Promise.resolve()
+          : new Promise<void>((resolve) => {
+              image.onload = () => resolve();
+              image.onerror = () => resolve();
+            }),
+      ),
+    );
+
+    view.focus();
+    view.print();
+    return 'printed';
+  } finally {
+    // Left in place while the dialog is up; a removed frame prints nothing.
+    setTimeout(() => frame.remove(), 1000);
+  }
 }
 
 /**

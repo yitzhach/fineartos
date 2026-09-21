@@ -11,6 +11,7 @@ import { TrashButton } from './os/TrashButton';
 import { Connect, type ConnectTab } from './connect/ui/Connect';
 import type { GuestEntry } from './connect/guestbook';
 import {
+  attachedIds,
   countPhrase,
   deletionTargets,
   findEntry,
@@ -145,6 +146,7 @@ import type { CardContext } from './commission/updateRender';
 import {
   downloadUpdateCard,
   downloadUpdatePage,
+  printUpdatePage,
   shareUpdateCard,
 } from './commission/updateDownload';
 import { PhotoWindow } from './photo/ui/PhotoWindow';
@@ -240,6 +242,9 @@ export default function App() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [clientUpdates, setClientUpdates] = useState<ClientUpdate[]>([]);
+  // Every update, trashed commissions included: the Trash has to count what
+  // emptying would take with it, and those are hidden from `clientUpdates`.
+  const [allUpdates, setAllUpdates] = useState<ClientUpdate[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [mileageRate, setMileageRate] = useState<number | null>(loadMileageRate);
   const [importingImages, setImportingImages] = useState(false);
@@ -438,6 +443,7 @@ export default function App() {
     // An update belongs to its commission: one in the Trash takes its updates
     // out of sight with it, and putting it back brings them back.
     setClientUpdates(updateRows.filter((update) => !hidden.has(update.documentId)));
+    setAllUpdates(updateRows);
     setExpenses(expenseRows);
     setLoaded(true);
 
@@ -716,6 +722,9 @@ export default function App() {
       await repo.deleteProject(folder.id);
     } else if (folder) {
       await repo.saveProject(removeFromProject(folder, id));
+    }
+    for (const updateId of attachedIds([id], await repo.listUpdates())) {
+      await repo.deleteUpdate(updateId);
     }
     await repo.deleteDocument(id);
     setWindows((current) =>
@@ -1275,6 +1284,12 @@ export default function App() {
     const ids = entries.flatMap(deletionTargets);
     const removedImages: string[] = [];
 
+    // A commission's updates are its own records and have no life without it.
+    // Left behind they are orphans: invisible everywhere, and still stored.
+    for (const updateId of attachedIds(ids, await repo.listUpdates())) {
+      await repo.deleteUpdate(updateId);
+    }
+
     for (const id of ids) {
       const storedPhoto = await repo.loadPhoto(id);
       if (storedPhoto) {
@@ -1547,15 +1562,24 @@ export default function App() {
       if (channel === 'jpeg') {
         await downloadUpdateCard(update, context, urls);
         setMessage('Saved as a picture. Attach it to a text or an email — it is yours to send.');
-      } else if (channel === 'page') {
+      } else if (channel === 'page' || channel === 'pdf') {
         const blobs = await Promise.all(
           chosen.map(async (photo) => ({
             blob: (await repo.getImage(photo.imageId))?.blob ?? null,
             title: photo.title,
           })),
         );
-        await downloadUpdatePage(update, context, blobs);
-        setMessage('Saved as one page, pictures and all. It opens anywhere, with or without a network.');
+        if (channel === 'page') {
+          await downloadUpdatePage(update, context, blobs);
+          setMessage('Saved as one page, pictures and all. It opens anywhere, with or without a network.');
+        } else {
+          const result = await printUpdatePage(update, context, blobs);
+          if (result === 'unsupported') {
+            setMessage('This browser cannot print from here — Save as a page and print that instead.');
+            return;
+          }
+          setMessage('Your print dialog is open. Choose Save as PDF to keep a copy.');
+        }
       } else if (channel === 'copy') {
         await navigator.clipboard?.writeText(message);
         setMessage('Message copied. Paste it wherever you talk to this client.');
@@ -2265,6 +2289,7 @@ export default function App() {
       return (
         <TrashWindow
           trash={trash}
+          updates={allUpdates}
           onPutBack={(id) => void handlePutBack(id)}
           onDeleteForever={(id) => void handleDeleteForever(id)}
           onEmpty={() => void handleEmptyTrash()}

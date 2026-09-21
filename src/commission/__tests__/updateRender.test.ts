@@ -76,3 +76,39 @@ describe('the file name', () => {
     );
   });
 });
+
+describe('the printed page', () => {
+  it('drops the mailto buttons, which do nothing on paper', () => {
+    const asking = update({ asksApproval: true });
+    expect(renderUpdateHtml(asking, context, [])).toContain('Approve</a>');
+    const printed = renderUpdateHtml(asking, context, [], { forPrint: true });
+    expect(printed).not.toContain('Approve</a>');
+    expect(printed).not.toContain('mailto:');
+  });
+
+  it('prints the address instead, so the ask is still answerable', () => {
+    const printed = renderUpdateHtml(update({ asksApproval: true }), context, [], {
+      forPrint: true,
+    });
+    expect(printed).toContain('studio@example.com');
+    expect(printed).toContain('a yes is enough');
+    expect(printed).not.toContain('These buttons open your own email');
+  });
+
+  it('still says the page cannot send anything', () => {
+    const printed = renderUpdateHtml(update(), context, [], { forPrint: true });
+    expect(printed).toContain('cannot send anything by itself');
+  });
+
+  it('carries print styling and keeps a picture off a page break', () => {
+    const printed = renderUpdateHtml(update(), context, [], { forPrint: true });
+    expect(printed).toContain('@media print');
+    expect(printed).toContain('page-break-inside: avoid');
+  });
+
+  it('says the same things the saved page says', () => {
+    const printed = renderUpdateHtml(update(), context, [], { forPrint: true });
+    expect(printed).toContain('Underpainting');
+    expect(printed).toContain('The ground is down.');
+  });
+});

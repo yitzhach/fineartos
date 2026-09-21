@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import {
+  attachedIds,
   countPhrase,
   deletionTargets,
   describeWhen,
   summarise,
+  type AttachedRecord,
   type Trash,
   type TrashSummary,
   type TrashEntry,
@@ -11,6 +13,8 @@ import {
 
 interface Props {
   trash: Trash;
+  /** Every client update in the studio, so the questions can count them. */
+  updates: AttachedRecord[];
   onPutBack: (id: string) => void;
   onDeleteForever: (id: string) => void;
   onEmpty: () => void;
@@ -23,11 +27,11 @@ interface Props {
  * exactly what would go — including the records inside a folder, which is the
  * number people are surprised by. "Put back" is always the easier click.
  */
-export function TrashWindow({ trash, onPutBack, onDeleteForever, onEmpty }: Props) {
+export function TrashWindow({ trash, updates, onPutBack, onDeleteForever, onEmpty }: Props) {
   // Which confirmation is showing: 'all' for Empty Trash, or an entry's id.
   const [confirming, setConfirming] = useState<string | null>(null);
 
-  const summary = summarise(trash);
+  const summary = summarise(trash, updates);
 
   if (trash.length === 0) {
     return (
@@ -90,14 +94,7 @@ export function TrashWindow({ trash, onPutBack, onDeleteForever, onEmpty }: Prop
             {confirming === entry.id && (
               <Confirm
                 question={`Delete “${entry.name}” forever?`}
-                detail={
-                  entry.contains.length > 0
-                    ? `This folder and the ${countPhrase(entry.contains.length)} inside it — ${countPhrase(
-                        deletionTargets(entry).length,
-                        'record',
-                      )} — will be gone for good.`
-                    : 'This cannot be undone.'
-                }
+                detail={describeEntry(entry, updates)}
                 confirmLabel="Delete forever"
                 onConfirm={() => {
                   onDeleteForever(entry.id);
@@ -165,13 +162,35 @@ function describeContents({
   pictures,
   records,
   entries,
+  updates,
 }: TrashSummary): string {
   const parts: string[] = [];
   if (folders) parts.push(countPhrase(folders, 'folder'));
   if (documents) parts.push(countPhrase(documents, 'commission'));
   if (invoices) parts.push(countPhrase(invoices, 'invoice'));
   if (pictures) parts.push(countPhrase(pictures, 'picture'));
-  const inside = records - entries;
+  const inside = records - entries - updates;
   if (inside > 0) parts.push(`${countPhrase(inside)} filed inside`);
+  // Named, because nobody put these in the Trash themselves: they follow the
+  // commission they belong to, and this is the only warning they get.
+  if (updates) parts.push(`${countPhrase(updates, 'client update')} belonging to them`);
   return `${parts.join(', ')}. This cannot be undone.`;
+}
+
+/** The same honesty for one row: what goes with it, named and counted. */
+function describeEntry(entry: TrashEntry, updates: AttachedRecord[]): string {
+  const targets = deletionTargets(entry);
+  const going = attachedIds(targets, updates).length;
+  const parts: string[] = [];
+  if (entry.contains.length > 0) {
+    parts.push(
+      `This folder and the ${countPhrase(entry.contains.length)} inside it — ${countPhrase(
+        targets.length,
+        'record',
+      )}`,
+    );
+  }
+  if (going > 0) parts.push(`${countPhrase(going, 'client update')} belonging to it`);
+  if (parts.length === 0) return 'This cannot be undone.';
+  return `${parts.join(', and ')} — gone for good. This cannot be undone.`;
 }

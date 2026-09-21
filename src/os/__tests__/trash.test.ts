@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  attachedIds,
   countPhrase,
   deletionTargets,
   describeWhen,
@@ -127,5 +128,36 @@ describe('orphanImageIds', () => {
 
   it('keeps nothing when nothing was removed', () => {
     expect(orphanImageIds([], ['img-1'])).toEqual([]);
+  });
+});
+
+describe('attachedIds', () => {
+  const updates = [
+    { id: 'u1', documentId: 'doc-1' },
+    { id: 'u2', documentId: 'doc-1' },
+    { id: 'u3', documentId: 'doc-2' },
+  ];
+
+  it('takes the updates of a commission that is going', () => {
+    expect(attachedIds(['doc-1'], updates)).toEqual(['u1', 'u2']);
+  });
+
+  it('takes the updates of a commission filed inside a folder', () => {
+    const targets = deletionTargets(entry({ id: 'f', kind: 'project', contains: ['doc-2'] }));
+    expect(attachedIds(targets, updates)).toEqual(['u3']);
+  });
+
+  it('leaves every other commission\u2019s updates alone', () => {
+    expect(attachedIds(['doc-9'], updates)).toEqual([]);
+  });
+
+  it('counts them in the total the confirmation quotes', () => {
+    const summary = summarise([entry({ id: 'doc-1' })], updates);
+    expect(summary.updates).toBe(2);
+    expect(summary.records).toBe(3); // the commission and its two updates
+  });
+
+  it('still counts nothing when no updates are passed', () => {
+    expect(summarise([entry({ id: 'doc-1' })]).records).toBe(1);
   });
 });

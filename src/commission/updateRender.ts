@@ -147,11 +147,23 @@ export function drawUpdateCard(
  * One self-contained page. Pictures are inlined, so it opens from a download
  * folder years later with no app and no network.
  */
+/**
+ * How the page is going to be looked at. On paper a mailto button is a dead
+ * control — nothing happens when it is pressed — so the printed page asks for
+ * a reply in words and prints the address instead of hiding it behind a link.
+ */
+export interface RenderOptions {
+  /** Styled for print, and handed straight to the print dialog by the caller. */
+  forPrint?: boolean;
+}
+
 export function renderUpdateHtml(
   update: ClientUpdate,
   context: CardContext,
   pictures: CardPicture[],
+  options: RenderOptions = {},
 ): string {
+  const forPrint = options.forPrint === true;
   const subject = [context.title, update.headline].filter(Boolean).join(' — ');
   const to = context.studioEmail ?? '';
   const reply = (outcome: string) =>
@@ -195,6 +207,12 @@ export function renderUpdateHtml(
   .btn { display: inline-block; padding: 11px 18px; margin: 0 8px 8px 0; border-radius: 9px; background: #241f19; color: #faf7f1; text-decoration: none; font-size: 15px; }
   .btn.quiet { background: transparent; color: #241f19; border: 1px solid #c9c1b3; }
   footer { margin-top: 34px; padding-top: 14px; border-top: 1px solid #e2dbcd; font-size: 12.5px; color: #6b6459; }
+  @page { margin: 14mm; }
+  @media print {
+    body { padding: 0; background: #fff; }
+    figure, .ask { break-inside: avoid; page-break-inside: avoid; }
+    img { max-height: 170mm; object-fit: contain; }
+  }
 </style>
 </head>
 <body>
@@ -217,12 +235,14 @@ export function renderUpdateHtml(
       // A button with no address behind it opens a blank email, which is
       // worse than no button. With no studio address the page asks for a
       // reply in words instead.
-      to
+      to && !forPrint
         ? `<a class="btn" href="${escapeHtml(reply('Approved'))}">Approve</a>
     <a class="btn quiet" href="${escapeHtml(reply('Changes please'))}">Ask for a change</a>`
-        : `<p class="sub">Just reply however you normally reach ${escapeHtml(
-            context.studioName ?? 'the studio',
-          )} — a yes is enough.</p>`
+        : to
+          ? `<p class="sub">Reply to ${escapeHtml(to)} — a yes is enough.</p>`
+          : `<p class="sub">Just reply however you normally reach ${escapeHtml(
+              context.studioName ?? 'the studio',
+            )} — a yes is enough.</p>`
     }
   </div>`
       : ''
@@ -234,7 +254,7 @@ export function renderUpdateHtml(
         : ''
     }
     ${
-      to
+      to && !forPrint
         ? 'These buttons open your own email so you can reply — this page cannot send anything by itself, and nobody is told whether you opened it.'
         : 'This page cannot send anything by itself, and nobody is told whether you opened it.'
     }
