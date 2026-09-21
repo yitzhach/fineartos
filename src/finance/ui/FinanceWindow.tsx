@@ -52,6 +52,9 @@ interface Props {
   /** Opens the record a row stands for, in its own window. */
   onOpenInvoice: (id: string) => void;
   onOpenDocument: (id: string) => void;
+  /** The books as a file that reads back in — the CSV is one-way. */
+  onExportBooks: () => void;
+  onImportBooks: (file: File) => void;
   onMessage: (text: string) => void;
 }
 
@@ -739,6 +742,29 @@ export function FinanceWindow(props: Props) {
             </button>
             <span className="hint">
               The CSV opens in Google Sheets or Excel, and imports into QuickBooks.
+            </span>
+          </div>
+          <div className="chip-row">
+            <button className="btn" data-variant="quiet" onClick={() => props.onExportBooks()}>
+              Save the books as a file
+            </button>
+            <label className="btn" data-variant="quiet">
+              Read a books file back in
+              <input
+                type="file"
+                accept="application/json,.json"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) props.onImportBooks(file);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+            <span className="hint">
+              This one comes back: every row exactly as you wrote it, for moving the books to
+              another device. Receipt photographs stay here, and a row already in the books is
+              left alone rather than added twice.
             </span>
           </div>
         </div>

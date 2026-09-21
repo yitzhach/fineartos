@@ -96,6 +96,25 @@ export function headlineFor(milestone: Milestone | null): string {
   return milestone ? milestone.label : '';
 }
 
+/**
+ * The update a finished stage suggests — offered when a stage is ticked off,
+ * never written by itself. It fills in the stage and its name and stops
+ * there: what to say, which pictures go with it, and whether to ask for a
+ * sign-off are all the artist's, and asking for one is never assumed.
+ */
+export function draftForMilestone(milestone: Milestone): UpdateDraft {
+  return { ...emptyDraft(), milestoneId: milestone.id, headline: headlineFor(milestone) };
+}
+
+/**
+ * Whether the client has already been told about a stage. A second offer on
+ * a stage that was ticked, unticked and ticked again would have the artist
+ * telling them twice.
+ */
+export function toldAbout(updates: ClientUpdate[], milestoneId: string): ClientUpdate | null {
+  return updates.find((update) => update.milestoneId === milestoneId) ?? null;
+}
+
 export function createUpdate(
   documentId: string,
   draft: UpdateDraft,

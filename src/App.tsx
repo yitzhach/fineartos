@@ -138,6 +138,7 @@ import {
   awaitingReply,
   recordHandoff,
   messageFor,
+  toldAbout,
   updatesFor,
   type ClientUpdate,
   type HandoffChannel,
@@ -165,7 +166,13 @@ import {
   type UndoStack,
 } from './os/undo';
 import { describeSaveState, drainQueue, unavailableCloud } from './persistence/sync';
-import { exportDocument, importDocumentFromText } from './persistence/portable';
+import {
+  exportDocument,
+  exportExpenses,
+  importDocumentFromText,
+  importExpensesFromText,
+  newExpenses,
+} from './persistence/portable';
 import {
   BUNDLED_WALLPAPERS,
   loadPaymentInstructions,
@@ -319,6 +326,8 @@ export default function App() {
    */
   const desktopViewportRef = useRef(viewport);
   const [projectTabs, setProjectTabs] = useState<Record<string, ProjectTab>>({});
+  /** A stage just ticked off, offered to the Client tab as a started update. */
+  const [updateSeed, setUpdateSeed] = useState<{ docId: string; milestoneId: string } | null>(null);
   const [invoicePreview, setInvoicePreview] = useState<Record<string, boolean>>({});
 
   const [search, setSearch] = useState('');
@@ -818,35 +827,89 @@ export default function App() {
 
   // --- Portable files -----------------------------------------------------
 
-  const handleExport = (doc: CommissionDocument) => {
-    const envelope = exportDocument(doc);
-    const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
+  const downloadJson = (value: unknown, filename: string) => {
+    const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `${doc.documentNumber}.json`;
+    anchor.download = filename;
     anchor.click();
     URL.revokeObjectURL(url);
-    setMessage('Exported as JSON. Images are not in the file; they stay on this device.');
+  };
+
+  const handleExport = (doc: CommissionDocument) => {
+    const carried = allUpdates.filter((update) => update.documentId === doc.id);
+    downloadJson(exportDocument(doc, carried), `${doc.documentNumber}.json`);
+    setMessage(
+      carried.length > 0
+        ? `Exported as JSON, with ${carried.length === 1 ? '1 client update' : `${carried.length} client updates`}. Images are not in the file; they stay on this device.`
+        : 'Exported as JSON. Images are not in the file; they stay on this device.',
+    );
   };
 
   const handleImport = async (file: File) => {
-    const result = importDocumentFromText(await file.text(), []);
+    const result = importDocumentFromText(
+      await file.text(),
+      Object.keys(imageUrls),
+      photos.map((photo) => photo.id),
+    );
     if (!result.ok) {
       setMessage(`Import refused: ${result.errors.join(' ')}`);
       return;
     }
     await save(result.document);
+    for (const update of result.updates) await repo.saveUpdate(update);
+    await refresh();
     open(
       { type: 'commission', docId: result.document.id },
       'Commission Studio',
       result.document.documentNumber,
     );
-    setMessage(
+    // Every gap is named. An import that looked whole and was not would be
+    // discovered months later, in front of the client.
+    const gaps = [
+      result.updates.length > 0
+        ? `${result.updates.length === 1 ? '1 client update' : `${result.updates.length} client updates`} came with it`
+        : null,
       result.missingImageIds.length > 0
-        ? `Imported. ${result.missingImageIds.length} referenced image(s) are not on this device.`
-        : 'Imported.',
+        ? `${result.missingImageIds.length} referenced image(s) are not on this device`
+        : null,
+      result.missingPhotoIds.length > 0
+        ? `${result.missingPhotoIds.length} picture(s) an update refers to are not here`
+        : null,
+    ].filter(Boolean);
+    setMessage(gaps.length > 0 ? `Imported. ${gaps.join('. ')}.` : 'Imported.');
+  };
+
+  // --- The books, as a file ------------------------------------------------
+
+  const handleExportExpenses = () => {
+    downloadJson(exportExpenses(expenses), `books-${new Date().toISOString().slice(0, 10)}.json`);
+    setMessage(
+      expenses.length === 0
+        ? 'Exported. There is nothing in the books yet, and the file says so.'
+        : 'Books exported. Receipt photographs are not in the file; they stay on this device.',
     );
+  };
+
+  const handleImportExpenses = async (file: File) => {
+    const result = importExpensesFromText(await file.text(), Object.keys(imageUrls));
+    if (!result.ok) {
+      setMessage(`Import refused: ${result.errors.join(' ')}`);
+      return;
+    }
+    const incoming = newExpenses(result.expenses, expenses);
+    for (const expense of incoming) await repo.saveExpense(expense);
+    await refresh();
+    const already = result.expenses.length - incoming.length;
+    const parts = [
+      `${incoming.length === 1 ? '1 row' : `${incoming.length} rows`} added`,
+      already > 0 ? `${already} already here and left alone` : null,
+      result.missingImageIds.length > 0
+        ? `${result.missingImageIds.length} receipt photograph(s) are not on this device`
+        : null,
+    ].filter(Boolean);
+    setMessage(`${parts.join('. ')}.`);
   };
 
   /**
@@ -1929,6 +1992,8 @@ export default function App() {
           }}
           onOpenInvoice={openInvoiceWindow}
           onOpenDocument={openDocumentWindow}
+          onExportBooks={handleExportExpenses}
+          onImportBooks={(file) => void handleImportExpenses(file)}
           onMessage={setMessage}
         />
       );
@@ -2011,6 +2076,13 @@ export default function App() {
           onNewInvoice={() => void makeInvoice(doc, null)}
           onOpenInvoice={openInvoiceWindow}
           onRemoveDemo={doc.isDemo ? () => void handleRemoveDemo(doc.id) : undefined}
+          toldAboutMilestoneIds={milestonesOf(doc)
+            .filter((stage) => toldAbout(updatesFor(clientUpdates, doc.id), stage.id))
+            .map((stage) => stage.id)}
+          onTellClient={(milestoneId) => {
+            setProjectTabs((s) => ({ ...s, [doc.id]: 'updates' }));
+            setUpdateSeed({ docId: doc.id, milestoneId });
+          }}
           editorSlot={
             <Editor
               doc={doc}
@@ -2036,6 +2108,8 @@ export default function App() {
               onSave={(update) => void saveClientUpdate(update)}
               onDelete={(id) => void deleteClientUpdate(id)}
               onHandoff={(update, channel) => handOverUpdate(doc, update, channel)}
+              seedMilestoneId={updateSeed?.docId === doc.id ? updateSeed.milestoneId : null}
+              onSeedUsed={() => setUpdateSeed(null)}
               onMessage={setMessage}
             />
           }
@@ -2280,6 +2354,8 @@ export default function App() {
           }}
           onOpenInvoice={openInvoiceWindow}
           onOpenDocument={openDocumentWindow}
+          onExportBooks={handleExportExpenses}
+          onImportBooks={(file) => void handleImportExpenses(file)}
           onMessage={setMessage}
         />
       );

@@ -41,6 +41,10 @@ interface Props {
   documentSlot: ReactNode;
   /** Client updates and the timeline, rendered in the Updates tab. */
   updatesSlot: ReactNode;
+  /** Stages the client has already been told about, so nobody is told twice. */
+  toldAboutMilestoneIds: string[];
+  /** Opens the Client tab with an update about this stage already started. */
+  onTellClient: (milestoneId: string) => void;
   /** How many updates asked for a sign-off and have no reply recorded. */
   updatesWaiting: number;
 }
@@ -76,6 +80,8 @@ export function ProjectWindow(props: Props) {
   const progress = milestoneProgress(doc);
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  /** The stage just ticked off, while its offer to tell the client is up. */
+  const [offering, setOffering] = useState<string | null>(null);
   const shownImage = selectedImage && images.includes(selectedImage) ? selectedImage : images[0] ?? null;
 
   const tabs: { id: ProjectTab; label: string; count?: number }[] = [
@@ -197,8 +203,36 @@ export function ProjectWindow(props: Props) {
             ) : (
               <MilestoneList
                 milestones={milestonesOf(doc)}
-                onToggle={(id) => props.onDocChange(toggle(doc, id))}
+                onToggle={(id) => {
+                  props.onDocChange(toggle(doc, id));
+                  // Only on the way to done, and only once: an offer is the
+                  // whole of it. Nothing is written or sent by ticking a box.
+                  const stage = milestonesOf(doc).find((one) => one.id === id);
+                  const fresh = stage && !stage.done && !props.toldAboutMilestoneIds.includes(id);
+                  setOffering(fresh ? id : null);
+                }}
               />
+            )}
+            {offering && (
+              <div className="ms-offer">
+                <span>
+                  {milestonesOf(doc).find((one) => one.id === offering)?.label} is done. Tell the
+                  client?
+                </span>
+                <button
+                  className="btn"
+                  data-variant="primary"
+                  onClick={() => {
+                    props.onTellClient(offering);
+                    setOffering(null);
+                  }}
+                >
+                  Write an update
+                </button>
+                <button className="btn" data-variant="quiet" onClick={() => setOffering(null)}>
+                  Not now
+                </button>
+              </div>
             )}
           </section>
 

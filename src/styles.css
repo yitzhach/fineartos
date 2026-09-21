@@ -1021,6 +1021,22 @@ body {
 .milestones.editable input[type='text'] { flex: 1 1 auto; }
 .milestones.editable input[type='date'] { flex: 0 0 150px; }
 
+/* The offer to tell the client, after a stage is ticked off. An offer, never
+   an action: nothing is written or handed over until the artist says so. */
+.ms-offer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  font-size: 13px;
+}
+.ms-offer > span { flex: 1 1 200px; }
+
 .ms-add { display: flex; gap: 9px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
 .ms-add input[type='text'] { flex: 1 1 200px; }
 .ms-add input[type='date'] { flex: 0 0 150px; }

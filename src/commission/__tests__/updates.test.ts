@@ -6,10 +6,12 @@ import {
   describeApproval,
   describeChannel,
   describePictures,
+  draftForMilestone,
   draftProblem,
   emptyDraft,
   headlineFor,
   lastHandoffAt,
+  toldAbout,
   messageFor,
   recordApproval,
   recordHandoff,
@@ -184,5 +186,32 @@ describe('housekeeping', () => {
     expect(describePictures(0)).toBe('No pictures');
     expect(describePictures(1)).toBe('1 picture');
     expect(describePictures(4)).toBe('4 pictures');
+  });
+});
+
+describe('an update offered by a finished stage', () => {
+  const stage = { id: 'm1', label: 'Underpainting', date: '2026-03-04', done: true };
+
+  it('fills in the stage and its name, and nothing else', () => {
+    const draft = draftForMilestone(stage);
+    expect(draft.milestoneId).toBe('m1');
+    expect(draft.headline).toBe('Underpainting');
+    expect(draft.note).toBe('');
+    expect(draft.photoIds).toEqual([]);
+  });
+
+  it('never assumes a sign-off is being asked for', () => {
+    expect(draftForMilestone(stage).asksApproval).toBe(false);
+  });
+
+  it('is a saveable draft as it stands', () => {
+    expect(draftProblem(draftForMilestone(stage))).toBeNull();
+  });
+
+  it('knows when the client has already been told about a stage', () => {
+    const told = createUpdate('doc-1', { ...draftForMilestone(stage) });
+    expect(toldAbout([told], 'm1')?.headline).toBe('Underpainting');
+    expect(toldAbout([told], 'm2')).toBeNull();
+    expect(toldAbout([], 'm1')).toBeNull();
   });
 });

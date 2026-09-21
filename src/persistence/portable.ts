@@ -11,9 +11,17 @@
  */
 
 import type { CommissionDocument, LineItem } from '../commission/types';
+import type { ClientUpdate } from '../commission/updates';
+import { CATEGORIES, type Expense } from '../finance/ledger';
 
 export const EXPORT_SCHEMA = 'artist-os/commission-document';
-export const EXPORT_VERSION = 1;
+export const EXPORT_VERSION = 2;
+/**
+ * Version 1 files had no client updates. They are still read: a file that was
+ * good enough to write is good enough to read back, and refusing one would
+ * strand work the artist already exported.
+ */
+export const READABLE_VERSIONS = [1, 2];
 
 export interface ExportEnvelope {
   schema: string;
@@ -23,9 +31,18 @@ export interface ExportEnvelope {
   imagesIncluded: false;
   referencedImageIds: string[];
   document: CommissionDocument;
+  /**
+   * What the artist told this client. They are the commission's own records
+   * and mean nothing apart from it, so they travel with it.
+   */
+  updates: ClientUpdate[];
 }
 
-export function exportDocument(doc: CommissionDocument, now = new Date()): ExportEnvelope {
+export function exportDocument(
+  doc: CommissionDocument,
+  updates: ClientUpdate[] = [],
+  now = new Date(),
+): ExportEnvelope {
   const referenced = [...doc.artwork.referenceImageIds];
   if (doc.studio.logoImageId) referenced.push(doc.studio.logoImageId);
   return {
@@ -35,11 +52,22 @@ export function exportDocument(doc: CommissionDocument, now = new Date()): Expor
     imagesIncluded: false,
     referencedImageIds: referenced,
     document: structuredClone(doc),
+    updates: structuredClone(updates.filter((update) => update.documentId === doc.id)),
   };
 }
 
 export type ImportResult =
-  | { ok: true; document: CommissionDocument; missingImageIds: string[] }
+  | {
+      ok: true;
+      document: CommissionDocument;
+      updates: ClientUpdate[];
+      missingImageIds: string[];
+      /**
+       * Pictures an imported update refers to that are not on this device.
+       * Photographs are records of their own and never travel in this file.
+       */
+      missingPhotoIds: string[];
+    }
   | { ok: false; errors: string[] };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -60,19 +88,50 @@ function checkLineItem(value: unknown, index: number, errors: string[]): void {
   }
 }
 
+function checkUpdate(value: unknown, index: number, documentId: string, errors: string[]): void {
+  if (!isObject(value)) {
+    errors.push(`updates[${index}] is not an object.`);
+    return;
+  }
+  if (typeof value.id !== 'string' || value.id === '') errors.push(`updates[${index}].id is missing.`);
+  if (value.documentId !== documentId) {
+    errors.push(`updates[${index}] belongs to another commission.`);
+  }
+  if (typeof value.headline !== 'string') errors.push(`updates[${index}].headline must be a string.`);
+  if (!Array.isArray(value.photoIds)) errors.push(`updates[${index}].photoIds must be a list.`);
+  if (!Array.isArray(value.handoffs)) errors.push(`updates[${index}].handoffs must be a list.`);
+  if (typeof value.asksApproval !== 'boolean') {
+    errors.push(`updates[${index}].asksApproval must be true or false.`);
+  }
+  // An approval is something that happened or is nothing at all. A half-read
+  // one would be the app inventing a reply the client never gave.
+  if (value.approval !== null && !isObject(value.approval)) {
+    errors.push(`updates[${index}].approval must be a recorded reply or null.`);
+  }
+}
+
 /**
  * Validates and accepts a parsed export file. Returns every problem found,
  * rather than the first, so a bad file can be fixed in one pass.
  */
-export function importDocument(raw: unknown, availableImageIds: string[] = []): ImportResult {
+export function importDocument(
+  raw: unknown,
+  availableImageIds: string[] = [],
+  availablePhotoIds: string[] = [],
+): ImportResult {
   const errors: string[] = [];
 
   if (!isObject(raw)) return { ok: false, errors: ['File is not a JSON object.'] };
   if (raw.schema !== EXPORT_SCHEMA) {
     return { ok: false, errors: [`Unrecognised file. Expected schema "${EXPORT_SCHEMA}".`] };
   }
-  if (raw.version !== EXPORT_VERSION) {
-    return { ok: false, errors: [`Unsupported export version ${String(raw.version)}. This app reads version ${EXPORT_VERSION}.`] };
+  if (!READABLE_VERSIONS.includes(Number(raw.version))) {
+    return {
+      ok: false,
+      errors: [
+        `Unsupported export version ${String(raw.version)}. This app reads ${READABLE_VERSIONS.join(' and ')}.`,
+      ],
+    };
   }
   if (!isObject(raw.document)) return { ok: false, errors: ['File contains no document.'] };
 
@@ -116,30 +175,170 @@ export function importDocument(raw: unknown, availableImageIds: string[] = []): 
   }
   if (!Array.isArray(doc.issuedSnapshots)) errors.push('document.issuedSnapshots must be a list.');
 
+  // Absent is fine — a version 1 file has none. Present and wrong is not.
+  const rawUpdates = raw.updates === undefined ? [] : raw.updates;
+  if (!Array.isArray(rawUpdates)) {
+    errors.push('updates must be a list.');
+  } else if (typeof doc.id === 'string') {
+    rawUpdates.forEach((update, i) => checkUpdate(update, i, doc.id as string, errors));
+  }
+
   if (errors.length > 0) return { ok: false, errors };
 
   const imported = doc as unknown as CommissionDocument;
   const referenced = [...imported.artwork.referenceImageIds];
   if (imported.studio.logoImageId) referenced.push(imported.studio.logoImageId);
 
+  const updates = structuredClone(rawUpdates as unknown as ClientUpdate[]);
+  const wantedPhotos = [...new Set(updates.flatMap((update) => update.photoIds))];
+
   return {
     ok: true,
     document: structuredClone(imported),
+    updates,
     missingImageIds: referenced.filter((id) => !availableImageIds.includes(id)),
+    missingPhotoIds: wantedPhotos.filter((id) => !availablePhotoIds.includes(id)),
   };
 }
 
 /** Convenience for the file input: parse then validate, never throwing. */
-export function importDocumentFromText(text: string, availableImageIds: string[] = []): ImportResult {
+export function importDocumentFromText(
+  text: string,
+  availableImageIds: string[] = [],
+  availablePhotoIds: string[] = [],
+): ImportResult {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch {
     return { ok: false, errors: ['File is not valid JSON.'] };
   }
-  return importDocument(parsed, availableImageIds);
+  return importDocument(parsed, availableImageIds, availablePhotoIds);
 }
 
 export function lineItemsTotalCount(items: LineItem[]): number {
   return items.length;
+}
+
+
+// --- The books ------------------------------------------------------------
+
+export const EXPENSES_SCHEMA = 'artist-os/expenses';
+export const EXPENSES_VERSION = 1;
+
+/**
+ * The books as a file that can be read back in.
+ *
+ * The CSV on the same screen is for the accountant and is a one-way door: it
+ * rounds, it flattens and nothing imports it back. This is the other half —
+ * the rows exactly as they were written, so a year's books can move to
+ * another device without being retyped.
+ *
+ * Receipt photographs are not in it, for the same reason the commission file
+ * carries no images: a year of receipts is tens of megabytes. The file lists
+ * the ids it expects, and the import says which ones are not on this device.
+ */
+export interface ExpensesEnvelope {
+  schema: string;
+  version: number;
+  exportedAt: string;
+  imagesIncluded: false;
+  referencedImageIds: string[];
+  expenses: Expense[];
+}
+
+export function exportExpenses(expenses: Expense[], now = new Date()): ExpensesEnvelope {
+  return {
+    schema: EXPENSES_SCHEMA,
+    version: EXPENSES_VERSION,
+    exportedAt: now.toISOString(),
+    imagesIncluded: false,
+    referencedImageIds: [...new Set(expenses.flatMap((expense) => expense.receiptImageIds))],
+    expenses: structuredClone(expenses),
+  };
+}
+
+export type ExpensesImportResult =
+  | { ok: true; expenses: Expense[]; missingImageIds: string[] }
+  | { ok: false; errors: string[] };
+
+const CATEGORY_IDS = CATEGORIES.map((category) => category.id as string);
+
+function checkExpense(value: unknown, index: number, errors: string[]): void {
+  if (!isObject(value)) {
+    errors.push(`expenses[${index}] is not an object.`);
+    return;
+  }
+  if (typeof value.id !== 'string' || value.id === '') errors.push(`expenses[${index}].id is missing.`);
+  if (typeof value.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.date)) {
+    errors.push(`expenses[${index}].date must be yyyy-mm-dd.`);
+  }
+  if (!CATEGORY_IDS.includes(String(value.category))) {
+    errors.push(`expenses[${index}].category is not one this app knows.`);
+  }
+  if (typeof value.what !== 'string') errors.push(`expenses[${index}].what must be a string.`);
+  // Null is the whole point: an amount nobody recorded is not zero, and an
+  // import that quietly made it zero would put a wrong number in the books.
+  if (value.amount !== null && !Number.isInteger(value.amount)) {
+    errors.push(`expenses[${index}].amount must be null or a whole number of cents.`);
+  }
+  if (value.miles !== null && (typeof value.miles !== 'number' || !Number.isFinite(value.miles))) {
+    errors.push(`expenses[${index}].miles must be null or a number.`);
+  }
+  if (value.ratePerMile !== null && !Number.isInteger(value.ratePerMile)) {
+    errors.push(`expenses[${index}].ratePerMile must be null or a whole number of cents.`);
+  }
+  if (!Array.isArray(value.receiptImageIds)) {
+    errors.push(`expenses[${index}].receiptImageIds must be a list.`);
+  }
+}
+
+export function importExpenses(raw: unknown, availableImageIds: string[] = []): ExpensesImportResult {
+  if (!isObject(raw)) return { ok: false, errors: ['File is not a JSON object.'] };
+  if (raw.schema !== EXPENSES_SCHEMA) {
+    return { ok: false, errors: [`Unrecognised file. Expected schema "${EXPENSES_SCHEMA}".`] };
+  }
+  if (Number(raw.version) !== EXPENSES_VERSION) {
+    return {
+      ok: false,
+      errors: [
+        `Unsupported export version ${String(raw.version)}. This app reads version ${EXPENSES_VERSION}.`,
+      ],
+    };
+  }
+  if (!Array.isArray(raw.expenses)) return { ok: false, errors: ['File contains no rows.'] };
+
+  const errors: string[] = [];
+  raw.expenses.forEach((expense, i) => checkExpense(expense, i, errors));
+  if (errors.length > 0) return { ok: false, errors };
+
+  const expenses = structuredClone(raw.expenses as unknown as Expense[]);
+  const wanted = [...new Set(expenses.flatMap((expense) => expense.receiptImageIds))];
+  return {
+    ok: true,
+    expenses,
+    missingImageIds: wanted.filter((id) => !availableImageIds.includes(id)),
+  };
+}
+
+export function importExpensesFromText(
+  text: string,
+  availableImageIds: string[] = [],
+): ExpensesImportResult {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { ok: false, errors: ['File is not valid JSON.'] };
+  }
+  return importExpenses(parsed, availableImageIds);
+}
+
+/**
+ * Rows already in the studio. An import never writes over a row that is
+ * already there: the same file read twice must not double the books.
+ */
+export function newExpenses(incoming: Expense[], existing: Expense[]): Expense[] {
+  const here = new Set(existing.map((expense) => expense.id));
+  return incoming.filter((expense) => !here.has(expense.id));
 }

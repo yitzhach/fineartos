@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SignaturePad } from '../../connect/ui/SignaturePad';
 import type { Photo } from '../../photo/photo';
 import { describePrice, describeSize } from '../../photo/photo';
@@ -10,6 +10,7 @@ import {
   describeApproval,
   describeChannel,
   describePictures,
+  draftForMilestone,
   draftProblem,
   emptyDraft,
   headlineFor,
@@ -35,6 +36,12 @@ interface Props {
   onDelete: (id: string) => void;
   /** Renders and hands over a file; the pane records what happened. */
   onHandoff: (update: ClientUpdate, channel: HandoffChannel) => Promise<void> | void;
+  /**
+   * A stage ticked off on the Overview, offered as a started update. It fills
+   * the form in and nothing more — saving it is still the artist's click.
+   */
+  seedMilestoneId: string | null;
+  onSeedUsed: () => void;
   onMessage: (text: string) => void;
 }
 
@@ -62,6 +69,19 @@ export function UpdatesPane(props: Props) {
   const { doc, photos, imageUrls } = props;
   const [draft, setDraft] = useState<UpdateDraft>(emptyDraft);
   const [replyTo, setReplyTo] = useState<string | null>(null);
+
+  // The offer from the Overview arrives as a prop. It fills an empty form in
+  // and never writes over words already typed.
+  const seed = props.seedMilestoneId;
+  const onSeedUsed = props.onSeedUsed;
+  useEffect(() => {
+    if (!seed) return;
+    const stage = milestonesOf(doc).find((one) => one.id === seed);
+    setDraft((current) => (draftProblem(current) === null || !stage ? current : draftForMilestone(stage)));
+    onSeedUsed();
+    // Only when a new stage is offered: the draft changes on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed]);
 
   const updates = updatesFor(props.updates, doc.id);
   const milestones = milestonesOf(doc);
