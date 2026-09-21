@@ -16,13 +16,12 @@
 
 - **PDF hand-off** on a client update: the self-contained page rendered into
   a hidden iframe and handed to the browser's own print dialog.
-- **Emptying the Trash** now destroys a commission's client updates with it;
-  they used to be left behind as orphans. The confirmation counts and names
-  them.
-- **Export is version 2** and carries the commission's client updates. Version
-  1 files still read, with none.
+- **Emptying the Trash** destroys a commission's client updates with it; they
+  were left behind as orphans. The confirmation counts and names them.
+- **Export is version 2**, carrying the commission's client updates; version
+  1 files still read.
 - **The books save as a file** that reads back in (Finance → Profit and loss,
-  beside the CSV). Same file twice does not double the rows.
+  beside the CSV); the same file twice does not double the rows.
 - **Ticking a stage off offers to tell the client** — starts an update about
   that stage, writes and sends nothing.
 
@@ -31,8 +30,8 @@
 - Printing hands off to the browser; no PDF is written here. On paper the
   mailto buttons are dead controls, so the printed page prints the address
   and asks in words. Hidden iframe, not a new tab: a blocker eats the tab.
-- Updates belong to their commission — they travel in its export file and die
-  with it. Photographs never travel in either file; both name what is missing.
+- Updates belong to their commission: they travel in its export file and die
+  with it. Photographs travel in neither file; both name what is missing.
 - The books file is the two-way door; the CSV stays the accountant's one-way
   one. An amount nobody recorded stays null through a round trip.
 - A stage offers once, and never for a stage already told about.
