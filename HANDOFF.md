@@ -49,10 +49,9 @@
 
 1. Client status on a commission's Overview tab — last update, anything
    unanswered — so the Client tab need not be opened.
-2. Shows, the 4th tool. Scope to settle first: name, venue, dates, booth fee,
-   deadline, status, which pieces went, guest entries collected. Artwork owns
-   the piece and where it is; Shows owns the event; Finance reads both. Other
-   orders collide.
+2. Shows, the 4th tool. Settle scope first: name, venue, dates, booth fee,
+   deadline, status, pieces taken, guest entries. Artwork owns the piece and
+   where it is; Shows owns the event; Finance reads both.
 3. Visualizer. No design yet.
 4. Sign-in gates everything else: cloud saving, guest book online, real email,
    Square, a client page that can receive an approval. See `FUTURE_BUILD.md`.
@@ -70,13 +69,12 @@
 
 ## Verify (tested / NOT tested)
 
-- **Tested**: 541 unit tests (26 new). Chromium at 1440px and 390px against an
-  existing database with a second tab open: the PDF hand-off is recorded and
-  the print frame cleaned up; emptying the Trash asks "3 records" naming the
-  client update and leaves none behind, second tab agrees; the export file is
-  version 2 and carries the update; the books file imports once and adds
-  nothing the second time; the stage offer fills the headline, saves nothing
-  by itself, and does not offer twice. No console errors, no overflow.
+- **Tested**: 541 unit tests (26 new). Chromium at 1440px and 390px, existing
+  database, second tab open: PDF hand-off recorded and the frame cleaned up;
+  emptying asks "3 records" naming the update and leaves none, second tab
+  agrees; the export carries the update; the books file adds nothing the
+  second time; the stage offer fills the headline, saves nothing, offers once.
+  No console errors, no overflow.
 - **NOT tested**: what the print dialog actually produces — headless Chromium
   treats `window.print()` as a no-op, so the paper layout is unseen. Light
   mode and tablet width. iOS Safari printing. Nothing tested on the deployed
