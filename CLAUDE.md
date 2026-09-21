@@ -145,6 +145,9 @@ These came from real mistakes. Breaking them has broken the app before.
 
 ## How to report back
 
-Short, plain, beginner-legible. Lead with what now works in one sentence. Say
-what broke or was skipped — never hide it to stay short. Under ~150 words.
-Detail belongs in the commit message and the docs, not the chat reply.
+- When reporting information to me, be extremely concise and sacrifice
+  grammar for the sake of concision.
+
+Plain and beginner-legible. Lead with what now works, in one sentence. Say
+what broke or was skipped — never hide it to stay short. Detail belongs in the
+commit message and the docs, not the chat reply.
