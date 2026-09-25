@@ -6,7 +6,7 @@
 
 ## Now
 
-- Tree green. 554 tests pass. IndexedDB now v6 (adds `shows`).
+- Tree green. 557 tests pass. IndexedDB now v6 (adds `shows`).
 - Nothing half-finished.
 - Dock built: New, Home, Projects, Invoices, Finder, Connect, Artwork,
   Shows, Finance, Trash. Placeholder: Visualizer.
@@ -16,6 +16,9 @@
   picks show from list (old typed names still pickable); taking a piece sets
   Artwork location "At a show", taking off restores prior; booth fee → books
   row `show-fee:<id>` (Show fees) only when Accepted/Done, null stays null.
+- Shows go to the Trash (fee row + pieces untouched there); emptying deletes
+  fee row, restores pieces, count includes the fee row. Shows file export/
+  import (`portable.ts`); import re-adds a missing fee row, not locations.
 - Overview Client card via `clientStatus()` (updates.ts). Tested: unit +
   empty state in browser. NOT tested: filled card in browser, 2nd tab.
 - Earlier: PDF hand-off, Trash empties updates, export v2, books file,
@@ -46,8 +49,8 @@
 ## Next (numbered)
 
 1. Visualizer. No design yet — settle scope with the artist first.
-2. Shows follow-ups: shows not in export/backup or Trash (delete is a
-   confirmed hard delete); Home/calendar do not list deadlines yet.
+2. Show deadlines beyond the Shows window: Home is the bare desktop and
+   Calendar a PREVIEW mock, so needs a design call (dashboard? calendar?).
 3. Sign-in gates everything else: cloud saving, guest book online, real email,
    Square, a client page that can receive an approval. See `FUTURE_BUILD.md`.
 
@@ -67,7 +70,9 @@
 - Shows tested (`scripts/check-shows.mjs`): v5→v6 upgrade with 2 old tabs
   open, add/accept/fee/piece, reload keeps it, books row shows, Artwork says
   At a show, phone no overflow, no errors. NOT tested: guest-book picker in
-  browser, delete show, dark mode, look vs other tools.
+  browser, dark mode, look vs other tools.
+- `scripts/check-shows-trash.mjs`: Trash, empty ("2 records"), file
+  round-trip, 2nd tab — all pass. NOT tested: Put back / undo for a show.
 - Earlier batch browser-tested (1440/390, existing DB, 2nd tab). NOT tested:
   real print output (headless no-op), iOS Safari printing, deployed URL.
 

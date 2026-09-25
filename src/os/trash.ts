@@ -10,7 +10,7 @@
  * DOM-free and tested, like the rest of the model layer.
  */
 
-export type TrashKind = 'project' | 'document' | 'invoice' | 'photo';
+export type TrashKind = 'project' | 'document' | 'invoice' | 'photo' | 'show';
 
 export interface TrashEntry {
   id: string;
@@ -70,7 +70,10 @@ export function deletionTargets(entry: TrashEntry): string[] {
  */
 export interface AttachedRecord {
   id: string;
+  /** The record it belongs to: a commission, or a show. */
   documentId: string;
+  /** A client update unless said otherwise; 'fee' is a show's booth-fee row. */
+  kind?: 'update' | 'fee';
 }
 
 /**
@@ -91,6 +94,9 @@ export interface TrashSummary {
   documents: number;
   invoices: number;
   pictures: number;
+  shows: number;
+  /** Booth-fee rows in the books that would go with the shows above. */
+  fees: number;
   /** Client updates that would go with the commissions above. */
   updates: number;
 }
@@ -105,27 +111,33 @@ export function summarise(trash: Trash, attached: AttachedRecord[] = []): TrashS
   let documents = 0;
   let invoices = 0;
   let pictures = 0;
+  let shows = 0;
 
   for (const entry of trash) {
     records += deletionTargets(entry).length;
     if (entry.kind === 'project') folders += 1;
     else if (entry.kind === 'document') documents += 1;
     else if (entry.kind === 'photo') pictures += 1;
+    else if (entry.kind === 'show') shows += 1;
     else invoices += 1;
   }
 
   // The updates go too, so the number the confirmation quotes has to count
   // them: "delete 4 records" that turns out to be seven is the lie rule 2
   // exists to prevent.
-  const updates = attachedIds(trash.flatMap(deletionTargets), attached).length;
+  const going = trash.flatMap(deletionTargets);
+  const updates = attachedIds(going, attached.filter((one) => one.kind !== 'fee')).length;
+  const fees = attachedIds(going, attached.filter((one) => one.kind === 'fee')).length;
 
   return {
     entries: trash.length,
-    records: records + updates,
+    records: records + updates + fees,
     folders,
     documents,
     invoices,
     pictures,
+    shows,
+    fees,
     updates,
   };
 }

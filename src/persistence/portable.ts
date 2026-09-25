@@ -12,6 +12,7 @@
 
 import type { CommissionDocument, LineItem } from '../commission/types';
 import type { ClientUpdate } from '../commission/updates';
+import { SHOW_STATUSES, type Show } from '../shows/shows';
 import { CATEGORIES, type Expense } from '../finance/ledger';
 
 export const EXPORT_SCHEMA = 'artist-os/commission-document';
@@ -341,4 +342,81 @@ export function importExpensesFromText(
 export function newExpenses(incoming: Expense[], existing: Expense[]): Expense[] {
   const here = new Set(existing.map((expense) => expense.id));
   return incoming.filter((expense) => !here.has(expense.id));
+}
+
+// --- Shows ------------------------------------------------------------------
+
+export const SHOWS_SCHEMA = 'artist-os/shows';
+export const SHOWS_VERSION = 1;
+
+/**
+ * Shows as a file that reads back in. The pieces are named by id only — the
+ * pictures themselves are not in it — and booth fees travel in the books
+ * file; an accepted show writes its fee row again on import if it is missing.
+ */
+export interface ShowsEnvelope {
+  schema: string;
+  version: number;
+  exportedAt: string;
+  shows: Show[];
+}
+
+export function exportShows(shows: Show[], now = new Date()): ShowsEnvelope {
+  return { schema: SHOWS_SCHEMA, version: SHOWS_VERSION, exportedAt: now.toISOString(), shows: structuredClone(shows) };
+}
+
+export type ShowsImportResult =
+  | { ok: true; shows: Show[]; missingPieceIds: string[] }
+  | { ok: false; errors: string[] };
+
+const DATE_OR_NULL = (value: unknown) => value === null || (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value));
+const STATUS_IDS = SHOW_STATUSES.map((status) => status.id as string);
+
+function checkShow(value: unknown, index: number, errors: string[]): void {
+  if (!isObject(value)) {
+    errors.push(`shows[${index}] is not an object.`);
+    return;
+  }
+  if (typeof value.id !== 'string' || value.id === '') errors.push(`shows[${index}].id is missing.`);
+  if (typeof value.name !== 'string' || !value.name.trim()) errors.push(`shows[${index}].name is missing.`);
+  for (const key of ['startDate', 'endDate', 'deadline'] as const) {
+    if (!DATE_OR_NULL(value[key])) errors.push(`shows[${index}].${key} must be yyyy-mm-dd or null.`);
+  }
+  if (value.boothFee !== null && !Number.isInteger(value.boothFee)) {
+    errors.push(`shows[${index}].boothFee must be null or a whole number of cents.`);
+  }
+  if (value.status !== null && !STATUS_IDS.includes(String(value.status))) {
+    errors.push(`shows[${index}].status is not one this app knows.`);
+  }
+  if (!Array.isArray(value.pieceIds)) errors.push(`shows[${index}].pieceIds must be a list.`);
+  if (!isObject(value.priorLocations)) errors.push(`shows[${index}].priorLocations must be an object.`);
+}
+
+export function importShowsFromText(text: string, availablePieceIds: string[] = []): ShowsImportResult {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return { ok: false, errors: ['File is not valid JSON.'] };
+  }
+  if (!isObject(raw)) return { ok: false, errors: ['File is not a JSON object.'] };
+  if (raw.schema !== SHOWS_SCHEMA) {
+    return { ok: false, errors: [`Unrecognised file. Expected schema "${SHOWS_SCHEMA}".`] };
+  }
+  if (Number(raw.version) !== SHOWS_VERSION) {
+    return { ok: false, errors: [`Unsupported export version ${String(raw.version)}. This app reads version ${SHOWS_VERSION}.`] };
+  }
+  if (!Array.isArray(raw.shows)) return { ok: false, errors: ['File contains no shows.'] };
+  const errors: string[] = [];
+  raw.shows.forEach((show, i) => checkShow(show, i, errors));
+  if (errors.length > 0) return { ok: false, errors };
+  const shows = structuredClone(raw.shows as unknown as Show[]);
+  const wanted = [...new Set(shows.flatMap((show) => show.pieceIds))];
+  return { ok: true, shows, missingPieceIds: wanted.filter((id) => !availablePieceIds.includes(id)) };
+}
+
+/** Shows not already here. The same file read twice adds nothing. */
+export function newShows(incoming: Show[], existing: Show[]): Show[] {
+  const here = new Set(existing.map((show) => show.id));
+  return incoming.filter((show) => !here.has(show.id));
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatMoney, parseMoney } from '../../commission/calc';
 import type { GuestEntry } from '../../connect/guestbook';
 import type { Photo } from '../../photo/photo';
@@ -25,8 +25,10 @@ interface Props {
   guests: GuestEntry[];
   currency: string;
   onSave: (show: Show) => void;
-  onDelete: (show: Show) => void;
+  onTrash: (show: Show) => void;
   onTogglePiece: (show: Show, photo: Photo) => void;
+  onExport: () => void;
+  onImport: (file: File) => void;
 }
 
 const WHEN_LABEL = { upcoming: 'Upcoming', on: 'On now', past: 'Past', undated: 'No date' } as const;
@@ -36,7 +38,8 @@ const WHEN_LABEL = { upcoming: 'Upcoming', on: 'On now', past: 'Past', undated: 
  * lives on the piece, in Artwork. A booth fee lands in the books once the
  * artist is accepted — the books row is written by the app, not here.
  */
-export function ShowsWindow({ shows, photos, imageUrls, guests, currency, onSave, onDelete, onTogglePiece }: Props) {
+export function ShowsWindow({ shows, photos, imageUrls, guests, currency, onSave, onTrash, onTogglePiece, onExport, onImport }: Props) {
+  const fileRef = useRef<HTMLInputElement>(null);
   const today = localToday();
   const [selectedId, setSelectedId] = useState<string | null>(shows[0]?.id ?? null);
   const [newName, setNewName] = useState('');
@@ -73,6 +76,25 @@ export function ShowsWindow({ shows, photos, imageUrls, guests, currency, onSave
             Add show
           </button>
         </form>
+        <div className="chip-row">
+          <button className="btn" data-variant="quiet" onClick={onExport}>
+            Save shows as a file
+          </button>
+          <button className="btn" data-variant="quiet" onClick={() => fileRef.current?.click()}>
+            Read a shows file
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onImport(file);
+              e.target.value = '';
+            }}
+          />
+        </div>
         <p className="hint">
           Booth fees, accepted and done: {formatMoney(fees.total, currency)}
           {fees.notRecorded > 0 ? ` · ${fees.notRecorded} with no fee recorded, left out` : ''}
@@ -105,8 +127,8 @@ export function ShowsWindow({ shows, photos, imageUrls, guests, currency, onSave
             guests={guestsAt(selected, guests)}
             currency={currency}
             onSave={onSave}
-            onDelete={(show) => {
-              onDelete(show);
+            onTrash={(show) => {
+              onTrash(show);
               setSelectedId(null);
             }}
             onTogglePiece={onTogglePiece}
@@ -126,7 +148,7 @@ function ShowDetail({
   guests,
   currency,
   onSave,
-  onDelete,
+  onTrash,
   onTogglePiece,
 }: {
   show: Show;
@@ -135,7 +157,7 @@ function ShowDetail({
   guests: GuestEntry[];
   currency: string;
   onSave: (show: Show) => void;
-  onDelete: (show: Show) => void;
+  onTrash: (show: Show) => void;
   onTogglePiece: (show: Show, photo: Photo) => void;
 }) {
   // A local copy, so a half-typed date or a backwards range is shown with
@@ -275,22 +297,8 @@ function ShowDetail({
       )}
 
       <div className="sh-foot">
-        <button
-          className="btn"
-          data-variant="quiet"
-          onClick={() => {
-            const pieces = draft.pieceIds.length;
-            if (
-              window.confirm(
-                `Delete "${draft.name}"? This cannot be undone. Its booth fee row leaves the books` +
-                  (pieces ? ` and ${pieces} piece${pieces === 1 ? '' : 's'} go back where they were.` : '.') +
-                  ' Guest book entries stay.',
-              )
-            )
-              onDelete(draft);
-          }}
-        >
-          Delete show
+        <button className="btn" data-variant="quiet" onClick={() => onTrash(draft)}>
+          Move to Trash
         </button>
       </div>
     </section>

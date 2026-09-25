@@ -147,6 +147,7 @@ function kindLabel(kind: TrashEntry['kind']): string {
   if (kind === 'project') return 'Folder';
   if (kind === 'invoice') return 'Invoice';
   if (kind === 'photo') return 'Picture';
+  if (kind === 'show') return 'Show';
   return 'Commission';
 }
 
@@ -160,6 +161,8 @@ function describeContents({
   documents,
   invoices,
   pictures,
+  shows,
+  fees,
   records,
   entries,
   updates,
@@ -169,18 +172,22 @@ function describeContents({
   if (documents) parts.push(countPhrase(documents, 'commission'));
   if (invoices) parts.push(countPhrase(invoices, 'invoice'));
   if (pictures) parts.push(countPhrase(pictures, 'picture'));
-  const inside = records - entries - updates;
+  if (shows) parts.push(countPhrase(shows, 'show'));
+  const inside = records - entries - updates - fees;
   if (inside > 0) parts.push(`${countPhrase(inside)} filed inside`);
   // Named, because nobody put these in the Trash themselves: they follow the
   // commission they belong to, and this is the only warning they get.
   if (updates) parts.push(`${countPhrase(updates, 'client update')} belonging to them`);
-  return `${parts.join(', ')}. This cannot be undone.`;
+  if (fees) parts.push(`${countPhrase(fees, 'booth-fee row')} in the books`);
+  const back = shows ? ' Pieces taken to those shows go back where they were.' : '';
+  return `${parts.join(', ')}.${back} This cannot be undone.`;
 }
 
 /** The same honesty for one row: what goes with it, named and counted. */
 function describeEntry(entry: TrashEntry, updates: AttachedRecord[]): string {
   const targets = deletionTargets(entry);
-  const going = attachedIds(targets, updates).length;
+  const going = attachedIds(targets, updates.filter((one) => one.kind !== 'fee')).length;
+  const fees = attachedIds(targets, updates.filter((one) => one.kind === 'fee')).length;
   const parts: string[] = [];
   if (entry.contains.length > 0) {
     parts.push(
@@ -191,6 +198,10 @@ function describeEntry(entry: TrashEntry, updates: AttachedRecord[]): string {
     );
   }
   if (going > 0) parts.push(`${countPhrase(going, 'client update')} belonging to it`);
+  if (entry.kind === 'show') {
+    const what = fees > 0 ? 'The show and its booth-fee row in the books' : 'The show';
+    return `${what} — gone for good. Its pieces go back where they were. This cannot be undone.`;
+  }
   if (parts.length === 0) return 'This cannot be undone.';
   return `${parts.join(', and ')} — gone for good. This cannot be undone.`;
 }

@@ -207,3 +207,24 @@ describe('the books as a file', () => {
     expect(newExpenses([row()], [])).toHaveLength(1);
   });
 });
+
+describe('the shows file', () => {
+  it('reads back what it wrote, and adds nothing the second time', async () => {
+    const { createShow, editShow } = await import('../../shows/shows');
+    const { exportShows, importShowsFromText, newShows } = await import('../portable');
+    const show = editShow(createShow('Fair'), { boothFee: null, pieceIds: ['p1', 'p2'], status: 'accepted' });
+    const result = importShowsFromText(JSON.stringify(exportShows([show])), ['p1']);
+    expect(result.ok && result.shows[0]).toEqual(show);
+    expect(result.ok && result.missingPieceIds).toEqual(['p2']);
+    expect(result.ok && newShows(result.shows, [show])).toEqual([]);
+  });
+
+  it('refuses a zeroed fee that is not a number, and an unknown status', async () => {
+    const { createShow } = await import('../../shows/shows');
+    const { exportShows, importShowsFromText } = await import('../portable');
+    const file = exportShows([{ ...createShow('Fair'), boothFee: '0' as unknown as number, status: 'maybe' as never }]);
+    const result = importShowsFromText(JSON.stringify(file));
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.errors.join(' ')).toMatch(/boothFee.*status/);
+  });
+});

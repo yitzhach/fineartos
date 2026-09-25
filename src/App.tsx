@@ -12,6 +12,7 @@ import { Connect, type ConnectTab } from './connect/ui/Connect';
 import type { GuestEntry } from './connect/guestbook';
 import {
   attachedIds,
+  type AttachedRecord,
   countPhrase,
   deletionTargets,
   findEntry,
@@ -181,6 +182,9 @@ import { describeSaveState, drainQueue, unavailableCloud } from './persistence/s
 import {
   exportDocument,
   exportExpenses,
+  exportShows,
+  importShowsFromText,
+  newShows,
   importDocumentFromText,
   importExpensesFromText,
   newExpenses,
@@ -267,6 +271,8 @@ export default function App() {
   const [allUpdates, setAllUpdates] = useState<ClientUpdate[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [shows, setShows] = useState<Show[]>([]);
+  // Including the ones in the Trash, so emptying it can count their fee rows.
+  const [allShows, setAllShows] = useState<Show[]>([]);
   const [mileageRate, setMileageRate] = useState<number | null>(loadMileageRate);
   const [importingImages, setImportingImages] = useState(false);
   const [guests, setGuests] = useState<GuestEntry[]>(loadGuests);
@@ -470,7 +476,8 @@ export default function App() {
     setClientUpdates(updateRows.filter((update) => !hidden.has(update.documentId)));
     setAllUpdates(updateRows);
     setExpenses(expenseRows);
-    setShows(showRows);
+    setShows(showRows.filter((show) => !hidden.has(show.id)));
+    setAllShows(showRows);
     setLoaded(true);
 
     // First read of the studio: put back the windows that were open, now that
@@ -898,6 +905,48 @@ export default function App() {
     setMessage(gaps.length > 0 ? `Imported. ${gaps.join('. ')}.` : 'Imported.');
   };
 
+  // --- Shows, as a file ---------------------------------------------------
+
+  const handleExportShows = () => {
+    downloadJson(exportShows(shows), `shows-${new Date().toISOString().slice(0, 10)}.json`);
+    setMessage(
+      shows.length === 0
+        ? 'Exported. There are no shows yet, and the file says so.'
+        : 'Shows exported. The pictures are not in the file; booth fees travel in the books file.',
+    );
+  };
+
+  const handleImportShows = async (file: File) => {
+    const result = importShowsFromText(await file.text(), photos.map((photo) => photo.id));
+    if (!result.ok) {
+      setMessage(`Import refused: ${result.errors.join(' ')}`);
+      return;
+    }
+    const incoming = newShows(result.shows, allShows);
+    try {
+      for (const show of incoming) {
+        await repo.saveShow(show);
+        // An accepted show whose fee row is not here yet gets it back.
+        const row = feeExpense(show, null, localToday());
+        if (row && !expenses.some((one) => one.id === row.id)) await repo.saveExpense(row);
+      }
+    } catch (cause) {
+      setMessage(`The shows could not all be read in: ${String(cause)}`);
+      await refresh();
+      return;
+    }
+    await refresh();
+    const already = result.shows.length - incoming.length;
+    const parts = [
+      `${incoming.length === 1 ? '1 show' : `${incoming.length} shows`} added`,
+      already > 0 ? `${already} already here and left alone` : null,
+      result.missingPieceIds.length > 0
+        ? `${result.missingPieceIds.length} piece(s) they list are not on this device`
+        : null,
+    ].filter(Boolean);
+    setMessage(`${parts.join('. ')}.`);
+  };
+
   // --- The books, as a file ------------------------------------------------
 
   const handleExportExpenses = () => {
@@ -1300,12 +1349,21 @@ export default function App() {
     );
   };
 
+  /** What goes with a trashed record when it is emptied: updates and fee rows. */
+  const trashAttached: AttachedRecord[] = [
+    ...allUpdates,
+    ...allShows
+      .filter((show) => expenses.some((row) => row.id === feeExpenseId(show.id)))
+      .map((show) => ({ id: feeExpenseId(show.id), documentId: show.id, kind: 'fee' as const })),
+  ];
+
   const handleTrash = async (itemId: string) => {
     const project = projects.find((p) => p.id === itemId);
     const doc = docById(itemId);
     const invoice = invoices.find((i) => i.id === itemId);
     const photo = photos.find((p) => p.id === itemId);
-    if (!project && !doc && !invoice && !photo) return;
+    const show = shows.find((one) => one.id === itemId);
+    if (!project && !doc && !invoice && !photo && !show) return;
 
     const entry: TrashEntry = project
       ? {
@@ -1319,8 +1377,10 @@ export default function App() {
         }
       : {
           id: itemId,
-          kind: photo ? 'photo' : doc ? 'document' : 'invoice',
-          name: photo
+          kind: show ? 'show' : photo ? 'photo' : doc ? 'document' : 'invoice',
+          name: show
+            ? show.name
+            : photo
             ? photo.title
             : doc
               ? doc.title.trim() || doc.documentNumber
@@ -1368,6 +1428,22 @@ export default function App() {
     // Left behind they are orphans: invisible everywhere, and still stored.
     for (const updateId of attachedIds(ids, await repo.listUpdates())) {
       await repo.deleteUpdate(updateId);
+    }
+
+    // A show takes its booth-fee row with it and gives its pieces back.
+    const allStoredShows = await repo.listShows();
+    for (const show of allStoredShows.filter((one) => ids.includes(one.id))) {
+      let current = show;
+      const others = allStoredShows.filter((one) => !ids.includes(one.id) || one.id === show.id);
+      for (const pieceId of show.pieceIds) {
+        const piece = await repo.loadPhoto(pieceId);
+        if (!piece) continue;
+        const result = removePiece(current, piece, others);
+        current = result.show;
+        if (result.location !== undefined) await repo.savePhoto(editPhoto(piece, { location: result.location }));
+      }
+      await repo.deleteExpense(feeExpenseId(show.id));
+      await repo.deleteShow(show.id);
     }
 
     for (const id of ids) {
@@ -1418,7 +1494,7 @@ export default function App() {
   const handleEmptyTrash = async () => {
     const going = trashRef.current;
     if (going.length === 0) return;
-    const { records } = summarise(going);
+    const { records } = summarise(going, trashAttached);
     await destroy(going);
     setMessage(`Trash emptied. ${countPhrase(records, 'record')} deleted for good.`);
   };
@@ -1592,26 +1668,6 @@ export default function App() {
       if (result.location !== undefined) await repo.savePhoto(editPhoto(photo, { location: result.location }));
     } catch (cause) {
       setMessage(`The piece could not be moved: ${String(cause)}`);
-    }
-    await refresh();
-  };
-
-  /** Deleting a show puts its pieces back and takes its fee out of the books. */
-  const deleteShowRecord = async (show: Show) => {
-    try {
-      let current = show;
-      for (const id of show.pieceIds) {
-        const photo = photos.find((p) => p.id === id);
-        if (!photo) continue;
-        const result = removePiece(current, photo, shows);
-        current = result.show;
-        if (result.location !== undefined) await repo.savePhoto(editPhoto(photo, { location: result.location }));
-      }
-      if (expenses.some((row) => row.id === feeExpenseId(show.id))) await repo.deleteExpense(feeExpenseId(show.id));
-      await repo.deleteShow(show.id);
-      setMessage(`"${show.name}" deleted.`);
-    } catch (cause) {
-      setMessage(`The show could not be deleted: ${String(cause)}`);
     }
     await refresh();
   };
@@ -2033,7 +2089,9 @@ export default function App() {
           guests={guests}
           currency={invoices[0]?.quote.currency ?? photos[0]?.currency ?? 'USD'}
           onSave={(show) => void saveShowRecord(show)}
-          onDelete={(show) => void deleteShowRecord(show)}
+          onTrash={(show) => void handleTrash(show.id)}
+          onExport={handleExportShows}
+          onImport={(file) => void handleImportShows(file)}
           onTogglePiece={(show, photo) => void toggleShowPiece(show, photo)}
         />
       );
@@ -2429,7 +2487,9 @@ export default function App() {
           guests={guests}
           currency={invoices[0]?.quote.currency ?? photos[0]?.currency ?? 'USD'}
           onSave={(show) => void saveShowRecord(show)}
-          onDelete={(show) => void deleteShowRecord(show)}
+          onTrash={(show) => void handleTrash(show.id)}
+          onExport={handleExportShows}
+          onImport={(file) => void handleImportShows(file)}
           onTogglePiece={(show, photo) => void toggleShowPiece(show, photo)}
         />
       );
@@ -2481,7 +2541,7 @@ export default function App() {
       return (
         <TrashWindow
           trash={trash}
-          updates={allUpdates}
+          updates={trashAttached}
           onPutBack={(id) => void handlePutBack(id)}
           onDeleteForever={(id) => void handleDeleteForever(id)}
           onEmpty={() => void handleEmptyTrash()}

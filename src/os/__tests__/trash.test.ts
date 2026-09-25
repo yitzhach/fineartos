@@ -161,3 +161,16 @@ describe('attachedIds', () => {
     expect(summarise([entry({ id: 'doc-1' })]).records).toBe(1);
   });
 });
+
+describe('a show in the Trash', () => {
+  it('counts its booth-fee row in the total, apart from client updates', () => {
+    const trash = [
+      { id: 's1', kind: 'show' as const, name: 'Fair', deletedAt: '2026-09-01T00:00:00Z', contains: [], fromFolderId: null },
+    ];
+    const summary = summarise(trash, [
+      { id: 'show-fee:s1', documentId: 's1', kind: 'fee' },
+      { id: 'u1', documentId: 'other' },
+    ]);
+    expect(summary).toMatchObject({ shows: 1, fees: 1, updates: 0, records: 2, invoices: 0 });
+  });
+});
