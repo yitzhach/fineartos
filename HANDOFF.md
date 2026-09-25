@@ -6,13 +6,12 @@
 
 ## Now
 
-- Tree green. 541 tests pass. Four items off the old Next list, in one go.
+- Tree green. 543 tests pass.
 - Nothing half-finished.
 - Dock built: New, Home, Projects, Invoices, Finder, Connect, Artwork,
   Finance, Trash. Placeholders: Shows, Visualizer.
 
 ## Done
-
 - Overview Client card via `clientStatus()` (updates.ts). Tested: unit +
   empty state in browser. NOT tested: filled card in browser, 2nd tab.
 
