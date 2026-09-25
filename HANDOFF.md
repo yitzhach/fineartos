@@ -6,7 +6,7 @@
 
 ## Now
 
-- Tree green. 543 tests pass.
+- Tree green. 550 tests pass.
 - Nothing half-finished.
 - Dock built: New, Home, Projects, Invoices, Finder, Connect, Artwork,
   Finance, Trash. Placeholders: Shows, Visualizer.
@@ -48,9 +48,8 @@
 
 ## Next (numbered)
 
-1. Shows, the 4th tool. Settle scope first: name, venue, dates, booth fee,
-   deadline, status, pieces taken, guest entries. Artwork owns the piece and
-   where it is; Shows owns the event; Finance reads both.
+1. Shows: model done and tested (`src/shows/shows.ts`). Next: artist's answers
+   on open scope questions, then IndexedDB v6 `shows` store + window.
 2. Visualizer. No design yet.
 3. Sign-in gates everything else: cloud saving, guest book online, real email,
    Square, a client page that can receive an approval. See `FUTURE_BUILD.md`.
