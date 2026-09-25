@@ -136,6 +136,7 @@ import type { Expense } from './finance/ledger';
 import { UpdatesPane } from './commission/ui/UpdatesPane';
 import {
   awaitingReply,
+  clientStatus,
   recordHandoff,
   messageFor,
   toldAbout,
@@ -2094,6 +2095,7 @@ export default function App() {
             />
           }
           updatesWaiting={awaitingReply(updatesFor(clientUpdates, doc.id)).length}
+          clientStatus={clientStatus(updatesFor(clientUpdates, doc.id))}
           updatesSlot={
             <UpdatesPane
               doc={doc}

@@ -1,3 +1,4 @@
+import type { ClientStatus } from '../updates';
 import { useState, type ReactNode } from 'react';
 import { calculateTotals, formatMoney } from '../calc';
 import type { CommissionDocument, Milestone } from '../types';
@@ -47,6 +48,8 @@ interface Props {
   onTellClient: (milestoneId: string) => void;
   /** How many updates asked for a sign-off and have no reply recorded. */
   updatesWaiting: number;
+  /** The client at a glance, read off this commission's updates. */
+  clientStatus: ClientStatus;
 }
 
 const NO_DEPOSIT = { kind: 'percent' as const, value: null };
@@ -62,6 +65,13 @@ function shortDate(iso: string | null): string {
     year: 'numeric',
     timeZone: 'UTC',
   }).format(date);
+}
+
+/** An ISO timestamp as "Apr 5, 2026", in the artist's own time zone. */
+function shortDateTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
 }
 
 /**
@@ -233,6 +243,39 @@ export function ProjectWindow(props: Props) {
                   Not now
                 </button>
               </div>
+            )}
+          </section>
+
+          <section className="pj-block">
+            <h3>
+              Client
+              <button className="btn" data-variant="quiet" onClick={() => props.onTab('updates')}>
+                Open
+              </button>
+            </h3>
+            {props.clientStatus.latest === null ? (
+              <p className="hint">No updates written yet.</p>
+            ) : (
+              <dl className="pj-facts">
+                <Fact label="Latest update" value={props.clientStatus.latest.headline} />
+                <Fact
+                  label="Handed over"
+                  value={
+                    props.clientStatus.latest.handedOverAt
+                      ? shortDateTime(props.clientStatus.latest.handedOverAt)
+                      : 'Not handed over yet'
+                  }
+                />
+                <Fact label="Reply" value={props.clientStatus.latest.reply} />
+                <Fact
+                  label="Unanswered"
+                  value={
+                    props.clientStatus.unanswered.length === 0
+                      ? 'None'
+                      : props.clientStatus.unanswered.join(', ')
+                  }
+                />
+              </dl>
             )}
           </section>
 

@@ -352,3 +352,31 @@ function trimmedOrNull(value: string): string | null {
   const trimmed = value.trim();
   return trimmed === '' ? null : trimmed;
 }
+
+export interface ClientStatus {
+  /** The newest update, or null when none has been written. */
+  latest: { headline: string; reply: string; handedOverAt: string | null } | null;
+  /** The last time anything went out, or null when nothing has. */
+  lastHandoffAt: string | null;
+  /** Headlines of updates that asked for a sign-off and have none recorded. */
+  unanswered: string[];
+}
+
+/**
+ * The client, at a glance, for the Overview. Takes one commission's updates.
+ * An update never handed over reads as such — writing one is not sending it.
+ */
+export function clientStatus(updates: ClientUpdate[]): ClientStatus {
+  const newest = [...updates].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  return {
+    latest: newest
+      ? {
+          headline: newest.headline,
+          reply: describeApproval(newest),
+          handedOverAt: lastHandoffAt([newest]),
+        }
+      : null,
+    lastHandoffAt: lastHandoffAt(updates),
+    unanswered: awaitingReply(updates).map((update) => update.headline),
+  };
+}

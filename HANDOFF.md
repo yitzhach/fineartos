@@ -13,6 +13,9 @@
 
 ## Done
 
+- Overview Client card via `clientStatus()` (updates.ts). Tested: unit +
+  empty state in browser. NOT tested: filled card in browser, 2nd tab.
+
 - **PDF hand-off** on a client update: the self-contained page rendered into
   a hidden iframe and handed to the browser's own print dialog.
 - **Emptying the Trash** destroys a commission's client updates with it; they
@@ -46,13 +49,11 @@
 
 ## Next (numbered)
 
-1. Client status on a commission's Overview tab — last update, anything
-   unanswered — so the Client tab need not be opened.
-2. Shows, the 4th tool. Settle scope first: name, venue, dates, booth fee,
+1. Shows, the 4th tool. Settle scope first: name, venue, dates, booth fee,
    deadline, status, pieces taken, guest entries. Artwork owns the piece and
    where it is; Shows owns the event; Finance reads both.
-3. Visualizer. No design yet.
-4. Sign-in gates everything else: cloud saving, guest book online, real email,
+2. Visualizer. No design yet.
+3. Sign-in gates everything else: cloud saving, guest book online, real email,
    Square, a client page that can receive an approval. See `FUTURE_BUILD.md`.
 
 ## Files (path — why)

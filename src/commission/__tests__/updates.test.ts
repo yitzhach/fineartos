@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   awaitingReply,
+  clientStatus,
   clearApproval,
   createUpdate,
   describeApproval,
@@ -213,5 +214,24 @@ describe('an update offered by a finished stage', () => {
     expect(toldAbout([told], 'm1')?.headline).toBe('Underpainting');
     expect(toldAbout([told], 'm2')).toBeNull();
     expect(toldAbout([], 'm1')).toBeNull();
+  });
+});
+
+describe('client status for the overview', () => {
+  it('says nothing has been written when nothing has', () => {
+    expect(clientStatus([])).toEqual({ latest: null, lastHandoffAt: null, unanswered: [] });
+  });
+
+  it('reads the newest update and what is still unanswered', () => {
+    const older = recordHandoff(
+      { ...createUpdate('doc-1', draft({ headline: 'Sketch', asksApproval: true })), createdAt: '2026-03-01T00:00:00.000Z' },
+      'pdf',
+      at('2026-03-01T10:00:00Z'),
+    );
+    const newer = { ...createUpdate('doc-1', draft({ headline: 'Glaze' })), createdAt: '2026-03-05T00:00:00.000Z' };
+    const status = clientStatus([older, newer]);
+    expect(status.latest).toEqual({ headline: 'Glaze', reply: 'No sign-off asked for', handedOverAt: null });
+    expect(status.lastHandoffAt).toBe('2026-03-01T10:00:00.000Z');
+    expect(status.unanswered).toEqual(['Sketch']);
   });
 });
