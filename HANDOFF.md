@@ -6,25 +6,20 @@
 
 ## Now
 
-- Tree green. 550 tests pass.
+- Tree green. 554 tests pass. IndexedDB now v6 (adds `shows`).
 - Nothing half-finished.
 - Dock built: New, Home, Projects, Invoices, Finder, Connect, Artwork,
-  Finance, Trash. Placeholders: Shows, Visualizer.
+  Shows, Finance, Trash. Placeholder: Visualizer.
 
 ## Done
+- Shows tool: status Considering/Applied/Accepted/Declined/Done; guest book
+  picks show from list (old typed names still pickable); taking a piece sets
+  Artwork location "At a show", taking off restores prior; booth fee → books
+  row `show-fee:<id>` (Show fees) only when Accepted/Done, null stays null.
 - Overview Client card via `clientStatus()` (updates.ts). Tested: unit +
   empty state in browser. NOT tested: filled card in browser, 2nd tab.
-
-- **PDF hand-off** on a client update: the self-contained page rendered into
-  a hidden iframe and handed to the browser's own print dialog.
-- **Emptying the Trash** destroys a commission's client updates with it; they
-  were left behind as orphans. The confirmation counts and names them.
-- **Export is version 2**, carrying the commission's client updates; version
-  1 files still read.
-- **The books save as a file** that reads back in (Finance → Profit and loss,
-  beside the CSV); the same file twice does not double the rows.
-- **Ticking a stage off offers to tell the client** — starts an update about
-  that stage, writes and sends nothing.
+- Earlier: PDF hand-off, Trash empties updates, export v2, books file,
+  stage-done offer (see git log).
 
 ## Decisions (keep)
 
@@ -43,14 +38,16 @@
   assume it is current.
 
 ## Dead ends (do not retry)
+- Upgrade check with two builds of one commit: same `sw.js?v=` → SW never
+  updates. Commit before building the new one. Kill stray `vite preview`.
 
 - Nothing found this session.
 
 ## Next (numbered)
 
-1. Shows: model done and tested (`src/shows/shows.ts`). Next: artist's answers
-   on open scope questions, then IndexedDB v6 `shows` store + window.
-2. Visualizer. No design yet.
+1. Visualizer. No design yet — settle scope with the artist first.
+2. Shows follow-ups: shows not in export/backup or Trash (delete is a
+   confirmed hard delete); Home/calendar do not list deadlines yet.
 3. Sign-in gates everything else: cloud saving, guest book online, real email,
    Square, a client page that can receive an approval. See `FUTURE_BUILD.md`.
 
@@ -67,16 +64,12 @@
 
 ## Verify (tested / NOT tested)
 - Browser-check recipe: `TESTING.md` — open only when a check is needed.
-- **Tested**: 541 unit tests (26 new). Chromium at 1440px and 390px, existing
-  database, second tab open: PDF hand-off recorded and the frame cleaned up;
-  emptying asks "3 records" naming the update and leaves none, second tab
-  agrees; the export carries the update; the books file adds nothing the
-  second time; the stage offer fills the headline, saves nothing, offers once.
-  No console errors, no overflow.
-- **NOT tested**: what the print dialog actually produces — headless Chromium
-  treats `window.print()` as a no-op, so the paper layout is unseen. Light
-  mode and tablet width. iOS Safari printing. Nothing tested on the deployed
-  URL.
+- Shows tested (`scripts/check-shows.mjs`): v5→v6 upgrade with 2 old tabs
+  open, add/accept/fee/piece, reload keeps it, books row shows, Artwork says
+  At a show, phone no overflow, no errors. NOT tested: guest-book picker in
+  browser, delete show, dark mode, look vs other tools.
+- Earlier batch browser-tested (1440/390, existing DB, 2nd tab). NOT tested:
+  real print output (headless no-op), iOS Safari printing, deployed URL.
 
 ## Resume
 

@@ -45,6 +45,10 @@ interface Props {
   /** Blob for the picture being sent, so it can go as a real attachment. */
   imageBlob: (imageId: string) => Promise<Blob | null>;
   guests: GuestEntry[];
+  /** Shows a guest can sign in at, from the Shows tool, running one first. */
+  showNames: string[];
+  /** The show running today, if one is: a new entry starts on it. */
+  currentShowName: string | null;
   onGuests: (guests: GuestEntry[]) => void;
   /** Files dropped on the picture picker become pictures in the studio. */
   onAddImages: (files: FileList | File[], markCurrentShow: boolean) => void;
@@ -115,6 +119,8 @@ function Tab({
 // --- Guest book -----------------------------------------------------------
 
 function GuestBook({
+  showNames,
+  currentShowName,
   guests,
   onGuests,
   studio,
@@ -129,7 +135,7 @@ function GuestBook({
   onOpenPhoto,
   askForSignature,
 }: Props) {
-  const [draft, setDraft] = useState<GuestDraft>(() => emptyDraft());
+  const [draft, setDraft] = useState<GuestDraft>(() => emptyDraft(currentShowName ?? ''));
   const [query, setQuery] = useState('');
   const [warning, setWarning] = useState<string | null>(null);
   /**
@@ -309,12 +315,24 @@ function GuestBook({
 
         <div className="field">
           <label htmlFor="gb-show">Show</label>
-          <input
-            id="gb-show"
-            value={draft.show}
-            placeholder="Where you are today"
-            onChange={(e) => setDraft({ ...draft, show: e.target.value })}
-          />
+          {showNames.length === 0 ? (
+            <p className="hint" id="gb-show">No shows yet. Add one in Shows to sign guests in at it.</p>
+          ) : (
+            <select
+              id="gb-show"
+              value={draft.show}
+              onChange={(e) => setDraft({ ...draft, show: e.target.value })}
+            >
+              <option value="">No show</option>
+              {/* A name typed before shows were a list stays pickable. */}
+              {draft.show && !showNames.includes(draft.show) && <option value={draft.show}>{draft.show}</option>}
+              {showNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {photos.length > 0 && (

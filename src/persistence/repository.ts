@@ -9,10 +9,12 @@ import type { Invoice } from '../invoice/types';
 import type { Photo } from '../photo/photo';
 import type { ClientUpdate } from '../commission/updates';
 import type { Expense } from '../finance/ledger';
+import type { Show } from '../shows/shows';
 import type { Project } from '../project/project';
 import {
   STORE_DOCUMENTS,
   STORE_EXPENSES,
+  STORE_SHOWS,
   STORE_IMAGES,
   STORE_INVOICES,
   STORE_PHOTOS,
@@ -74,6 +76,12 @@ interface UpdateRow {
   id: string;
   workspaceId: string;
   update: ClientUpdate;
+}
+
+interface ShowRow {
+  id: string;
+  workspaceId: string;
+  show: Show;
 }
 
 interface ExpenseRow {
@@ -257,6 +265,21 @@ export class Repository {
 
   async deleteExpense(id: string): Promise<void> {
     await remove(STORE_EXPENSES, id);
+  }
+
+  // --- Shows --------------------------------------------------------------
+
+  async listShows(): Promise<Show[]> {
+    const rows = await listByWorkspace<ShowRow>(STORE_SHOWS, this.workspaceId);
+    return rows.map((row) => row.show).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async saveShow(show: Show): Promise<void> {
+    await put(STORE_SHOWS, { id: show.id, workspaceId: this.workspaceId, show });
+  }
+
+  async deleteShow(id: string): Promise<void> {
+    await remove(STORE_SHOWS, id);
   }
 
   // --- Photos -------------------------------------------------------------

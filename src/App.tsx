@@ -131,6 +131,17 @@ import type { Adjustments } from './photo/adjust';
 import type { Framing } from './photo/crop';
 import { milestonesOf } from './commission/milestones';
 import { ArtworkWindow } from './artwork/ui/ArtworkWindow';
+import { ShowsWindow } from './shows/ui/ShowsWindow';
+import {
+  addPiece,
+  feeExpense,
+  feeExpenseId,
+  localToday,
+  pickableShows,
+  removePiece,
+  whenIs,
+  type Show,
+} from './shows/shows';
 import { FinanceWindow } from './finance/ui/FinanceWindow';
 import type { Expense } from './finance/ledger';
 import { UpdatesPane } from './commission/ui/UpdatesPane';
@@ -238,6 +249,7 @@ registerModule({ id: 'invoices', name: 'Invoices', icon: 'invoices', available: 
 registerModule({ id: 'finder', name: 'Finder', icon: 'finder', available: true, group: 'tool' });
 registerModule({ id: 'connect', name: 'Connect', icon: 'connect', available: true, group: 'tool' });
 registerModule({ id: 'artwork', name: 'Artwork', icon: 'artwork', available: true, group: 'tool' });
+registerModule({ id: 'shows', name: 'Shows', icon: 'shows', available: true, group: 'tool' });
 registerModule({ id: 'finance', name: 'Finance', icon: 'finance', available: true, group: 'tool' });
 // Last in the dock, the way the Trash is always last.
 registerModule({ id: 'trash', name: 'Trash', icon: 'trash', available: true, group: 'trash' });
@@ -254,6 +266,7 @@ export default function App() {
   // emptying would take with it, and those are hidden from `clientUpdates`.
   const [allUpdates, setAllUpdates] = useState<ClientUpdate[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [shows, setShows] = useState<Show[]>([]);
   const [mileageRate, setMileageRate] = useState<number | null>(loadMileageRate);
   const [importingImages, setImportingImages] = useState(false);
   const [guests, setGuests] = useState<GuestEntry[]>(loadGuests);
@@ -426,14 +439,16 @@ export default function App() {
     let photoRows: Photo[];
     let updateRows: ClientUpdate[];
     let expenseRows: Expense[];
+    let showRows: Show[];
     try {
-      [documentRows, projectRows, invoiceRows, photoRows, updateRows, expenseRows] = await Promise.all([
+      [documentRows, projectRows, invoiceRows, photoRows, updateRows, expenseRows, showRows] = await Promise.all([
         repo.list(),
         repo.listProjects(),
         repo.listInvoices(),
         repo.listPhotos(),
         repo.listUpdates(),
         repo.listExpenses(),
+        repo.listShows(),
       ]);
     } catch (cause) {
       // The database reports its own problem through onDbProblem; this stops
@@ -455,6 +470,7 @@ export default function App() {
     setClientUpdates(updateRows.filter((update) => !hidden.has(update.documentId)));
     setAllUpdates(updateRows);
     setExpenses(expenseRows);
+    setShows(showRows);
     setLoaded(true);
 
     // First read of the studio: put back the windows that were open, now that
@@ -1550,6 +1566,56 @@ export default function App() {
     await refresh();
   };
 
+  // --- Shows ----------------------------------------------------------------
+
+  /** Saves a show and keeps its booth-fee row in the books in step. */
+  const saveShowRecord = async (show: Show) => {
+    try {
+      await repo.saveShow(show);
+      const existing = expenses.find((row) => row.id === feeExpenseId(show.id)) ?? null;
+      const row = feeExpense(show, existing, localToday());
+      if (row) await repo.saveExpense(row);
+      else if (existing) await repo.deleteExpense(existing.id);
+    } catch (cause) {
+      setMessage(`The show could not be saved: ${String(cause)}`);
+    }
+    await refresh();
+  };
+
+  /** A piece on or off a show; its location in Artwork follows. */
+  const toggleShowPiece = async (show: Show, photo: Photo) => {
+    const result = show.pieceIds.includes(photo.id)
+      ? removePiece(show, photo, shows)
+      : addPiece(show, photo);
+    try {
+      await repo.saveShow(result.show);
+      if (result.location !== undefined) await repo.savePhoto(editPhoto(photo, { location: result.location }));
+    } catch (cause) {
+      setMessage(`The piece could not be moved: ${String(cause)}`);
+    }
+    await refresh();
+  };
+
+  /** Deleting a show puts its pieces back and takes its fee out of the books. */
+  const deleteShowRecord = async (show: Show) => {
+    try {
+      let current = show;
+      for (const id of show.pieceIds) {
+        const photo = photos.find((p) => p.id === id);
+        if (!photo) continue;
+        const result = removePiece(current, photo, shows);
+        current = result.show;
+        if (result.location !== undefined) await repo.savePhoto(editPhoto(photo, { location: result.location }));
+      }
+      if (expenses.some((row) => row.id === feeExpenseId(show.id))) await repo.deleteExpense(feeExpenseId(show.id));
+      await repo.deleteShow(show.id);
+      setMessage(`"${show.name}" deleted.`);
+    } catch (cause) {
+      setMessage(`The show could not be deleted: ${String(cause)}`);
+    }
+    await refresh();
+  };
+
   const deleteExpenseRecord = async (id: string) => {
     await repo.deleteExpense(id);
     await refresh();
@@ -1958,6 +2024,21 @@ export default function App() {
       );
     }
 
+    if (kind.type === 'tool' && kind.tool === 'shows') {
+      return (
+        <ShowsWindow
+          shows={shows}
+          photos={photos}
+          imageUrls={imageUrls}
+          guests={guests}
+          currency={invoices[0]?.quote.currency ?? photos[0]?.currency ?? 'USD'}
+          onSave={(show) => void saveShowRecord(show)}
+          onDelete={(show) => void deleteShowRecord(show)}
+          onTogglePiece={(show, photo) => void toggleShowPiece(show, photo)}
+        />
+      );
+    }
+
     if (kind.type === 'tool' && kind.tool === 'artwork') {
       return (
         <ArtworkWindow
@@ -2012,6 +2093,14 @@ export default function App() {
       return (
         <span className="faint" style={{ fontSize: 12 }}>
           Select a row, then Open. Drag an icon onto a folder on the desktop, or use Move to here.
+        </span>
+      );
+    }
+
+    if (kind.type === 'tool' && kind.tool === 'shows') {
+      return (
+        <span className="faint" style={{ fontSize: 12 }}>
+          The events. Pieces taken read "At a show" in Artwork; accepted booth fees go in the books.
         </span>
       );
     }
@@ -2202,6 +2291,14 @@ export default function App() {
       );
     }
 
+    if (kind.type === 'tool' && kind.tool === 'shows') {
+      return (
+        <span className="faint" style={{ fontSize: 12 }}>
+          The events. Pieces taken read "At a show" in Artwork; accepted booth fees go in the books.
+        </span>
+      );
+    }
+
     if (kind.type === 'tool' && kind.tool === 'artwork') {
       return (
         <span className="faint" style={{ fontSize: 12 }}>
@@ -2297,6 +2394,8 @@ export default function App() {
           imageUrls={imageUrls}
           imageBlob={async (imageId) => (await repo.getImage(imageId))?.blob ?? null}
           guests={guests}
+          showNames={pickableShows(shows, localToday()).map((show) => show.name)}
+          currentShowName={shows.find((show) => whenIs(show, localToday()) === 'on' && show.status !== 'declined')?.name ?? null}
           onGuests={setGuests}
           importing={importingImages}
           onAddImages={(files, markCurrentShow) =>
@@ -2317,6 +2416,21 @@ export default function App() {
           siteUrl={siteUrl}
           onSiteUrl={setSiteUrl}
           onMessage={setMessage}
+        />
+      );
+    }
+
+    if (kind.type === 'tool' && kind.tool === 'shows') {
+      return (
+        <ShowsWindow
+          shows={shows}
+          photos={photos}
+          imageUrls={imageUrls}
+          guests={guests}
+          currency={invoices[0]?.quote.currency ?? photos[0]?.currency ?? 'USD'}
+          onSave={(show) => void saveShowRecord(show)}
+          onDelete={(show) => void deleteShowRecord(show)}
+          onTogglePiece={(show, photo) => void toggleShowPiece(show, photo)}
         />
       );
     }
@@ -2657,6 +2771,8 @@ export default function App() {
                   ? { kind: { type: 'tool' as const, tool: 'artwork' }, title: 'Artwork', subtitle: 'The catalogue' }
                   : id === 'finance'
                   ? { kind: { type: 'tool' as const, tool: 'finance' }, title: 'Finance', subtitle: 'The books' }
+                  : id === 'shows'
+                  ? { kind: { type: 'tool' as const, tool: 'shows' }, title: 'Shows', subtitle: 'Fairs, openings and markets' }
                   : { kind: { type: 'tool' as const, tool: id }, title: MOCK_TOOL_NAMES[id] ?? id, subtitle: 'Preview' };
           setWindows((c) => toggleWindow(c, spec, desktopViewportRef.current).windows);
         }}

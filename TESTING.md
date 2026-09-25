@@ -25,3 +25,8 @@
 - `pkill -f "vite preview"` inside a compound command killed the shell
   (exit 144) and skipped the rest. Stop preview in its own command.
 - Full `scripts/acceptance.mjs` run: preview on 4180, `PLAYWRIGHT_CHROMIUM` set.
+- DB upgrade check: build the old commit in a `git worktree`, serve it, open
+  two tabs, then serve the new build on the same port (`scripts/check-shows.mjs`
+  does this). Commit first — same commit means same `sw.js?v=`, no update.
+- `npx vite preview` spawned from node survives `kill`; spawn detached and
+  kill the group, or stray servers keep serving the old build.

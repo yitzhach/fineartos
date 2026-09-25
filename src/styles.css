@@ -3801,3 +3801,34 @@ fieldset.section > legend {
   .fin-money { grid-column: 1 / -1; }
   .fin-preview { height: 420px; }
 }
+
+/* --- Shows ---------------------------------------------------------------- */
+.sh-window { display: flex; flex-direction: column; gap: 14px; padding: 16px; min-height: 0; }
+.sh-bar { display: flex; flex-direction: column; gap: 6px; }
+.sh-new { display: flex; gap: 8px; }
+.sh-new input { flex: 1; min-width: 0; }
+.sh-body { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr); gap: 20px; align-items: start; }
+.sh-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.sh-list button {
+  width: 100%; text-align: left; display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; cursor: pointer;
+}
+.sh-list button[aria-current='true'] { border-color: var(--accent); background: var(--surface-2, transparent); }
+.sh-list .faint { font-size: 12px; }
+.sh-detail { display: flex; flex-direction: column; gap: 10px; }
+.sh-detail h4 { margin: 8px 0 0; font-family: var(--serif); font-weight: 400; font-size: 15px; }
+.sh-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.sh-problem { color: var(--danger); margin: 0; font-size: 13px; }
+.sh-pieces { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.sh-piece {
+  display: flex; flex-direction: column; gap: 4px; padding: 4px; border: 2px solid transparent;
+  border-radius: 8px; background: transparent; color: inherit; cursor: pointer;
+}
+.sh-piece img, .sh-piece .missing { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 5px; background: var(--line); display: block; }
+.sh-piece .cap { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sh-piece[aria-pressed='true'] { border-color: var(--accent); }
+.sh-guests { margin: 0; padding-left: 18px; font-size: 13px; }
+.sh-foot { display: flex; justify-content: flex-end; padding-top: 8px; border-top: 1px solid var(--line); }
+@media (max-width: 1100px) {
+  .sh-body { grid-template-columns: minmax(0, 1fr); }
+}
