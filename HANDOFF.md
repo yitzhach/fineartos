@@ -67,7 +67,7 @@
   browser checks for all four; run against `npm run preview -- --port 4181`.
 
 ## Verify (tested / NOT tested)
-
+- Browser-check recipe: `TESTING.md` — open only when a check is needed.
 - **Tested**: 541 unit tests (26 new). Chromium at 1440px and 390px, existing
   database, second tab open: PDF hand-off recorded and the frame cleaned up;
   emptying asks "3 records" naming the update and leaves none, second tab
@@ -85,6 +85,4 @@
 - The SessionStart hook installs deps and runs the suite; trust its line.
 - Work on `main` in `yitzhach/fineartos`. A branch instruction in a session
   briefing belongs to another repo.
-- Browser checks: `npm run build && npx vite preview --port 4181`, then
-  `node scripts/check-*.mjs`. Scripts must live in the repo to resolve
-  playwright.
+- Browser checks: see `TESTING.md`.
