@@ -74,12 +74,9 @@
 
 ## Verify (tested / NOT tested)
 - Browser-check recipe: `TESTING.md` — open only when a check is needed.
-- Shows tested (`scripts/check-shows.mjs`): v5→v6 upgrade with 2 old tabs
-  open, add/accept/fee/piece, reload keeps it, books row shows, Artwork says
-  At a show, phone no overflow, no errors. NOT tested: guest-book picker in
-  browser, dark mode, look vs other tools.
-- `scripts/check-shows-trash.mjs`: Trash, empty ("2 records"), file
-  round-trip, 2nd tab — all pass. NOT tested: Put back / undo for a show.
+- Tested: `scripts/check-shows*.mjs`, `check-coming-up`, `check-desktop` all
+  pass (v5→v6 upgrade, Trash, file round-trip, 2nd tab, 390/820/1024).
+- NOT tested: guest-book picker, show Put back/undo, dark mode.
 - Earlier batch browser-tested (1440/390, existing DB, 2nd tab). NOT tested:
   real print output (headless no-op), iOS Safari printing, deployed URL.
 
