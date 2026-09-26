@@ -20,6 +20,18 @@ function docNamed(title: string): CommissionDocument {
 describe('Repository', () => {
   beforeEach(freshIndexedDb);
 
+  it('keeps a thumbnail beside an image without touching the original', async () => {
+    const repo = new Repository('ws-1');
+    const original = new Blob(['full'], { type: 'image/png' });
+    await repo.putImage('img-1', original);
+    await repo.setThumbnail('img-1', new Blob(['s'], { type: 'image/webp' }));
+    const image = await repo.getImage('img-1');
+    expect(image?.byteSize).toBe(original.size);
+    expect(image?.thumb).toBeTruthy();
+    await repo.setThumbnail('missing', null); // no image, nothing written
+    expect(await repo.getImage('missing')).toBeNull();
+  });
+
   it('saves and reloads a document without data loss', async () => {
     const repo = new Repository('ws-1');
     const doc = docNamed('Lobby triptych');

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   byCreated,
+  diffIdsKey,
   byDocumentUpdated,
   byUpdated,
   emptyRecords,
@@ -116,5 +117,13 @@ describe('the images in use', () => {
 
   it('is empty for an empty studio', () => {
     expect(imageIdsKey({ documents: [], projects: [], photos: [], expenses: [] })).toBe('');
+  });
+});
+
+describe('diffIdsKey', () => {
+  it('names only what arrived and what left', () => {
+    expect(diffIdsKey('a,b,c', 'b,c,d')).toEqual({ added: ['d'], removed: ['a'] });
+    expect(diffIdsKey('', 'a')).toEqual({ added: ['a'], removed: [] });
+    expect(diffIdsKey('a', '')).toEqual({ added: [], removed: ['a'] });
   });
 });

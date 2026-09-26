@@ -132,13 +132,13 @@ mentions a plan until billing exists.
   `scripts/check-launcher-tiling.mjs` passes at 1440, 1024 and 390 with a
   second tab open and a reload. **Met.**
 
-### Phase 1 — Speed and a lighter shell · **In progress** (part 1 done: split, one-record saves, startup, keys)
+### Phase 1 — Speed and a lighter shell · **Done**
 
-- Load each tool's code when it is first opened (Finance, Connect and its QR
+- **Done.** Load each tool's code when it is first opened (Finance, Connect and its QR
   library, the darkroom, Artwork, Shows, the invoice editor, Settings), then
   fetch the rest while the app is idle so the service worker still has every
   tool for offline. A tool that cannot load says so and offers Reload.
-- Thumbnails: a small WebP stored beside each original; the desktop, lists
+- **Done.** Thumbnails: a small WebP stored beside each original; the desktop, lists
   and catalogue use it; the full picture loads only where it is shown. The
   image map is updated per image, not rebuilt.
 - **Done.** A save updates the one record in state instead of re-reading every store.

@@ -7,26 +7,22 @@
 
 ## Now
 
-- Tree green, 646 tests, IndexedDB v6. Phase 1 part 1 done; part 2 not started.
-- First-load JS 162 KB gzip (one 537 KB chunk); <100 KB target is part 2.
+- Tree green, 657 tests, IndexedDB v6. Phase 1 done. Phase 2 next.
+- First-load JS ~96–98 KB gzip (was 162). Little headroom: new tools go lazy.
 
 ## Done
 
 - Phase 0: search box (`launcher.ts`, `Launcher.tsx`) and tiling (`tiling.ts`).
-- Phase 1 part 1:
-  - `App.tsx` 3,258 → ~2,430 lines. State in `src/app/`: `useStudioData`,
-    `useWindows`, `useTrash` (state + actions), `useShellKeys` (keys, search
-    box entries, `?` sheet), `usePrefs`, `useUndo`, `useObjectUrls`.
-  - One-record saves: `persistence/records.ts` holds the store orders (the
-    repository sorts with them too), upsert/remove, trash filters, image key.
-    A save puts its record into state; no store re-read. `reload()` only for
-    bulk writes (imports, photo import, empty Trash, remove demo, online).
-  - State holds every record, Trash included; visible lists are derived, so
-    Trash/Put back need no read.
-  - Startup (`os/startup.ts`): restore saved windows, else newest commission.
-  - Keys: `os/keys.ts` (⌘/Ctrl names), `os/shortcuts.ts` + `ShortcutSheet.tsx`;
-    `?` opens it, search box "Keyboard shortcuts" too (not on phone).
-  - Fixed: Ctrl+Z after Put back said "Undone" and did nothing (stale lists).
+- Phase 1 part 1: state in `src/app/` hooks; one-record saves
+  (`persistence/records.ts`); startup restore (`os/startup.ts`); key names
+  + `?` sheet (`os/keys.ts`, `os/shortcuts.ts`).
+- Phase 1 part 2: `app/lazyTools.tsx` (every tool + big window lazy, idle
+  warm-up 3 s after load, boundary says "could not load" + Reload; stray
+  chunk failure → message via `isLoadFailure`). Import/export, downloads,
+  demo seed are `import()`ed at use. Thumbnails: `StoredImage.thumb`
+  (null = could not make), `photo/thumbnail.ts`, `useObjectUrls` patches
+  per id, backfills 2 at a time, batches redraws. Full originals only for
+  open photo/darkroom/commission windows + preview ±1 (`fullImageIdsKey`).
 
 ## Decisions (keep)
 
@@ -46,6 +42,12 @@
 - Direct `repo.save*` in App only where `data.reload()` follows, else stale.
 - `PROJECT_GUIDE.md` predates Finance and tiling. Do not assume it is current.
 
+- A module shared by the entry and a lazy chunk lands whole in the entry:
+  split cheap helpers out (`photo/neutral.ts`, `invoice/mailto.ts`,
+  `lib/demoSeeded.ts`, `os/mock/names.ts`) — do not re-export them back.
+- Thumb mode never shows an original while its thumb is missing (200 full
+  decodes = the stall). Blank tile until the backfill reaches it.
+
 ## Dead ends (do not retry)
 
 - Upgrade check with two builds of one commit: same `sw.js?v=` → SW never
@@ -55,13 +57,9 @@
 
 ## Next (numbered)
 
-1. Phase 1 part 2: lazy-load tools (Finance, Connect+QR lib, darkroom,
-   Artwork, Shows, invoice editor, Settings) with idle warm-up so the SW has
-   all for offline, failed load says so + Reload; thumbnails (small WebP
-   beside each original, backfill existing photos, image map per image).
-   Done when: <100 KB gzip first load, 200 photos no stall, offline check.
-2. Phase 2: Clients + notes; guest book into IndexedDB v7 with visible failure.
-3. Visualizer scope: settle with the artist before Phase 4.
+1. Phase 2: Clients + notes; guest book into IndexedDB v7 with visible
+   failure. New tools lazy (first load has ~2 KB headroom).
+2. Visualizer scope: settle with the artist before Phase 4.
 
 ## Files (path — why)
 
@@ -69,10 +67,13 @@
 - `src/persistence/records.ts` — orders, upsert, visible lists, image key.
 - `src/os/startup.ts`, `src/os/keys.ts`, `src/os/shortcuts.ts` — pure, tested.
 - `scripts/check-shell-split.mjs` — 18 browser checks for part 1.
+- `scripts/check-lazy-thumbs.mjs` — 16 for part 2 (size, offline, failed
+  load, 200 photos, backfill, second tab).
 
 ## Verify (tested / NOT tested)
 
-- Tested: unit 646; `check-shell-split` (0 store reads per keystroke — old
+- Tested: unit 657; `check-lazy-thumbs` all pass (96 KB, longest task
+  370 ms seeding 200 photos, 200/200 thumbs); `check-shell-split` (0 store reads per keystroke — old
   build did 7; startup restore vs newest; 2nd tab; Mac UA ⌘; phone sheet;
   Put-back undo — old build fails it), `check-launcher-tiling`,
   `check-desktop`, `check-coming-up`, `check-shows-trash`, `check-owed`,
@@ -81,7 +82,6 @@
   database from before this change with many records, deployed URL (proxy
   403 from container), real iPad drag, 861–1000px widths, iOS printing.
 - Nit, not fixed: desktop buttons show faintly through tiled titlebars.
-
 ## Resume
 
 - Read `CLAUDE.md`, then only the Phase 1 section of `BUILD_PLAN.md`.

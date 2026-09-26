@@ -334,6 +334,13 @@ export class Repository {
     await remove(STORE_IMAGES, id);
   }
 
+  /** Stores the small copy beside an image. The original is not touched. */
+  async setThumbnail(id: string, thumb: Blob | null): Promise<void> {
+    const image = await this.getImage(id);
+    if (!image) return;
+    await put(STORE_IMAGES, { ...image, thumb });
+  }
+
   async getImage(id: string): Promise<StoredImage | null> {
     const image = await get<StoredImage>(STORE_IMAGES, id);
     if (!image || image.workspaceId !== this.workspaceId) return null;

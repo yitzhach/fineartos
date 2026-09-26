@@ -9,18 +9,13 @@ import { enterFullscreen, exitFullscreen, isFullscreen, useFullscreen } from './
 import { Dock } from './os/Dock';
 import { Frame } from './os/Frame';
 import { Desktop, type DesktopItem } from './os/Desktop';
-import { Finder } from './os/Finder';
-import { TrashWindow } from './os/TrashWindow';
 import { TrashButton } from './os/TrashButton';
-import { ShortcutSheet } from './os/ShortcutSheet';
-import { Connect, type ConnectTab } from './connect/ui/Connect';
+import type { ConnectTab } from './connect/ui/Connect';
 import { attachedIds, countPhrase, trashedIds } from './os/trash';
 import { autoArrange, pruneLayout, trashPositionOf } from './os/desktopLayout';
-import { Settings } from './os/Settings';
 import { BuildStamp } from './os/BuildStamp';
-import { WallpaperSlides } from './os/WallpaperSlides';
 import { AppRail, type RailItem } from './os/AppRail';
-import { MOCK_TOOLS, MOCK_TOOL_NAMES } from './os/mock/tools';
+import { MOCK_TOOL_NAMES } from './os/mock/names';
 import { registerModule, registerPlannedModules } from './os/registry';
 import { renderGroups, topZ, type WindowKind, type WindowState } from './os/windows';
 import { openingWindows } from './os/startup';
@@ -36,10 +31,7 @@ import {
   toClientFacing,
 } from './commission/document';
 import type { CommissionDocument } from './commission/types';
-import { Editor } from './commission/ui/Editor';
-import { ClientPreview } from './commission/ui/ClientPreview';
-import { DocumentList } from './commission/ui/DocumentList';
-import { ProjectWindow, type ProjectTab } from './commission/ui/ProjectWindow';
+import type { ProjectTab } from './commission/ui/ProjectWindow';
 import { ArtworkInspector } from './commission/ui/ArtworkInspector';
 import {
   applyInvoiceEdit,
@@ -50,16 +42,7 @@ import {
   recordInvoicePayment,
 } from './invoice/invoice';
 import type { Invoice } from './invoice/types';
-import { InvoiceEditor } from './invoice/ui/InvoiceEditor';
-import { InvoiceView } from './invoice/ui/InvoiceView';
-import { InvoiceList } from './invoice/ui/InvoiceList';
-import {
-  blobToDataUrl,
-  copyInvoiceHtml,
-  downloadInvoiceHtml,
-  downloadInvoiceImage,
-  mailtoForInvoice,
-} from './invoice/download';
+import { mailtoForInvoice } from './invoice/mailto';
 import {
   addDocumentToProject,
   addInvoiceToProject,
@@ -76,7 +59,6 @@ import {
   setProjectCover,
   type Project,
 } from './project/project';
-import { FolderWindow } from './project/ui/FolderWindow';
 import {
   addWallpaper,
   prepareWallpaper,
@@ -95,8 +77,6 @@ import {
 import type { Adjustments } from './photo/adjust';
 import type { Framing } from './photo/crop';
 import { milestonesOf } from './commission/milestones';
-import { ArtworkWindow } from './artwork/ui/ArtworkWindow';
-import { ShowsWindow } from './shows/ui/ShowsWindow';
 import { ComingUp } from './os/ComingUp';
 import { comingUp } from './os/dashboard';
 import { allOwed } from './finance/owed';
@@ -110,8 +90,6 @@ import {
   whenIs,
   type Show,
 } from './shows/shows';
-import { FinanceWindow } from './finance/ui/FinanceWindow';
-import { UpdatesPane } from './commission/ui/UpdatesPane';
 import {
   awaitingReply,
   clientStatus,
@@ -123,32 +101,13 @@ import {
   type HandoffChannel,
 } from './commission/updates';
 import type { CardContext } from './commission/updateRender';
-import {
-  downloadUpdateCard,
-  downloadUpdatePage,
-  printUpdatePage,
-  shareUpdateCard,
-} from './commission/updateDownload';
-import { PhotoWindow } from './photo/ui/PhotoWindow';
-import { PicturePreview } from './photo/ui/PicturePreview';
-import { ImageEditor } from './photo/ui/ImageEditor';
 import { crossfadeSeconds, emptySlideshow, readySlides, secondsPerSlide } from './lib/slideshow';
 import { SHIPPED_PHOTOGRAPHS } from './lib/photographs';
 import { Repository, type StoredDocument } from './persistence/repository';
-import { imageIdsKey, type StudioRecords } from './persistence/records';
+import { fullImageIdsKey, imageIdsKey, type StudioRecords } from './persistence/records';
 import { onDbProblem, type DbProblem } from './persistence/db';
 import { onAppUpdate } from './lib/appUpdate';
 import { describeSaveState, unavailableCloud } from './persistence/sync';
-import {
-  exportDocument,
-  exportExpenses,
-  exportShows,
-  importShowsFromText,
-  newShows,
-  importDocumentFromText,
-  importExpensesFromText,
-  newExpenses,
-} from './persistence/portable';
 import {
   BUNDLED_WALLPAPERS,
   loadRestoreWindows,
@@ -156,6 +115,32 @@ import {
   type WallpaperChoice,
 } from './lib/prefs';
 import { usePrefs } from './app/usePrefs';
+import {
+  ArtworkWindow,
+  Connect,
+  ClientPreview,
+  DocumentList,
+  Editor,
+  Finder,
+  FolderWindow,
+  InvoiceList,
+  InvoiceView,
+  MockToolWindow,
+  PhotoWindow,
+  PicturePreview,
+  ProjectWindow,
+  ShortcutSheet,
+  TrashWindow,
+  UpdatesPane,
+  WallpaperSlides,
+  FinanceWindow,
+  ImageEditor,
+  InvoiceEditor,
+  Settings,
+  ShowsWindow,
+  isLoadFailure,
+  warmTools,
+} from './app/lazyTools';
 import { useUndo } from './app/useUndo';
 import { useObjectUrls } from './app/useObjectUrls';
 import { useStudioData } from './app/useStudioData';
@@ -311,6 +296,18 @@ export default function App() {
 
   useEffect(() => onDbProblem(setDbProblem), []);
   useEffect(() => onAppUpdate(() => setUpdateReady(true)), []);
+  useEffect(() => warmTools(), []);
+  // A part of the app fetched on demand (import, export, a download) that
+  // fails to arrive must say so, not do nothing (rule 5).
+  useEffect(() => {
+    const onRejection = (event: PromiseRejectionEvent) => {
+      if (isLoadFailure(event.reason)) {
+        setMessage('That part of the app could not load. Check the connection, then reload the page.');
+      }
+    };
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => window.removeEventListener('unhandledrejection', onRejection);
+  }, []);
   useEffect(() => {
     previewOpenRef.current = preview !== null;
   }, [preview]);
@@ -326,7 +323,27 @@ export default function App() {
     () => imageIdsKey({ documents: rows, projects, photos, expenses }),
     [rows, projects, photos, expenses],
   );
-  const imageUrls = useObjectUrls(repo, neededImageIds);
+  // Lists, the desktop and the catalogue draw the small copy; only what is
+  // open at full size loads the original.
+  const imageUrls = useObjectUrls(repo, neededImageIds, true);
+  const fullIds = useMemo(() => {
+    const photoIds: string[] = [];
+    const docIds: string[] = [];
+    for (const win of windows) {
+      if (win.kind.type === 'photo' || win.kind.type === 'photoEdit') photoIds.push(win.kind.photoId);
+      if (win.kind.type === 'commission') docIds.push(win.kind.docId);
+    }
+    if (preview) {
+      for (const step of [-1, 0, 1]) {
+        const id = preview.ids[(preview.index + step + preview.ids.length) % preview.ids.length];
+        if (id) photoIds.push(id);
+      }
+    }
+    return fullImageIdsKey({ photos, documents: rows, photoIds, docIds });
+  }, [windows, preview, photos, rows]);
+  const fullUrls = useObjectUrls(repo, fullIds);
+  /** The original where it is loaded, else the thumbnail until it is. */
+  const bigUrls = useMemo(() => ({ ...imageUrls, ...fullUrls }), [imageUrls, fullUrls]);
   const libraryIds = useMemo(
     () => wallpaperLibrary.map((w) => w.imageId).sort().join(','),
     [wallpaperLibrary],
@@ -494,13 +511,14 @@ export default function App() {
       const id = invoice.studio.logoImageId;
       if (!id) return null;
       const image = await repo.getImage(id);
-      return image ? blobToDataUrl(image.blob) : null;
+      return image ? (await import('./invoice/download')).blobToDataUrl(image.blob) : null;
     },
     [repo],
   );
 
   const exportInvoice = async (invoice: Invoice, format: 'html' | 'jpeg' | 'png' | 'copy') => {
     try {
+      const { copyInvoiceHtml, downloadInvoiceHtml, downloadInvoiceImage } = await import('./invoice/download');
       if (format === 'html') {
         downloadInvoiceHtml(invoice, await logoDataUrlFor(invoice));
         setMessage('Saved as a self-contained HTML file. Attach it, or open it and copy it into an email.');
@@ -528,7 +546,8 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const handleExport = (doc: CommissionDocument) => {
+  const handleExport = async (doc: CommissionDocument) => {
+    const { exportDocument } = await import('./persistence/portable');
     const carried = allUpdates.filter((update) => update.documentId === doc.id);
     downloadJson(exportDocument(doc, carried), `${doc.documentNumber}.json`);
     setMessage(
@@ -539,6 +558,7 @@ export default function App() {
   };
 
   const handleImport = async (file: File) => {
+    const { importDocumentFromText } = await import('./persistence/portable');
     const result = importDocumentFromText(
       await file.text(),
       Object.keys(imageUrls),
@@ -573,7 +593,8 @@ export default function App() {
 
   // --- Shows, as a file ---------------------------------------------------
 
-  const handleExportShows = () => {
+  const handleExportShows = async () => {
+    const { exportShows } = await import('./persistence/portable');
     downloadJson(exportShows(shows), `shows-${new Date().toISOString().slice(0, 10)}.json`);
     setMessage(
       shows.length === 0
@@ -583,6 +604,7 @@ export default function App() {
   };
 
   const handleImportShows = async (file: File) => {
+    const { importShowsFromText, newShows } = await import('./persistence/portable');
     const result = importShowsFromText(await file.text(), photos.map((photo) => photo.id));
     if (!result.ok) {
       setMessage(`Import refused: ${result.errors.join(' ')}`);
@@ -615,7 +637,8 @@ export default function App() {
 
   // --- The books, as a file ------------------------------------------------
 
-  const handleExportExpenses = () => {
+  const handleExportExpenses = async () => {
+    const { exportExpenses } = await import('./persistence/portable');
     downloadJson(exportExpenses(expenses), `books-${new Date().toISOString().slice(0, 10)}.json`);
     setMessage(
       expenses.length === 0
@@ -625,6 +648,7 @@ export default function App() {
   };
 
   const handleImportExpenses = async (file: File) => {
+    const { importExpensesFromText, newExpenses } = await import('./persistence/portable');
     const result = importExpensesFromText(await file.text(), Object.keys(imageUrls));
     if (!result.ok) {
       setMessage(`Import refused: ${result.errors.join(' ')}`);
@@ -1157,9 +1181,12 @@ export default function App() {
     const chosen = update.photoIds
       .map((id) => photos.find((photo) => photo.id === id))
       .filter((photo): photo is Photo => Boolean(photo));
-    const urls = chosen
-      .map((photo) => imageUrls[photo.imageId])
+    // The card is drawn from the originals, not the thumbnails the lists use.
+    const originals = await Promise.all(chosen.map((photo) => repo.getImage(photo.imageId)));
+    const urls = originals
+      .map((image) => (image ? URL.createObjectURL(image.blob) : null))
       .filter((url): url is string => Boolean(url));
+    setTimeout(() => urls.forEach((url) => URL.revokeObjectURL(url)), 60_000);
     const message = messageFor(update, {
       studioName: doc.studio.name || null,
       clientName: doc.client.name || null,
@@ -1167,6 +1194,9 @@ export default function App() {
     });
 
     try {
+      const { downloadUpdateCard, downloadUpdatePage, printUpdatePage, shareUpdateCard } = await import(
+        './commission/updateDownload'
+      );
       if (channel === 'jpeg') {
         await downloadUpdateCard(update, context, urls);
         setMessage('Saved as a picture. Attach it to a text or an email — it is yours to send.');
@@ -1753,7 +1783,7 @@ export default function App() {
               </div>
               <ClientPreview
                 doc={toClientFacing(doc)}
-                imageUrls={imageUrls}
+                imageUrls={bigUrls}
                 issued={snapshot ? { version: snapshot.version, issuedAt: snapshot.issuedAt } : null}
               />
             </>
@@ -1823,7 +1853,7 @@ export default function App() {
       return (
         <PhotoWindow
           photo={photo}
-          url={imageUrls[photo.imageId]}
+          url={bigUrls[photo.imageId]}
           onChange={(changes) => void savePhotoRecord(editPhoto(photo, changes))}
           onSend={() => openConnect('send', photo.id)}
           onPreview={() => openPreview(photo.id)}
@@ -1838,7 +1868,7 @@ export default function App() {
       return (
         <ImageEditor
           photo={photo}
-          url={imageUrls[sourceImageId(photo)]}
+          url={fullUrls[sourceImageId(photo)]}
           onSaveEdit={(blob, adjustments, framing, size) =>
             savePhotoEdit(photo, blob, adjustments, framing, size)
           }
@@ -2043,8 +2073,7 @@ export default function App() {
     }
 
     if (kind.type === 'tool') {
-      const Tool = MOCK_TOOLS[kind.tool];
-      return Tool ? <Tool /> : <p className="hint">This tool does not exist yet.</p>;
+      return <MockToolWindow tool={kind.tool} />;
     }
 
     return null;
@@ -2301,7 +2330,7 @@ export default function App() {
             .map((id) => photos.find((photo) => photo.id === id))
             .filter((photo): photo is Photo => Boolean(photo))}
           index={preview.index}
-          imageUrls={imageUrls}
+          imageUrls={bigUrls}
           onIndex={(index) => setPreview((current) => (current ? { ...current, index } : current))}
           onClose={() => setPreview(null)}
           onEdit={(photoId) => {

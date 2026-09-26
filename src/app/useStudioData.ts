@@ -34,7 +34,7 @@ import type { ClientUpdate } from '../commission/updates';
 import type { Expense } from '../finance/ledger';
 import type { Show } from '../shows/shows';
 import { newId } from '../commission/document';
-import { buildDemo, demoAlreadySeeded, drawDemoArtwork, markDemoSeeded } from '../lib/demo';
+import { demoAlreadySeeded, markDemoSeeded } from '../lib/demoSeeded';
 
 export function useStudioData(options: {
   repo: Repository;
@@ -90,6 +90,7 @@ export function useStudioData(options: {
       if (!demoAlreadySeeded()) {
         const existing = await repo.list();
         if (existing.length === 0) {
+          const { buildDemo, drawDemoArtwork } = await import('../lib/demo');
           const demo = buildDemo();
           let doc = demo.document;
 

@@ -138,3 +138,41 @@ export function imageIdsKey(records: {
   }
   return [...ids].sort().join(',');
 }
+
+/** What changed between two image-id keys, so a URL map is patched, not rebuilt. */
+export function diffIdsKey(before: string, after: string): { added: string[]; removed: string[] } {
+  const was = new Set(before ? before.split(',') : []);
+  const now = new Set(after ? after.split(',') : []);
+  return {
+    added: [...now].filter((id) => !was.has(id)),
+    removed: [...was].filter((id) => !now.has(id)),
+  };
+}
+
+/**
+ * The images drawn at full size right now: the pictures open on their own or
+ * in the darkroom, the one in the preview and its neighbours, and those on an
+ * open commission (the client page prints them). Everything else draws its
+ * thumbnail.
+ */
+export function fullImageIdsKey(input: {
+  photos: Photo[];
+  documents: StoredDocument[];
+  photoIds: string[];
+  docIds: string[];
+}): string {
+  const ids = new Set<string>();
+  const wantPhotos = new Set(input.photoIds);
+  for (const photo of input.photos) {
+    if (!wantPhotos.has(photo.id)) continue;
+    ids.add(photo.imageId);
+    ids.add(sourceImageId(photo));
+  }
+  const wantDocs = new Set(input.docIds);
+  for (const row of input.documents) {
+    if (!wantDocs.has(row.document.id)) continue;
+    for (const id of row.document.artwork.referenceImageIds) ids.add(id);
+    if (row.document.studio.logoImageId) ids.add(row.document.studio.logoImageId);
+  }
+  return [...ids].sort().join(',');
+}

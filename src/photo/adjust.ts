@@ -26,6 +26,10 @@
  * are rather than being tinted.
  */
 
+import { BAND_NAMES, isNeutral } from './neutral';
+
+export { BAND_NAMES, isNeutral };
+
 /** The eight hues the editor lets the artist work on, as Lightroom does. */
 export type BandName =
   | 'red'
@@ -37,16 +41,6 @@ export type BandName =
   | 'purple'
   | 'magenta';
 
-export const BAND_NAMES: BandName[] = [
-  'red',
-  'orange',
-  'yellow',
-  'green',
-  'cyan',
-  'blue',
-  'purple',
-  'magenta',
-];
 
 /** Where each band sits on the colour wheel, in degrees. */
 export const BAND_HUES: Record<BandName, number> = {
@@ -136,30 +130,6 @@ export function mergeAdjustments(saved: Partial<Adjustments> | null | undefined)
     if (band) bands[name] = { ...neutralBand(), ...band };
   }
   return { ...base, ...saved, bands };
-}
-
-/** True when the picture would come out exactly as it went in. */
-export function isNeutral(adjustments: Adjustments): boolean {
-  const a = adjustments;
-  if (a.blackAndWhite) return false;
-  if (
-    a.exposure !== 0 ||
-    a.contrast !== 0 ||
-    a.highlights !== 0 ||
-    a.shadows !== 0 ||
-    a.blackPoint !== 0 ||
-    a.whitePoint !== 0 ||
-    a.gamma !== 1 ||
-    a.temperature !== 0 ||
-    a.saturation !== 0 ||
-    a.hue !== 0
-  ) {
-    return false;
-  }
-  return BAND_NAMES.every((name) => {
-    const band = a.bands[name];
-    return band.hue === 0 && band.saturation === 0 && band.luminance === 0;
-  });
 }
 
 /** What was changed, in words. Used on the saved copy, so it says why it differs. */

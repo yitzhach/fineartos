@@ -14,7 +14,8 @@
  */
 
 import { newId } from '../commission/document';
-import { isNeutral, type Adjustments } from './adjust';
+import type { Adjustments } from './adjust';
+import { isNeutral } from './neutral';
 import { isFramed, type Framing } from './crop';
 import type { PieceLocation, Sale } from '../artwork/catalogue';
 

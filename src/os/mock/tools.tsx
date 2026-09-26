@@ -175,14 +175,10 @@ export const MOCK_TOOLS: Record<string, () => JSX.Element> = {
   visualizer: Visualizer,
 };
 
-export const MOCK_TOOL_NAMES: Record<string, string> = {
-  calendar: 'Calendar',
-  clients: 'Clients',
-  files: 'Files',
-  templates: 'Templates',
-  shows: 'Shows',
-  artwork: 'Artwork',
-  finance: 'Finance',
-  connect: 'Connect',
-  visualizer: 'Visualizer',
-};
+export { MOCK_TOOL_NAMES } from './names';
+
+/** One preview window by tool id — the unit the shell loads on demand. */
+export function MockToolWindow({ tool }: { tool: string }) {
+  const Tool = MOCK_TOOLS[tool];
+  return Tool ? <Tool /> : <p className="hint">This tool does not exist yet.</p>;
+}

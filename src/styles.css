@@ -4219,3 +4219,13 @@ fieldset.section > legend {
 @media (max-width: 400px) {
   .shortcuts-groups { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* A tool loading on first open, or failing to. */
+.tool-loading,
+.tool-load-failed {
+  padding: 24px;
+  color: var(--muted, inherit);
+}
+.tool-load-failed p {
+  margin: 0 0 12px;
+}

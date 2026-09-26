@@ -25,25 +25,7 @@ import { createMilestone } from '../commission/milestones';
 import type { CommissionDocument } from '../commission/types';
 import { addDocumentToProject, createProject, setProjectCover, type Project } from '../project/project';
 
-const SEEDED_KEY = 'artistOS.demoSeeded';
-
-export function demoAlreadySeeded(): boolean {
-  try {
-    return localStorage.getItem(SEEDED_KEY) === 'true';
-  } catch {
-    // With site data blocked we cannot remember, so we do not seed at all
-    // rather than re-seed a demo on every single load.
-    return true;
-  }
-}
-
-export function markDemoSeeded(): void {
-  try {
-    localStorage.setItem(SEEDED_KEY, 'true');
-  } catch {
-    /* preferences are a convenience, not a requirement */
-  }
-}
+export { demoAlreadySeeded, markDemoSeeded } from './demoSeeded';
 
 export interface DemoContent {
   document: CommissionDocument;

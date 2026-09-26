@@ -32,6 +32,12 @@ export interface StoredImage {
   mimeType: string;
   byteSize: number;
   createdAt: string;
+  /**
+   * A small WebP (480px on the long side) that lists and the desktop draw
+   * instead of the original. Absent until made; null when the browser could
+   * not make one, so it is not tried again on every load.
+   */
+  thumb?: Blob | null;
 }
 
 export type PendingOp = 'upsertDocument' | 'uploadImage';

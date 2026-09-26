@@ -22,6 +22,10 @@
 - Say in HANDOFF which of these were NOT done.
 
 ## Traps
+- `check-owed` expects preview on 4180; `check-books-and-stage` defaults to
+  4181 — pass `URL=http://localhost:4180/`.
+- A context's `route()` misses fetches made by the service worker. To fake a
+  failed chunk, create the context with `serviceWorkers: 'block'`.
 - `pkill -f "vite preview"` inside a compound command killed the shell
   (exit 144) and skipped the rest. Stop preview in its own command.
 - Full `scripts/acceptance.mjs` run: preview on 4180, `PLAYWRIGHT_CHROMIUM` set.
