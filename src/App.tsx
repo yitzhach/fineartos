@@ -2,6 +2,32 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './styles.css';
 import './print.css';
 import { SystemBar } from './os/SystemBar';
+import { Launcher } from './os/Launcher';
+import {
+  actionEntries,
+  goStep,
+  recordEntries,
+  toolEntries,
+  type GoState,
+  type LauncherEntry,
+} from './os/launcher';
+import {
+  anySnapped,
+  cascadeAll,
+  resnap,
+  snapByArrow,
+  snapWindow,
+  tileAll,
+  unsnapWindow,
+  untileAll,
+  visibleFrames,
+  zoneAt,
+  zoneRect,
+  type Arrow,
+  type TileLayout,
+  type Zone,
+} from './os/tiling';
+import { enterFullscreen, exitFullscreen, isFullscreen, useFullscreen } from './os/fullscreen';
 import { Dock } from './os/Dock';
 import { Frame } from './os/Frame';
 import { Desktop, type DesktopItem } from './os/Desktop';
@@ -57,6 +83,7 @@ import {
   stepTab,
   tabsOf,
   toggleZoom,
+  topZ,
   type WindowKind,
   type WindowState,
 } from './os/windows';
@@ -204,8 +231,10 @@ import {
   loadTrash,
   loadTrashPosition,
   loadAskForSignature,
+  loadAutoTile,
   loadMileageRate,
   loadRestoreWindows,
+  loadTileLayout,
   loadWallpaperLibrary,
   loadWindows,
   savePaymentInstructions,
@@ -218,8 +247,10 @@ import {
   saveTrash,
   saveTrashPosition,
   saveAskForSignature,
+  saveAutoTile,
   saveMileageRate,
   saveRestoreWindows,
+  saveTileLayout,
   saveWallpaperLibrary,
   saveWindows,
   type PaymentInstructions,
@@ -360,6 +391,23 @@ export default function App() {
   const [studio, setStudio] = useState<StudioDefaults>(loadStudioDefaults);
   const [askForSignature, setAskForSignature] = useState<boolean>(loadAskForSignature);
   const [restoreWindowsOn, setRestoreWindowsOn] = useState<boolean>(loadRestoreWindows);
+  const [autoTile, setAutoTile] = useState<boolean>(loadAutoTile);
+  const [tileLayout, setTileLayout] = useState<TileLayout>(loadTileLayout);
+  /** Read when the desktop changes size, from a handler made once. */
+  const tileLayoutRef = useRef(tileLayout);
+  /**
+   * The zone a window being dragged would snap into if let go now: drawn as
+   * a preview while the drag lasts. The ref is what the release reads.
+   */
+  const [snapPreview, setSnapPreview] = useState<Zone | null>(null);
+  const snapZoneRef = useRef<Zone | null>(null);
+  /** Goes up by one each time ⌘K, Ctrl+K or / asks for the search box. */
+  const [launcherSummon, setLauncherSummon] = useState(0);
+  const goRef = useRef<GoState>({ armedAt: null });
+  /** A show chosen in the search box, for the Shows window to select. */
+  const [showFocus, setShowFocus] = useState<{ id: string } | null>(null);
+  const addImagesRef = useRef<HTMLInputElement>(null);
+  const fullscreen = useFullscreen();
   const [payment, setPayment] = useState<PaymentInstructions>(loadPaymentInstructions);
 
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
@@ -383,6 +431,11 @@ export default function App() {
   useEffect(() => saveAskForSignature(askForSignature), [askForSignature]);
   useEffect(() => saveRestoreWindows(restoreWindowsOn), [restoreWindowsOn]);
   useEffect(() => saveMileageRate(mileageRate), [mileageRate]);
+  useEffect(() => saveAutoTile(autoTile), [autoTile]);
+  useEffect(() => {
+    saveTileLayout(tileLayout);
+    tileLayoutRef.current = tileLayout;
+  }, [tileLayout]);
 
   /**
    * The arrangement, kept so a reload picks the work back up. Written on a
@@ -411,8 +464,9 @@ export default function App() {
     const previous = desktopViewportRef.current;
     desktopViewportRef.current = size;
     if (previous.width === size.width && previous.height === size.height) return;
-    // Windows follow the surface in, so none is left unreachable or clipped.
-    setWindows((current) => clampToViewport(current, size));
+    // Windows follow the surface in, so none is left unreachable or clipped,
+    // and a snapped or tiled window keeps its share of the new size.
+    setWindows((current) => resnap(clampToViewport(current, size), size, tileLayoutRef.current));
   }, []);
 
   const open = useCallback((kind: WindowKind, title: string, subtitle?: string | null) => {
@@ -1073,37 +1127,74 @@ export default function App() {
   }, [undoLast]);
 
   /**
-   * Stepping through the tabs of the frame in front.
+   * The shell's own keys, in one place so they cannot fight:
+   *  - ⌘K or Ctrl+K anywhere, and / when not typing: the search box.
+   *  - Ctrl/⌘ + Alt + an arrow steps through the tabs of the frame in front.
+   *    Not Ctrl+Tab: browsers keep that one for their own tabs. Alt with a
+   *    number jumps straight to a tab.
+   *  - Alt + Shift + an arrow snaps the window in front (tiling.ts).
+   *  - G, then a letter, opens a tool (launcher.ts).
+   * A key typed into a field is left to the field — except ⌘K, which is
+   * deliberate enough to mean the search box wherever the cursor is.
    *
-   * Not Ctrl+Tab: browsers keep that one for their own tabs and a page cannot
-   * have it. Ctrl/⌘ with Alt and an arrow is reachable everywhere, and Alt
-   * with a number jumps straight to a tab.
+   * Everything is decided from refs, here, before the handler returns. A
+   * state updater runs later, after the browser has already acted on the
+   * key, so a preventDefault inside one never prevented anything.
    */
+  const keyActions = useRef<{ openTool: (id: string) => void; snapFront: (arrow: Arrow) => void }>({
+    openTool: () => undefined,
+    snapFront: () => undefined,
+  });
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      // The preview owns the arrows while it is open.
+      // The preview owns the keys while it is open.
       if (previewOpenRef.current) return;
-      const stepping = (event.ctrlKey || event.metaKey) && event.altKey;
-      if (stepping && (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) {
+      const mod = event.ctrlKey || event.metaKey;
+      const typing = isTypingTarget(event.target);
+
+      if (mod && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
         event.preventDefault();
-        setWindows((current) => {
-          const front = focusedWindow(current);
-          if (!front) return current;
-          const next = stepTab(current, front.id, event.key === 'ArrowRight' ? 1 : -1);
-          return next === front.id ? current : focusWindow(current, next);
-        });
+        setLauncherSummon((n) => n + 1);
         return;
       }
-      if (event.altKey && !event.ctrlKey && !event.metaKey && /^[1-9]$/.test(event.key)) {
-        setWindows((current) => {
-          const front = focusedWindow(current);
-          if (!front) return current;
-          const tabs = tabsOf(current, front.id);
-          const wanted = tabs[Number(event.key) - 1];
-          if (!wanted || tabs.length < 2) return current;
-          event.preventDefault();
-          return focusWindow(current, wanted.id);
-        });
+      if (!typing && !mod && !event.altKey && event.key === '/') {
+        event.preventDefault();
+        setLauncherSummon((n) => n + 1);
+        return;
+      }
+
+      const current = windowsRef.current;
+      if (mod && event.altKey && (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) {
+        const front = focusedWindow(current);
+        if (!front) return;
+        event.preventDefault();
+        const next = stepTab(current, front.id, event.key === 'ArrowRight' ? 1 : -1);
+        if (next !== front.id) setWindows((c) => focusWindow(c, next));
+        return;
+      }
+      if (event.altKey && !mod && !event.shiftKey && /^[1-9]$/.test(event.key)) {
+        const front = focusedWindow(current);
+        if (!front) return;
+        const tabs = tabsOf(current, front.id);
+        const wanted = tabs[Number(event.key) - 1];
+        if (!wanted || tabs.length < 2) return;
+        event.preventDefault();
+        setWindows((c) => focusWindow(c, wanted.id));
+        return;
+      }
+
+      const arrow = ARROWS[event.key];
+      if (arrow && event.altKey && event.shiftKey && !mod && !typing) {
+        event.preventDefault();
+        keyActions.current.snapFront(arrow);
+        return;
+      }
+
+      if (!typing && !mod && !event.altKey && event.key.length === 1) {
+        const step = goStep(goRef.current, event.key, Date.now());
+        goRef.current = step.state;
+        if (step.consumed) event.preventDefault();
+        if (step.tool) keyActions.current.openTool(step.tool);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -1894,32 +1985,255 @@ export default function App() {
   const zoomWin = (id: string) => setWindows((c) => toggleZoom(c, id, desktopViewportRef.current));
 
   /**
-   * A window being dragged by its titlebar. While the pointer is over the top
-   * of another frame that frame lights up, and letting go there makes the
-   * dragged window one of its tabs. Let go anywhere else and it is what it
-   * always was: a window that has been moved.
+   * A window being dragged by its titlebar. Pushed against an edge of the
+   * desktop, the zone it would snap into is drawn; over the top of another
+   * frame, that frame lights up to take it as a tab. The edge wins where both
+   * could apply: pushing at the side of the screen is a request, brushing a
+   * titlebar on the way there is not.
    */
-  const onDragWindow = useCallback((id: string, point: { x: number; y: number } | null) => {
+  const onDragWindow = useCallback((id: string, point: { x: number; y: number }) => {
     const surface = desktopRef.current?.getBoundingClientRect();
+    if (!surface) return;
+    const local = { x: point.x - surface.left, y: point.y - surface.top };
 
-    // Let go: take whatever was lit up, and stop pointing at anything.
-    if (!point || !surface) {
-      const target = dropTargetRef.current;
-      dropTargetRef.current = null;
-      setDropTarget(null);
-      if (target) setWindows((current) => mergeInto(current, id, target));
-      return;
+    const zone = zoneAt(local, desktopViewportRef.current);
+    if (zone !== snapZoneRef.current) {
+      snapZoneRef.current = zone;
+      setSnapPreview(zone);
     }
 
-    const found = dropTargetAt(windowsRef.current, id, {
-      x: point.x - surface.left,
-      y: point.y - surface.top,
-    });
-    if (found?.id !== dropTargetRef.current) {
-      dropTargetRef.current = found?.id ?? null;
-      setDropTarget(found?.id ?? null);
+    const target = zone ? null : (dropTargetAt(windowsRef.current, id, local)?.id ?? null);
+    if (target !== dropTargetRef.current) {
+      dropTargetRef.current = target;
+      setDropTarget(target);
     }
   }, []);
+
+  /**
+   * Let go. The frame moved itself during the drag; this is the one time the
+   * desktop hears where it ended up, and decides what that means: a snap, a
+   * tab, or a window that has been moved — at its own size again, if it had
+   * been snapped when it was picked up.
+   */
+  const onDragEndWindow = useCallback((id: string, to: { x: number; y: number }) => {
+    const zone = snapZoneRef.current;
+    const target = dropTargetRef.current;
+    snapZoneRef.current = null;
+    dropTargetRef.current = null;
+    setSnapPreview(null);
+    setDropTarget(null);
+    if (zone) setWindows((current) => snapWindow(current, id, zone, desktopViewportRef.current));
+    else if (target) setWindows((current) => mergeInto(current, id, target));
+    else setWindows((current) => moveWindow(unsnapWindow(current, id), id, to.x, to.y));
+  }, []);
+
+  // --- Tools, tiling and the search box -----------------------------------
+
+  const frames = visibleFrames(windows);
+  const hasFocused = top !== null;
+  const snapped = anySnapped(windows);
+  const apple = useMemo(onApple, []);
+
+  /** What a tool's window is called and shows, by dock id. */
+  const toolSpec = (id: string): { kind: WindowKind; title: string; subtitle: string } => {
+    switch (id) {
+      case 'invoices':
+        return { kind: { type: 'tool', tool: 'invoices-list' }, title: 'Invoices', subtitle: 'All invoices' };
+      case 'commissions':
+        return { kind: { type: 'list' }, title: 'Projects', subtitle: 'All commissions' };
+      case 'trash':
+        return { kind: { type: 'tool', tool: 'trash' }, title: 'Trash', subtitle: 'Nothing here is deleted yet' };
+      case 'connect':
+        return { kind: { type: 'tool', tool: 'connect' }, title: 'Connect', subtitle: 'Guest book, sharing and QR' };
+      case 'finder':
+        return { kind: { type: 'tool', tool: 'finder' }, title: 'Finder', subtitle: 'Everything in the studio' };
+      case 'artwork':
+        return { kind: { type: 'tool', tool: 'artwork' }, title: 'Artwork', subtitle: 'The catalogue' };
+      case 'finance':
+        return { kind: { type: 'tool', tool: 'finance' }, title: 'Finance', subtitle: 'The books' };
+      case 'shows':
+        return { kind: { type: 'tool', tool: 'shows' }, title: 'Shows', subtitle: 'Fairs, openings and markets' };
+      default:
+        return { kind: { type: 'tool', tool: id }, title: MOCK_TOOL_NAMES[id] ?? id, subtitle: 'Preview' };
+    }
+  };
+
+  /** Show the desktop: everything goes to the tray, nothing is lost. */
+  const showDesktop = () => setWindows((c) => c.map((w) => ({ ...w, minimized: true })));
+
+  /**
+   * Opens a tool, or brings it forward. Unlike a dock button this never puts
+   * the tool away: asking for something by name means wanting to see it.
+   */
+  const openTool = (id: string) => {
+    if (id === 'home') return showDesktop();
+    if (id === 'settings') return open({ type: 'settings' }, 'Settings', null);
+    const spec = toolSpec(id);
+    open(spec.kind, spec.title, spec.subtitle);
+  };
+
+  /** Alt+Shift and an arrow, on the window in front. Nothing to do on a phone. */
+  const snapFront = (arrow: Arrow) => {
+    if (compact) return;
+    const front = focusedWindow(windowsRef.current);
+    if (!front) return;
+    const next = snapByArrow(front.snap, arrow);
+    if (next === null) return;
+    setWindows((c) =>
+      next === 'restore' ? unsnapWindow(c, front.id) : snapWindow(c, front.id, next, desktopViewportRef.current),
+    );
+  };
+  keyActions.current = { openTool, snapFront };
+
+  /** Straight into a zone, whatever the window was doing: the search box's snaps. */
+  const snapFrontTo = (zone: Zone) => {
+    const front = focusedWindow(windowsRef.current);
+    if (front) setWindows((c) => snapWindow(c, front.id, zone, desktopViewportRef.current));
+  };
+
+  const tile = (layout: TileLayout) => {
+    setTileLayout(layout);
+    setWindows((c) => tileAll(c, layout, desktopViewportRef.current, focusedWindow(c)?.id ?? null));
+  };
+
+  /**
+   * Auto-tiling: whenever a frame opens, closes, comes back from the tray or
+   * joins a group, everything on screen is laid out again. A lone window is
+   * given back its own size — a single tile filling the screen is just a
+   * zoomed window nobody asked for.
+   */
+  const frameKey = frames
+    .map((frame) => frame.groupId ?? frame.id)
+    .sort()
+    .join('|');
+  useEffect(() => {
+    if (!autoTile || compact || !loaded) return;
+    setWindows((c) =>
+      visibleFrames(c).length < 2
+        ? untileAll(c)
+        : tileAll(c, tileLayoutRef.current, desktopViewportRef.current, focusedWindow(c)?.id ?? null),
+    );
+  }, [autoTile, compact, frameKey, loaded]);
+
+  const undoLabel = nextUndoLabel(undoStack);
+  const launcherEntries = useMemo(
+    () => [
+      ...toolEntries(),
+      ...actionEntries({
+        frames: frames.length,
+        hasFocused,
+        compact,
+        undoLabel,
+        theme,
+        fullscreen: fullscreen.supported ? (fullscreen.active ? 'on' : 'off') : 'unsupported',
+        autoTile,
+        snapped,
+        mac: apple,
+      }),
+      ...recordEntries({ documents: rows, invoices, projects, photos, shows, guests }),
+    ],
+    [
+      frames.length,
+      hasFocused,
+      compact,
+      undoLabel,
+      theme,
+      fullscreen.supported,
+      fullscreen.active,
+      autoTile,
+      snapped,
+      apple,
+      rows,
+      invoices,
+      projects,
+      photos,
+      shows,
+      guests,
+    ],
+  );
+
+  const toggleFullscreen = async () => {
+    try {
+      if (isFullscreen()) await exitFullscreen();
+      else await enterFullscreen();
+    } catch {
+      setMessage('This browser refused to go fullscreen.');
+    }
+  };
+
+  /** Something chosen from the search box. */
+  const onLaunch = (entry: LauncherEntry) => {
+    const at = entry.id.indexOf(':');
+    const kind = entry.id.slice(0, at);
+    const ref = entry.id.slice(at + 1);
+    if (kind === 'tool') openTool(ref);
+    else if (kind === 'action') runAction(ref);
+    else if (kind === 'commission') openDocumentWindow(ref);
+    else if (kind === 'invoice') openInvoiceWindow(ref);
+    else if (kind === 'photo') openPhotoWindow(ref);
+    else if (kind === 'folder') {
+      const project = projects.find((p) => p.id === ref);
+      if (project) open({ type: 'folder', projectId: ref }, project.name, 'Project folder');
+    } else if (kind === 'show') {
+      setShowFocus({ id: ref });
+      openTool('shows');
+    } else if (kind === 'guest') openConnect('guestbook');
+  };
+
+  const runAction = (id: string) => {
+    const viewportNow = desktopViewportRef.current;
+    switch (id) {
+      case 'new-commission':
+        return void handleNew();
+      case 'new-invoice':
+        return void makeInvoice(null, null);
+      case 'new-folder':
+        return void handleNewFolder();
+      case 'add-images':
+        return addImagesRef.current?.click();
+      case 'guest-book':
+        return openConnect('guestbook');
+      case 'qr':
+        return openConnect('qr');
+      case 'send-picture':
+        return openConnect('send');
+      case 'tidy':
+        return handleTidy();
+      case 'wallpaper':
+        return open({ type: 'settings' }, 'Settings', null);
+      case 'undo':
+        return void undoLast();
+      case 'theme':
+        return setTheme(theme === 'dark' ? 'light' : 'dark');
+      case 'fullscreen':
+        return void toggleFullscreen();
+      case 'tile-columns':
+        return tile('columns');
+      case 'tile-grid':
+        return tile('grid');
+      case 'tile-main':
+        return tile('main');
+      case 'tile-rows':
+        return tile('rows');
+      case 'cascade':
+        return setWindows((c) => cascadeAll(c, viewportNow));
+      case 'untile':
+        return setWindows(untileAll);
+      case 'merge':
+        setWindows((c) => mergeAll(c));
+        return setMessage('Windows merged into tabs. ⧉ on a tab moves it back out.');
+      case 'snap-left':
+        return snapFrontTo('left');
+      case 'snap-right':
+        return snapFrontTo('right');
+      case 'snap-fill':
+        return snapFrontTo('fill');
+      case 'auto-tile':
+        return setAutoTile(!autoTile);
+      default:
+        return undefined;
+    }
+  };
 
   const statusRow =
     top && top.kind.type === 'commission'
@@ -2411,6 +2725,7 @@ export default function App() {
           onExport={handleExportShows}
           onImport={(file) => void handleImportShows(file)}
           onTogglePiece={(show, photo) => void toggleShowPiece(show, photo)}
+          focus={showFocus}
         />
       );
     }
@@ -2552,8 +2867,30 @@ export default function App() {
       )}
       <SystemBar
         studioName={studio.name}
-        search={search}
-        onSearch={setSearch}
+        launcher={
+          <Launcher
+            entries={launcherEntries}
+            onChoose={onLaunch}
+            summon={launcherSummon}
+            compact={compact}
+            summonKeys={apple ? ['⌘', 'K'] : ['Ctrl', 'K']}
+          />
+        }
+        arrange={
+          compact
+            ? undefined
+            : {
+                frames: frames.length,
+                snapped,
+                autoTile,
+                layout: tileLayout,
+                onTile: tile,
+                onCascade: () => setWindows((c) => cascadeAll(c, desktopViewportRef.current)),
+                onUntile: () => setWindows(untileAll),
+                onAutoTile: setAutoTile,
+                snapKeys: apple ? '⌥⇧' : 'Alt+Shift',
+              }
+        }
         statusText={statusText}
         statusState={statusRow?.saveState ?? 'saved-local'}
         theme={theme}
@@ -2575,6 +2912,21 @@ export default function App() {
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) void handleImport(file);
+          e.target.value = '';
+        }}
+      />
+
+      {/* Add images from the search box: the same door as the desktop's square. */}
+      <input
+        ref={addImagesRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        multiple
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) void handleImportPhotos(e.target.files);
           e.target.value = '';
         }}
       />
@@ -2613,6 +2965,8 @@ export default function App() {
               items={comingUp({ shows, owed: allOwed({ invoices, documents: rows.map((row) => row.document) }), today: localToday() })}
               onOpen={(item) => {
                 if (item.kind !== 'payment') {
+                  // Straight to the show that was clicked, not the first one.
+                  setShowFocus({ id: item.openId });
                   open({ type: 'tool', tool: 'shows' }, 'Shows', 'Fairs, openings and markets');
                 } else if (invoices.some((invoice) => invoice.id === item.openId)) {
                   openInvoiceWindow(item.openId);
@@ -2648,6 +3002,19 @@ export default function App() {
           onViewport={onDesktopViewport}
         />
 
+        {/* Where a window being dragged will land if let go now. Drawn at the
+            top z but before the frames, so the window itself stays over it. */}
+        {snapPreview && !compact && (
+          <div
+            className="snap-preview no-print"
+            aria-hidden="true"
+            style={(() => {
+              const r = zoneRect(snapPreview, desktopViewportRef.current);
+              return { left: r.x, top: r.y, width: r.width, height: r.height, zIndex: topZ(windows) };
+            })()}
+          />
+        )}
+
         {renderGroups(windows.filter((w) => !w.minimized)).map(({ active: win, tabs }) => (
             <Frame
               key={win.groupId ?? win.id}
@@ -2675,8 +3042,18 @@ export default function App() {
               onClose={() => closeWin(win.id)}
               onMinimize={() => minimizeWin(win.id)}
               onZoom={() => zoomWin(win.id)}
-              onMove={(x, y) => setWindows((c) => moveWindow(c, win.id, x, y))}
+              onDragEnd={(to) => onDragEndWindow(win.id, to)}
               onResize={(w, h) => setWindows((c) => resizeWindow(c, win.id, w, h))}
+              onSnap={
+                compact
+                  ? undefined
+                  : (zone) =>
+                      setWindows((c) =>
+                        zone === 'restore'
+                          ? unsnapWindow(c, win.id)
+                          : focusWindow(snapWindow(c, win.id, zone, desktopViewportRef.current), win.id),
+                      )
+              }
               fills={win.kind.type === 'photoEdit'}
               onDragTo={(point) => onDragWindow(win.id, point)}
               dropTarget={tabs.some((tab) => tab.id === dropTarget)}
@@ -2744,30 +3121,12 @@ export default function App() {
             return;
           }
           if (id === 'home') {
-            // Show the desktop: everything goes to the tray, nothing is lost.
-            setWindows((c) => c.map((w) => ({ ...w, minimized: true })));
+            showDesktop();
             return;
           }
           // Every other dock button is a switch for its tool: open it, bring
           // it forward, or put it away. See toggleWindow.
-          const spec =
-            id === 'invoices'
-              ? { kind: { type: 'tool' as const, tool: 'invoices-list' }, title: 'Invoices', subtitle: 'All invoices' }
-              : id === 'commissions'
-                ? { kind: { type: 'list' as const }, title: 'Projects', subtitle: 'All commissions' }
-                : id === 'trash'
-                  ? { kind: { type: 'tool' as const, tool: 'trash' }, title: 'Trash', subtitle: 'Nothing here is deleted yet' }
-                  : id === 'connect'
-                  ? { kind: { type: 'tool' as const, tool: 'connect' }, title: 'Connect', subtitle: 'Guest book, sharing and QR' }
-                  : id === 'finder'
-                  ? { kind: { type: 'tool' as const, tool: 'finder' }, title: 'Finder', subtitle: 'Everything in the studio' }
-                  : id === 'artwork'
-                  ? { kind: { type: 'tool' as const, tool: 'artwork' }, title: 'Artwork', subtitle: 'The catalogue' }
-                  : id === 'finance'
-                  ? { kind: { type: 'tool' as const, tool: 'finance' }, title: 'Finance', subtitle: 'The books' }
-                  : id === 'shows'
-                  ? { kind: { type: 'tool' as const, tool: 'shows' }, title: 'Shows', subtitle: 'Fairs, openings and markets' }
-                  : { kind: { type: 'tool' as const, tool: id }, title: MOCK_TOOL_NAMES[id] ?? id, subtitle: 'Preview' };
+          const spec = toolSpec(id);
           setWindows((c) => toggleWindow(c, spec, desktopViewportRef.current).windows);
         }}
       />
@@ -2785,6 +3144,31 @@ export default function App() {
       />
     );
   }
+}
+
+const ARROWS: Record<string, Arrow | undefined> = {
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+  ArrowUp: 'up',
+  ArrowDown: 'down',
+};
+
+/** A key pressed here belongs to what is being typed, not to the shell. */
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  if (target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return true;
+  if (target instanceof HTMLInputElement) {
+    return !['button', 'checkbox', 'radio', 'range', 'color', 'file', 'submit', 'reset', 'image'].includes(
+      target.type,
+    );
+  }
+  return false;
+}
+
+/** ⌘ and ⌥ on a Mac or an iPad; Ctrl and Alt everywhere else. */
+function onApple(): boolean {
+  return typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
 }
 
 /** The record a window is a view onto, when it is a view onto one. */

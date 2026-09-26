@@ -210,15 +210,6 @@ body {
 
 .systembar .spacer { flex: 1 1 auto; }
 
-.search { flex: 0 1 300px; min-width: 0; }
-.search input {
-  height: 27px;
-  padding: 0 11px;
-  border-radius: 999px;
-  background: var(--raised);
-  border-color: transparent;
-  font-size: 13px;
-}
 
 .status-pill {
   display: inline-flex;
@@ -266,6 +257,13 @@ body {
   flex: 1 1 auto;
   overflow: hidden;
 }
+/* Windows get a layer of their own, under the system bar, the dock and the
+   tray. A window's z goes up every time it is focused, so after twenty-odd
+   clicks it outranked the system bar (20) and covered the search results,
+   the menus and the dock. Phones keep their sheets at a fixed 30 instead. */
+@media (min-width: 861px) {
+  .desktop { z-index: 0; }
+}
 
 /* The icons' half of the desktop: everything above the dock. Windows use the
    whole of .desktop and are allowed under the dock; icons are not, because an
@@ -276,6 +274,10 @@ body {
   inset: 0;
   bottom: var(--dock-reserve, 104px);
   overflow: auto;
+  /* A layer of its own, under every window. Without it the desktop's buttons
+     and the Coming up panel (z-index 3) were drawn over any window whose z
+     was lower — the first two opened — which tiling made impossible to miss. */
+  z-index: 0;
 }
 
 /* Icons are positioned, not flowed: the artist drags them where they like and
@@ -2040,13 +2042,12 @@ fieldset.section > legend {
 
 @media (max-width: 860px) {
   /* The system bar keeps identity, status and the controls a phone can use.
-     Search moves into the lists, where there is room for it. */
+     The search box shrinks to a button that opens it as a sheet. */
   /* Above the sheets. A window is z-index 30 and fixed here, so at the
      bar's usual 20 its own menu opened *behind* the window that was open —
      which put Settings out of reach on a phone whenever anything was open. */
   .systembar { gap: 10px; padding: 0 10px; z-index: 40; }
   .systembar .studio,
-  .systembar .search,
   .systembar .clock { display: none; }
   .status-pill { font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
@@ -3869,4 +3870,282 @@ fieldset.section > legend {
 /* Below 1100px the dock reaches the bottom-left corner the stamp sits in. */
 @media (max-width: 1100px) {
   .build-stamp { display: none; }
+}
+
+/* --- Search box ---------------------------------------------------------
+   The launcher in the system bar: tools by the words artists use for them,
+   what can be done now, and the studio's records. The ranking is in
+   src/os/launcher.ts; this is only how it looks. */
+
+.launcher { position: relative; flex: 0 1 440px; min-width: 0; }
+
+.launcher-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 6px 0 11px;
+  border-radius: 999px;
+  background: var(--raised);
+  border: 1px solid transparent;
+  color: var(--ink-faint);
+  transition: border-color 110ms ease, background 110ms ease;
+}
+.launcher-box:hover { background: var(--raised-hover); }
+.launcher[data-open='true'] .launcher-box { border-color: var(--line-strong); background: var(--panel-solid); }
+.launcher-glass { flex: 0 0 auto; }
+.launcher-box input[type='text'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+}
+.launcher-box input::placeholder { color: var(--ink-faint); }
+:root[data-theme='light'] .launcher-box input[type='text'] { background: transparent; }
+
+.launcher kbd,
+.arrange-menu kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 5px;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--raised);
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 10.5px;
+  line-height: 16px;
+  text-align: center;
+}
+.launcher-keys { display: inline-flex; gap: 3px; flex: 0 0 auto; }
+
+.launcher-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 24px));
+  max-height: min(70vh, 560px);
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--panel-solid);
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.45);
+  z-index: 45;
+}
+.launcher-head {
+  margin: 4px 8px 6px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.launcher-list { list-style: none; margin: 0; padding: 0; }
+.launcher-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.launcher-row[aria-selected='true'] { background: var(--accent-quiet); }
+.launcher-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--raised);
+  color: var(--ink-soft);
+}
+.launcher-row[aria-selected='true'] .launcher-icon { color: var(--ink); }
+.launcher-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-faint); }
+.launcher-row[data-section='action'] .launcher-dot { background: var(--copper); }
+.launcher-text { display: flex; flex-direction: column; min-width: 0; }
+.launcher-title {
+  font-size: 13.5px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.launcher-hint {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.launcher-label {
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.launcher-empty { margin: 10px 8px; font-size: 12.5px; color: var(--ink-soft); }
+.launcher-try {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin: 8px 8px 4px;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+.launcher-chip {
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+.launcher-chip:hover { border-color: var(--accent); color: var(--ink); }
+.launcher-foot {
+  margin: 8px 8px 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+/* On a phone the box is a button in the bar; tapped, it becomes a sheet
+   across the top of the screen, above any window. */
+.launcher[data-compact='true'] { flex: 0 0 auto; }
+.launcher-button { padding: 6px 9px; color: var(--ink-soft); }
+.launcher[data-compact='true'][data-open='true'] {
+  position: fixed;
+  top: 46px;
+  left: 8px;
+  right: 8px;
+  z-index: 60;
+}
+.launcher[data-compact='true'][data-open='true'] .launcher-box { height: 40px; }
+.launcher[data-compact='true'] .launcher-box input[type='text'] { font-size: 16px; } /* no zoom-on-focus on iOS */
+.launcher[data-compact='true'] .launcher-panel {
+  left: 0;
+  right: 0;
+  transform: none;
+  width: auto;
+  max-height: calc(100vh - 150px);
+}
+.launcher-cancel { padding: 4px 8px; font-size: 13px; }
+
+/* --- Arranging windows ---------------------------------------------------- */
+
+.layout-picture rect { fill: currentColor; opacity: 0.75; }
+.arrange-button { padding: 5px 8px; color: var(--ink-soft); }
+.arrange-button .layout-picture { width: 22px; height: 11px; }
+
+.arrange-menu { width: 300px; }
+.arrange-layouts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.arrange-layout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 9px 6px 7px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--raised);
+  color: var(--ink-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+.arrange-layout:hover:not(:disabled) { border-color: var(--accent); color: var(--ink); }
+.arrange-layout:disabled { opacity: 0.4; cursor: not-allowed; }
+.arrange-layout[data-current='true'] { border-color: var(--accent); color: var(--ink); }
+.arrange-row { display: flex; gap: 6px; margin-top: 8px; }
+.arrange-row .btn { flex: 1 1 0; justify-content: center; }
+.arrange-auto { display: flex; gap: 8px; align-items: flex-start; margin: 12px 0 0; font-size: 12.5px; cursor: pointer; }
+.arrange-auto input { margin-top: 2px; }
+.arrange-keys { margin: 10px 0 0; font-size: 11.5px; }
+
+/* Where a dragged window will land if let go now. */
+.snap-preview {
+  position: absolute;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--accent);
+  background: var(--accent-quiet);
+  pointer-events: none;
+  transition: left 90ms ease, top 90ms ease, width 90ms ease, height 90ms ease;
+}
+
+/* The snap button on a titlebar, and the little screens it offers. */
+.frame-snap { position: relative; margin-left: auto; flex: 0 0 auto; }
+.frame-snap-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+.frame-snap-button:hover,
+.frame-snap-button[aria-expanded='true'] { color: var(--ink); background: var(--raised-hover); }
+.frame-snap-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.snap-menu {
+  position: absolute;
+  top: 30px;
+  right: -4px;
+  z-index: 6;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--panel-solid);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  cursor: default;
+}
+.snap-grid { display: grid; grid-template-columns: repeat(4, 44px); gap: 5px; }
+.snap-target {
+  display: grid;
+  place-items: center;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--raised);
+  cursor: pointer;
+}
+.snap-target:hover,
+.snap-target[data-current='true'] { border-color: var(--accent); }
+.snap-mini {
+  position: relative;
+  width: 32px;
+  height: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+}
+.snap-area { position: absolute; border-radius: 2px; background: var(--ink-soft); }
+.snap-target:hover .snap-area,
+.snap-target[data-current='true'] .snap-area { background: var(--accent); }
+.snap-area[data-zone='left'] { left: 2px; top: 2px; bottom: 2px; width: calc(50% - 3px); }
+.snap-area[data-zone='right'] { right: 2px; top: 2px; bottom: 2px; width: calc(50% - 3px); }
+.snap-area[data-zone='fill'] { inset: 2px; }
+.snap-area[data-zone='top-left'] { left: 2px; top: 2px; width: calc(50% - 3px); height: calc(50% - 3px); }
+.snap-area[data-zone='top-right'] { right: 2px; top: 2px; width: calc(50% - 3px); height: calc(50% - 3px); }
+.snap-area[data-zone='bottom-left'] { left: 2px; bottom: 2px; width: calc(50% - 3px); height: calc(50% - 3px); }
+.snap-area[data-zone='bottom-right'] { right: 2px; bottom: 2px; width: calc(50% - 3px); height: calc(50% - 3px); }
+.snap-restore { width: 100%; justify-content: center; margin-top: 8px; font-size: 12.5px; }
+
+/* A titlebar is dragged, never scrolled: without this a finger on a tablet
+   pans the page and the browser takes the pointer away mid-drag. */
+@media (min-width: 861px) {
+  .frame-bar, .frame-resize { touch-action: none; }
 }

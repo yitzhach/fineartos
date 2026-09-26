@@ -29,6 +29,11 @@ interface Props {
   onTogglePiece: (show: Show, photo: Photo) => void;
   onExport: () => void;
   onImport: (file: File) => void;
+  /**
+   * A show asked for from outside — the search box. A new object each time,
+   * so asking for the same show twice still selects it.
+   */
+  focus?: { id: string } | null;
 }
 
 const WHEN_LABEL = { upcoming: 'Upcoming', on: 'On now', past: 'Past', undated: 'No date' } as const;
@@ -38,12 +43,15 @@ const WHEN_LABEL = { upcoming: 'Upcoming', on: 'On now', past: 'Past', undated: 
  * lives on the piece, in Artwork. A booth fee lands in the books once the
  * artist is accepted — the books row is written by the app, not here.
  */
-export function ShowsWindow({ shows, photos, imageUrls, guests, currency, onSave, onTrash, onTogglePiece, onExport, onImport }: Props) {
+export function ShowsWindow({ shows, photos, imageUrls, guests, currency, onSave, onTrash, onTogglePiece, onExport, onImport, focus }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const today = localToday();
   const [selectedId, setSelectedId] = useState<string | null>(shows[0]?.id ?? null);
   const [newName, setNewName] = useState('');
   const selected = shows.find((show) => show.id === selectedId) ?? null;
+  useEffect(() => {
+    if (focus) setSelectedId(focus.id);
+  }, [focus]);
   const fees = boothFees(shows.filter((show) => show.status === 'accepted' || show.status === 'done'));
   const ahead = deadlinesAhead(shows, today);
 

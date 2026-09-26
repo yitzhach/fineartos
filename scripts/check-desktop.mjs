@@ -10,7 +10,7 @@ const errors = [];
 const page = await b.newPage({ viewport: { width: 1440, height: 900 } });
 page.on('pageerror', (e) => errors.push(String(e)));
 await page.goto('http://localhost:4194/'); await wait(3000);
-await page.locator('input[type=file][accept^="image/png"]').setInputFiles('public/icon-512.png'); await wait(2500);
+await page.locator('main input[type=file][accept^="image/png"]').setInputFiles('public/icon-512.png'); await wait(2500);
 const m = () => page.evaluate(() => { const fr = document.querySelector('.frame[data-focused="true"]'); const body = fr.querySelector('.frame-body');
   return `frameScroll ${fr.scrollTop} bodyH ${body.clientHeight}`; });
 for (const tool of ['Shows', 'Artwork', 'Finance']) {

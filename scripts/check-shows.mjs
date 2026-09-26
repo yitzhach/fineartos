@@ -47,7 +47,7 @@ for (let i = 0; i < 3 && !(await page.locator('.dock button[title="Shows"]').cou
 log('dock:', await page.$$eval('.dock-item', (els) => els.map((e) => e.title).join(', ')));
 log('db problem shown:', await page.locator('.db-problem').count());
 
-await page.locator('input[type=file][accept^="image/png"]').setInputFiles('public/icon-512.png'); await wait(2500);
+await page.locator('main input[type=file][accept^="image/png"]').setInputFiles('public/icon-512.png'); await wait(2500);
 await page.locator('.dock button[title="Shows"]').click(); await wait(800);
 const win = page.locator('.frame[data-focused="true"]');
 await win.getByLabel('New show name').fill('Autumn Fair');

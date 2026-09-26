@@ -10,6 +10,7 @@
 
 import type { DesktopLayout, IconPosition } from '../os/desktopLayout';
 import type { WindowState } from '../os/windows';
+import type { TileLayout } from '../os/tiling';
 import type { Trash } from '../os/trash';
 import type { GuestEntry } from '../connect/guestbook';
 import type { CustomWallpaper, WallpaperFit } from './wallpapers';
@@ -157,6 +158,8 @@ const KEYS = {
   mileageRate: 'artistOS.mileageRate',
   windows: 'artistOS.windows',
   restoreWindows: 'artistOS.restoreWindows',
+  autoTile: 'artistOS.autoTile',
+  tileLayout: 'artistOS.tileLayout',
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -235,6 +238,22 @@ export const saveWindows = (value: WindowState[]): void => write(KEYS.windows, v
 /** Whether to put them back at all. Some people want an empty desk. */
 export const loadRestoreWindows = (): boolean => read<boolean>(KEYS.restoreWindows, true);
 export const saveRestoreWindows = (value: boolean): void => write(KEYS.restoreWindows, value);
+
+/**
+ * Auto-tiling: windows arrange themselves whenever one opens or closes. Off
+ * by default — windows that move on their own are a surprise until asked for.
+ */
+export const loadAutoTile = (): boolean => read<boolean>(KEYS.autoTile, false) === true;
+export const saveAutoTile = (value: boolean): void => write(KEYS.autoTile, value);
+
+const TILE_LAYOUTS: TileLayout[] = ['columns', 'rows', 'grid', 'main'];
+
+/** The layout last asked for, which auto-tiling and a resized screen reuse. */
+export const loadTileLayout = (): TileLayout => {
+  const stored = read<string>(KEYS.tileLayout, 'columns');
+  return TILE_LAYOUTS.includes(stored as TileLayout) ? (stored as TileLayout) : 'columns';
+};
+export const saveTileLayout = (value: TileLayout): void => write(KEYS.tileLayout, value);
 
 /**
  * What a mile is worth, in minor units, as the artist has set it.

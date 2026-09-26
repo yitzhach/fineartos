@@ -34,6 +34,21 @@ export type WindowKind =
   | { type: 'settings' }
   | { type: 'tool'; tool: string };
 
+/**
+ * Where a window has been put by the tiling rather than dragged by hand. A
+ * half or a quarter of the desktop, the whole of it, or a cell of a tiled
+ * arrangement. See tiling.ts for the geometry.
+ */
+export type SnapZone =
+  | 'left'
+  | 'right'
+  | 'top-left'
+  | 'top-right'
+  | 'bottom-left'
+  | 'bottom-right'
+  | 'fill'
+  | 'tiled';
+
 export interface Rect {
   x: number;
   y: number;
@@ -50,8 +65,13 @@ export interface WindowState {
   /** Stacking order. Higher is nearer the front. */
   z: number;
   minimized: boolean;
-  /** The rect to go back to when un-zooming. Null when not zoomed. */
+  /**
+   * The rect to go back to when un-zooming or un-snapping: the size the artist
+   * gave the window by hand. Null when the window is at that size already.
+   */
   restoreRect: Rect | null;
+  /** Which zone the tiling put it in, or null for a window placed by hand. */
+  snap: SnapZone | null;
   /**
    * The tab group this window belongs to, or null when it is a window on its
    * own. Windows sharing an id are drawn as one frame with a tab strip.
@@ -184,6 +204,7 @@ export function openWindow(
     z: topZ(windows) + 1,
     minimized: false,
     restoreRect: null,
+    snap: null,
     groupId: null,
   };
   return { windows: [...windows, next], id };
@@ -243,7 +264,9 @@ export function mergeAll(windows: WindowState[], groupId = `tabs-${Date.now().to
   if (visible.length < 2) return windows;
   const lead = visible.reduce((top, w) => (w.z > top.z ? w : top));
   return windows.map((w) =>
-    w.minimized ? w : { ...w, groupId, rect: { ...lead.rect }, restoreRect: lead.restoreRect },
+    w.minimized
+      ? w
+      : { ...w, groupId, rect: { ...lead.rect }, restoreRect: lead.restoreRect, snap: lead.snap },
   );
 }
 
@@ -268,7 +291,7 @@ export function pullOutTab(
     y: Math.min(target.rect.y + 34, Math.max(8, viewport.height - target.rect.height - 16)),
   };
   return windows.map((w) => {
-    if (w.id === id) return { ...w, groupId: null, rect, z, restoreRect: null };
+    if (w.id === id) return { ...w, groupId: null, rect, z, restoreRect: null, snap: null };
     if (w.id === orphan) return { ...w, groupId: null };
     return w;
   });
@@ -337,6 +360,7 @@ export function mergeInto(
         groupId,
         rect: { ...target.rect },
         restoreRect: target.restoreRect,
+        snap: target.snap,
         minimized: false,
         z: w.id === sourceId ? base + 1 : base,
       };
@@ -415,8 +439,9 @@ export function resizeWindow(
             width: Math.max(MIN_WIDTH, width),
             height: Math.max(MIN_HEIGHT, height),
           },
-          // Resizing by hand means the window is no longer zoomed.
+          // Resizing by hand means the window is no longer zoomed or snapped.
           restoreRect: null,
+          snap: null,
         }
       : w,
   );
@@ -431,15 +456,17 @@ export function toggleZoom(
   const family = familyOf(windows, id);
   return windows.map((w) => {
     if (!family.has(w.id)) return w;
-    if (w.restoreRect) return { ...w, rect: w.restoreRect, restoreRect: null };
+    if (w.restoreRect) return { ...w, rect: w.restoreRect, restoreRect: null, snap: null };
     return {
       ...w,
       restoreRect: w.rect,
+      snap: 'fill' as const,
       rect: { x: 12, y: 8, width: viewport.width - 24, height: viewport.height - 16 },
     };
   });
 }
 
+/** Zoomed, snapped or tiled: anywhere but the size it was given by hand. */
 export function isZoomed(window: WindowState): boolean {
   return window.restoreRect !== null;
 }
@@ -507,9 +534,23 @@ function asWindow(value: unknown): WindowState | null {
     z: typeof w.z === 'number' && Number.isFinite(w.z) ? w.z : 1,
     minimized: w.minimized === true,
     restoreRect: w.restoreRect ?? null,
+    // A zone is only kept alongside the rect to go back to: without one there
+    // is nothing to restore, and the window is simply where it is.
+    snap: w.restoreRect && typeof w.snap === 'string' && SNAP_ZONES.has(w.snap) ? w.snap : null,
     groupId: typeof w.groupId === 'string' ? w.groupId : null,
   };
 }
+
+const SNAP_ZONES = new Set<string>([
+  'left',
+  'right',
+  'top-left',
+  'top-right',
+  'bottom-left',
+  'bottom-right',
+  'fill',
+  'tiled',
+] satisfies SnapZone[]);
 
 const KIND_TYPES = new Set<WindowKind['type']>([
   'commission',

@@ -30,7 +30,7 @@ const db = (store) => page.evaluate((store) => new Promise((res) => {
   r.onsuccess = () => { const q = r.result.transaction(store).objectStore(store).getAll(); q.onsuccess = () => res(q.result); };
 }), store);
 
-await page.locator('input[type=file][accept^="image/png"]').setInputFiles('public/icon-512.png'); await wait(2500);
+await page.locator('main input[type=file][accept^="image/png"]').setInputFiles('public/icon-512.png'); await wait(2500);
 await dock('Shows'); await wait(800);
 await focused().getByLabel('New show name').fill('Spring Market');
 await focused().getByRole('button', { name: 'Add show' }).click(); await wait(800);

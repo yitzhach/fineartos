@@ -41,9 +41,9 @@ export function DocumentList(props: Props) {
 
   return (
     <div>
-      {/* The system bar's search is hidden on phones, so the list carries its
-          own field at that width. */}
-      <div className="field compact-only">
+      {/* The list filters itself. The search box in the system bar finds a
+          commission from anywhere; this narrows the list that is open. */}
+      <div className="field">
         <label htmlFor="list-search">Search documents</label>
         <input
           id="list-search"

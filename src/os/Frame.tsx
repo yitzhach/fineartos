@@ -1,5 +1,6 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { isZoomed, MIN_HEIGHT, MIN_WIDTH, type WindowState } from './windows';
+import type { Zone } from './tiling';
 
 interface Props {
   window: WindowState;
@@ -24,14 +25,20 @@ interface Props {
   onClose: () => void;
   onMinimize: () => void;
   onZoom: () => void;
-  onMove: (x: number, y: number) => void;
+  /**
+   * The drag is over. `to` is where the window was let go, in the desktop's
+   * coordinates. The desktop decides what that means: a snap, a tab, or a
+   * window that has simply been moved.
+   */
+  onDragEnd: (to: { x: number; y: number }) => void;
   onResize: (width: number, height: number) => void;
   /**
-   * Where the pointer is during a titlebar drag, in client coordinates, and
-   * null the moment it is let go. The desktop uses it to work out whether
-   * this window is being dropped onto another one as a tab.
+   * Where the pointer is during a titlebar drag, in client coordinates. The
+   * desktop uses it to light up a snap zone or a frame to join as a tab.
    */
-  onDragTo?: (point: { x: number; y: number } | null) => void;
+  onDragTo?: (point: { x: number; y: number }) => void;
+  /** Snap into a zone from the titlebar's menu, or put it back. Absent on a phone. */
+  onSnap?: (zone: Zone | 'restore') => void;
   /** True while letting go here would make this frame's tabs take it in. */
   dropTarget?: boolean;
   /**
@@ -68,62 +75,150 @@ export function Frame({
   onClose,
   onMinimize,
   onZoom,
-  onMove,
+  onDragEnd,
   onResize,
   onDragTo,
+  onSnap,
   dropTarget,
   fills,
 }: Props) {
-  const dragFrom = useRef<{ x: number; y: number } | null>(null);
-  const resizeFrom = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  const frameRef = useRef<HTMLElement>(null);
+  const drag = useRef<Drag | null>(null);
+  const resizing = useRef<Resize | null>(null);
+  const [menu, setMenu] = useState(false);
+  // Read by the pointer listeners, which are added once rather than on every
+  // render: the callbacks are new functions each time the desktop draws.
+  const handlers = useRef({ onDragTo, onDragEnd, onResize });
+  handlers.current = { onDragTo, onDragEnd, onResize };
+  /** The rect React last drew, which is what it believes the frame's style holds. */
+  const drawn = useRef(win.rect);
+  drawn.current = win.rect;
 
+  /**
+   * Dragging and resizing move the frame itself, not the app's state. The
+   * whole desktop used to redraw sixty times a second while a window moved —
+   * every open tool, not just this one — which is what made dragging stutter
+   * with the Finance or Artwork window open. The new place is handed over
+   * once, when the pointer is let go.
+   */
   useEffect(() => {
     if (compact) return undefined;
 
     const move = (event: PointerEvent) => {
-      if (dragFrom.current) {
-        onMove(event.clientX - dragFrom.current.x, event.clientY - dragFrom.current.y);
-        onDragTo?.({ x: event.clientX, y: event.clientY });
-      } else if (resizeFrom.current) {
-        const from = resizeFrom.current;
-        onResize(
-          Math.max(MIN_WIDTH, from.width + (event.clientX - from.x)),
-          Math.max(MIN_HEIGHT, from.height + (event.clientY - from.y)),
-        );
+      const frame = frameRef.current;
+      const d = drag.current;
+      if (d && frame) {
+        const dx = event.clientX - d.pointerX;
+        const dy = event.clientY - d.pointerY;
+        // A click, or the first twitch of a double click, is not a drag.
+        if (!d.moved && Math.abs(dx) + Math.abs(dy) < 5) return;
+        if (!d.moved) {
+          d.moved = true;
+          // Snapped or filling the screen: it comes away at the size it was
+          // given by hand, still under the pointer where it was picked up.
+          if (d.free) {
+            frame.style.width = `${d.free.width}px`;
+            frame.style.height = `${d.free.height}px`;
+          }
+        }
+        const width = d.free?.width ?? d.width;
+        const grab = d.free ? d.grabX * (d.free.width / d.width) : d.grabX;
+        const x = Math.max(-width + 120, d.originX + d.grabX - grab + dx);
+        const y = Math.max(0, d.originY + dy);
+        frame.style.left = `${x}px`;
+        frame.style.top = `${y}px`;
+        d.last = { x, y };
+        handlers.current.onDragTo?.({ x: event.clientX, y: event.clientY });
+        return;
+      }
+      const r = resizing.current;
+      if (r && frame) {
+        const width = Math.max(MIN_WIDTH, r.width + (event.clientX - r.pointerX));
+        const height = Math.max(MIN_HEIGHT, r.height + (event.clientY - r.pointerY));
+        frame.style.width = `${width}px`;
+        frame.style.height = `${height}px`;
+        r.last = { width, height };
       }
     };
+    // Let go, or the browser took the pointer away: either way the window
+    // stays where it can be seen, and the desktop is told once.
     const up = () => {
-      // Told even when nothing was being dragged: the desktop clears its drop
-      // target on any pointer up, which is one less way to leave it stuck on.
-      if (dragFrom.current) onDragTo?.(null);
-      dragFrom.current = null;
-      resizeFrom.current = null;
+      const d = drag.current;
+      const r = resizing.current;
+      drag.current = null;
+      resizing.current = null;
+      // Hand the frame back to React exactly as React last drew it. React
+      // writes only the style values that differ from its previous render —
+      // not whatever a drag left behind — so a snap that happened to keep the
+      // old top left the window hanging where the pointer let go. Both this
+      // and React's own update land before the next paint: nothing flickers.
+      const frame = frameRef.current;
+      if (frame && (d?.moved || r?.last)) {
+        const rect = drawn.current;
+        frame.style.left = `${rect.x}px`;
+        frame.style.top = `${rect.y}px`;
+        frame.style.width = `${rect.width}px`;
+        frame.style.height = `${rect.height}px`;
+      }
+      if (d?.moved && d.last) handlers.current.onDragEnd(d.last);
+      if (r?.last) handlers.current.onResize(r.last.width, r.last.height);
     };
 
     globalThis.addEventListener('pointermove', move);
     globalThis.addEventListener('pointerup', up);
+    globalThis.addEventListener('pointercancel', up);
     return () => {
       globalThis.removeEventListener('pointermove', move);
       globalThis.removeEventListener('pointerup', up);
+      globalThis.removeEventListener('pointercancel', up);
     };
-  }, [compact, onDragTo, onMove, onResize]);
+  }, [compact]);
+
+  // The snap menu goes away on a press anywhere else, or on Escape.
+  useEffect(() => {
+    if (!menu) return undefined;
+    const away = (event: PointerEvent) => {
+      if (!(event.target as HTMLElement).closest?.('.frame-snap')) setMenu(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenu(false);
+    };
+    document.addEventListener('pointerdown', away);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', away);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [menu]);
 
   const startDrag = (event: React.PointerEvent) => {
     onFocus();
-    if (compact || isZoomed(win)) return;
+    if (compact) return;
     // Ignore drags that start on a control in the titlebar.
     if ((event.target as HTMLElement).closest('button')) return;
-    dragFrom.current = { x: event.clientX - win.rect.x, y: event.clientY - win.rect.y };
+    const box = frameRef.current?.getBoundingClientRect();
+    drag.current = {
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+      originX: win.rect.x,
+      originY: win.rect.y,
+      width: win.rect.width,
+      grabX: box ? event.clientX - box.left : win.rect.width / 2,
+      free: win.restoreRect ? { width: win.restoreRect.width, height: win.restoreRect.height } : null,
+      moved: false,
+      last: null,
+    };
   };
 
   const startResize = (event: React.PointerEvent) => {
     event.stopPropagation();
     onFocus();
-    resizeFrom.current = {
-      x: event.clientX,
-      y: event.clientY,
+    resizing.current = {
+      pointerX: event.clientX,
+      pointerY: event.clientY,
       width: win.rect.width,
       height: win.rect.height,
+      last: null,
     };
   };
 
@@ -139,6 +234,7 @@ export function Frame({
 
   return (
     <section
+      ref={frameRef}
       className="frame"
       data-focused={focused}
       data-compact={compact}
@@ -175,6 +271,57 @@ export function Frame({
           <span className="t">{win.title}</span>
           {win.subtitle && <span className="s">{win.subtitle}</span>}
         </div>
+
+        {onSnap && !compact && (
+          <div className="frame-snap">
+            <button
+              className="frame-snap-button"
+              onClick={() => setMenu(!menu)}
+              onDoubleClick={(event) => event.stopPropagation()}
+              aria-expanded={menu}
+              aria-label={`Snap ${win.title} to part of the screen`}
+              title="Snap to a half, a quarter or the whole screen"
+            >
+              <SnapGlyph />
+            </button>
+            {menu && (
+              <div className="snap-menu" role="menu" aria-label="Snap window">
+                <div className="snap-grid">
+                  {ZONES.map(({ zone, label }) => (
+                    <button
+                      key={zone}
+                      role="menuitem"
+                      className="snap-target"
+                      data-current={win.snap === zone}
+                      aria-label={label}
+                      title={label}
+                      onClick={() => {
+                        setMenu(false);
+                        onSnap(zone);
+                      }}
+                    >
+                      <span className="snap-mini" aria-hidden="true">
+                        <span className="snap-area" data-zone={zone} />
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {isZoomed(win) && (
+                  <button
+                    role="menuitem"
+                    className="btn snap-restore"
+                    onClick={() => {
+                      setMenu(false);
+                      onSnap('restore');
+                    }}
+                  >
+                    Back to its own size
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* On a phone the lights are too small and mean too little, so the
             same actions appear as one obvious control. */}
@@ -239,5 +386,46 @@ export function Frame({
         />
       )}
     </section>
+  );
+}
+
+interface Drag {
+  pointerX: number;
+  pointerY: number;
+  originX: number;
+  originY: number;
+  width: number;
+  /** How far across the frame it was picked up, in px. */
+  grabX: number;
+  /** The size it comes away at when it was snapped; null when it was not. */
+  free: { width: number; height: number } | null;
+  moved: boolean;
+  last: { x: number; y: number } | null;
+}
+
+interface Resize {
+  pointerX: number;
+  pointerY: number;
+  width: number;
+  height: number;
+  last: { width: number; height: number } | null;
+}
+
+const ZONES: { zone: Zone; label: string }[] = [
+  { zone: 'left', label: 'Left half' },
+  { zone: 'right', label: 'Right half' },
+  { zone: 'fill', label: 'Whole screen' },
+  { zone: 'top-left', label: 'Top left quarter' },
+  { zone: 'top-right', label: 'Top right quarter' },
+  { zone: 'bottom-left', label: 'Bottom left quarter' },
+  { zone: 'bottom-right', label: 'Bottom right quarter' },
+];
+
+function SnapGlyph() {
+  return (
+    <svg width="15" height="12" viewBox="0 0 15 12" aria-hidden="true">
+      <rect x="0.75" y="0.75" width="13.5" height="10.5" rx="2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="2.5" y="2.5" width="4.6" height="7" rx="0.8" fill="currentColor" />
+    </svg>
   );
 }

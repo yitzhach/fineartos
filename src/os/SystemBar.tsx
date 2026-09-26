@@ -1,11 +1,54 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Theme } from '../lib/prefs';
 import { useFullscreen } from './fullscreen';
+import type { TileLayout } from './tiling';
+
+/** What the Arrange menu can do, and whether each thing can be done now. */
+export interface ArrangeControls {
+  /** Frames on screen; a group of tabs counts once. */
+  frames: number;
+  /** Something is snapped or tiled, so there is something to put back. */
+  snapped: boolean;
+  autoTile: boolean;
+  layout: TileLayout;
+  onTile: (layout: TileLayout) => void;
+  onCascade: () => void;
+  onUntile: () => void;
+  onAutoTile: (on: boolean) => void;
+  /** The keys that snap the window in front, as drawn: ⌥⇧ or Alt+Shift. */
+  snapKeys: string;
+}
+
+const LAYOUTS: { layout: TileLayout; name: string; hint: string }[] = [
+  { layout: 'columns', name: 'Side by side', hint: 'A column each' },
+  { layout: 'grid', name: 'Grid', hint: 'As square as fits' },
+  { layout: 'main', name: 'Front one large', hint: 'The rest beside it' },
+  { layout: 'rows', name: 'Top to bottom', hint: 'A row each' },
+];
+
+/** A layout drawn as a little screen, so the choice can be seen before it is made. */
+export function LayoutPicture({ layout }: { layout: TileLayout }) {
+  const cells: Record<TileLayout, [number, number, number, number][]> = {
+    columns: [[1, 1, 10, 16], [13, 1, 10, 16], [25, 1, 10, 16]],
+    grid: [[1, 1, 16, 7.5], [19, 1, 16, 7.5], [1, 10.5, 34, 6.5]],
+    main: [[1, 1, 20, 16], [23, 1, 12, 7.5], [23, 10.5, 12, 6.5]],
+    rows: [[1, 1, 34, 4.6], [1, 7.2, 34, 4.6], [1, 13.4, 34, 3.6]],
+  };
+  return (
+    <svg className="layout-picture" width="36" height="18" viewBox="0 0 36 18" aria-hidden="true">
+      {cells[layout].map(([x, y, w, h], i) => (
+        <rect key={i} x={x} y={y} width={w} height={h} rx="1.5" />
+      ))}
+    </svg>
+  );
+}
 
 interface Props {
   studioName: string;
-  search: string;
-  onSearch: (value: string) => void;
+  /** The search box: tools, actions and records. Drawn by Launcher. */
+  launcher: ReactNode;
+  /** Absent on a phone, where every window is a sheet and nothing tiles. */
+  arrange?: ArrangeControls;
   /** Verbatim status text from the persistence layer. Never embellished here. */
   statusText: string;
   statusState: string;
@@ -61,7 +104,7 @@ function MiniCalendar({ today }: { today: Date }) {
 export function SystemBar(props: Props) {
   const fullscreen = useFullscreen();
   const [now, setNow] = useState(() => new Date());
-  const [open, setOpen] = useState<'clock' | 'profile' | null>(null);
+  const [open, setOpen] = useState<'clock' | 'profile' | 'arrange' | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -74,8 +117,15 @@ export function SystemBar(props: Props) {
     const close = (event: MouseEvent) => {
       if (!barRef.current?.contains(event.target as Node)) setOpen(null);
     };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(null);
+    };
     document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', escape);
+    };
   }, [open]);
 
   return (
@@ -85,16 +135,9 @@ export function SystemBar(props: Props) {
 
       <div className="spacer" />
 
-      <div className="search">
-        <label className="sr-only" htmlFor="doc-search">Search documents</label>
-        <input
-          id="doc-search"
-          type="text"
-          placeholder="Search client, title or number"
-          value={props.search}
-          onChange={(e) => props.onSearch(e.target.value)}
-        />
-      </div>
+      {props.launcher}
+
+      <div className="spacer" />
 
       <span className="status-pill" title={props.statusText}>
         <span className="status-dot" data-state={props.statusState} aria-hidden="true" />
@@ -129,6 +172,19 @@ export function SystemBar(props: Props) {
         </button>
       )}
 
+      {props.arrange && (
+        <button
+          className="btn arrange-button"
+          data-variant="quiet"
+          onClick={() => setOpen(open === 'arrange' ? null : 'arrange')}
+          aria-expanded={open === 'arrange'}
+          aria-label="Arrange windows"
+          title="Arrange windows: tile, cascade, auto-tile"
+        >
+          <LayoutPicture layout="grid" />
+        </button>
+      )}
+
       <button
         className="btn clock"
         data-variant="quiet"
@@ -148,6 +204,9 @@ export function SystemBar(props: Props) {
       </button>
 
       {open === 'clock' && <MiniCalendar today={now} />}
+      {open === 'arrange' && props.arrange && (
+        <ArrangeMenu controls={props.arrange} onDone={() => setOpen(null)} />
+      )}
       {open === 'profile' && (
         <div className="popover" role="dialog" aria-label="Profile">
           <h4>{props.studioName || 'Studio name not set'}</h4>
@@ -189,6 +248,77 @@ export function SystemBar(props: Props) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function ArrangeMenu({ controls, onDone }: { controls: ArrangeControls; onDone: () => void }) {
+  const two = controls.frames >= 2;
+  const why = two ? undefined : 'Two or more windows are needed to tile them';
+  return (
+    <div className="popover arrange-menu" role="dialog" aria-label="Arrange windows">
+      <h4>Arrange windows</h4>
+      <div className="arrange-layouts">
+        {LAYOUTS.map(({ layout, name, hint }) => (
+          <button
+            key={layout}
+            className="arrange-layout"
+            data-current={controls.autoTile && controls.layout === layout}
+            disabled={!two}
+            title={why ?? hint}
+            onClick={() => {
+              controls.onTile(layout);
+              onDone();
+            }}
+          >
+            <LayoutPicture layout={layout} />
+            <span>{name}</span>
+          </button>
+        ))}
+      </div>
+      <div className="arrange-row">
+        <button
+          className="btn"
+          disabled={!two}
+          title={why ?? 'Each at its own size, stepped so every titlebar shows'}
+          onClick={() => {
+            controls.onCascade();
+            onDone();
+          }}
+        >
+          Cascade
+        </button>
+        <button
+          className="btn"
+          disabled={!controls.snapped}
+          title={
+            controls.snapped
+              ? 'Every snapped or tiled window goes back to the size it was given'
+              : 'Nothing is snapped or tiled'
+          }
+          onClick={() => {
+            controls.onUntile();
+            onDone();
+          }}
+        >
+          Put back
+        </button>
+      </div>
+      <label className="arrange-auto">
+        <input
+          type="checkbox"
+          checked={controls.autoTile}
+          onChange={(event) => controls.onAutoTile(event.target.checked)}
+        />
+        <span>
+          Auto-tile
+          <span className="faint"> — windows arrange themselves whenever one opens or closes</span>
+        </span>
+      </label>
+      <p className="faint arrange-keys">
+        Drag a titlebar to an edge to snap it. {controls.snapKeys} with an arrow snaps the window
+        in front.
+      </p>
     </div>
   );
 }
