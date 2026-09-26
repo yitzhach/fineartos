@@ -24,6 +24,7 @@ import type { Photo } from '../photo/photo';
 import { describePhoto } from '../photo/photo';
 import type { Show } from '../shows/shows';
 import type { GuestEntry } from '../connect/guestbook';
+import { keyNames } from './keys';
 
 export type LauncherSection = 'tool' | 'action' | 'record';
 
@@ -60,6 +61,15 @@ export const GO_KEYS: Record<string, string> = {
   t: 'trash',
   h: 'home',
 };
+
+/** Each G sequence and the tool it opens, for the shortcut sheet. */
+export function goSequences(): { letter: string; tool: string; title: string }[] {
+  return Object.entries(GO_KEYS).map(([letter, tool]) => ({
+    letter: letter.toUpperCase(),
+    tool,
+    title: TOOL_SPECS.find((spec) => spec.id === tool)?.title ?? tool,
+  }));
+}
 
 function goKeysFor(tool: string): string[] | undefined {
   const letter = Object.keys(GO_KEYS).find((key) => GO_KEYS[key] === tool);
@@ -170,9 +180,7 @@ export interface LauncherContext {
 
 /** The actions that can be done now, and only those. */
 export function actionEntries(context: LauncherContext): LauncherEntry[] {
-  const alt = context.mac ? '⌥' : 'Alt';
-  const shift = context.mac ? '⇧' : 'Shift';
-  const mod = context.mac ? '⌘' : 'Ctrl';
+  const { alt, shift, mod } = keyNames(context.mac);
   const tiling = !context.compact;
   const out: LauncherEntry[] = [];
   const add = (entry: Omit<LauncherEntry, 'section' | 'label'>, when = true) => {
@@ -237,6 +245,17 @@ export function actionEntries(context: LauncherContext): LauncherEntry[] {
     hint: 'In Settings: a colour, a photograph or a slideshow',
     keywords: ['wallpaper', 'background', 'slideshow', 'desktop picture', 'photograph'],
   });
+  add(
+    {
+      id: 'action:shortcuts',
+      title: 'Keyboard shortcuts',
+      hint: 'Every key the app answers to',
+      keywords: ['keyboard', 'shortcuts', 'keys', 'hotkeys', 'help', 'cheat sheet'],
+      keys: ['?'],
+    },
+    // A sheet of keys on a phone with no keyboard would be a dead control.
+    !context.compact,
+  );
   if (context.undoLabel) {
     add({
       id: 'action:undo',

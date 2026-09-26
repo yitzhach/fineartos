@@ -4149,3 +4149,73 @@ fieldset.section > legend {
 @media (min-width: 861px) {
   .frame-bar, .frame-resize { touch-action: none; }
 }
+
+/* --- The shortcut sheet --------------------------------------------------- */
+
+.shortcuts-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.35);
+}
+.shortcuts {
+  width: min(760px, 100%);
+  max-height: min(84vh, 720px);
+  overflow: auto;
+  padding: 16px 18px 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--panel-solid);
+  color: var(--ink);
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.45);
+}
+.shortcuts-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.shortcuts-head h2 { margin: 0; font-size: 16px; }
+.shortcuts-note { margin: 4px 0 0; font-size: 12px; }
+.shortcuts-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 6px 24px;
+  margin-top: 8px;
+}
+.shortcuts-group h3 {
+  margin: 12px 0 2px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.shortcuts-group dl { margin: 6px 0 0; }
+.shortcuts-row {
+  display: grid;
+  grid-template-columns: minmax(96px, auto) minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  padding: 4px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.shortcuts-row dd { margin: 0; color: var(--ink-soft); }
+.shortcuts-chord { display: inline-flex; gap: 3px; align-items: baseline; }
+.shortcuts-or { margin: 0 3px; font-size: 12px; }
+.shortcuts kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 5px;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--raised);
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 11px;
+  line-height: 17px;
+  text-align: center;
+}
+@media (max-width: 400px) {
+  .shortcuts-groups { grid-template-columns: minmax(0, 1fr); }
+}

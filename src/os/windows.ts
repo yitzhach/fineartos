@@ -516,6 +516,34 @@ export function restorable(
   }));
 }
 
+/** The record a window is a view onto, when it is a view onto one. */
+export function subjectIdOf(kind: WindowKind): string | null {
+  switch (kind.type) {
+    case 'commission':
+      return kind.docId;
+    case 'invoice':
+      return kind.invoiceId;
+    case 'folder':
+      return kind.projectId;
+    case 'photo':
+    case 'photoEdit':
+      return kind.photoId;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Without the windows onto records that have just been hidden or destroyed.
+ * A window onto one would only show a tombstone; closing it loses nothing.
+ */
+export function closeWindowsOnto(windows: WindowState[], ids: readonly string[]): WindowState[] {
+  return windows.filter((w) => {
+    const subject = subjectIdOf(w.kind);
+    return subject === null || !ids.includes(subject);
+  });
+}
+
 /** Storage is untrusted input: anything not shaped like a window is dropped. */
 function asWindow(value: unknown): WindowState | null {
   if (typeof value !== 'object' || value === null) return null;

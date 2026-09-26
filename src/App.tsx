@@ -3,30 +3,8 @@ import './styles.css';
 import './print.css';
 import { SystemBar } from './os/SystemBar';
 import { Launcher } from './os/Launcher';
-import {
-  actionEntries,
-  goStep,
-  recordEntries,
-  toolEntries,
-  type GoState,
-  type LauncherEntry,
-} from './os/launcher';
-import {
-  anySnapped,
-  cascadeAll,
-  resnap,
-  snapByArrow,
-  snapWindow,
-  tileAll,
-  unsnapWindow,
-  untileAll,
-  visibleFrames,
-  zoneAt,
-  zoneRect,
-  type Arrow,
-  type TileLayout,
-  type Zone,
-} from './os/tiling';
+import type { LauncherEntry } from './os/launcher';
+import { zoneRect } from './os/tiling';
 import { enterFullscreen, exitFullscreen, isFullscreen, useFullscreen } from './os/fullscreen';
 import { Dock } from './os/Dock';
 import { Frame } from './os/Frame';
@@ -34,59 +12,19 @@ import { Desktop, type DesktopItem } from './os/Desktop';
 import { Finder } from './os/Finder';
 import { TrashWindow } from './os/TrashWindow';
 import { TrashButton } from './os/TrashButton';
+import { ShortcutSheet } from './os/ShortcutSheet';
 import { Connect, type ConnectTab } from './connect/ui/Connect';
-import type { GuestEntry } from './connect/guestbook';
-import {
-  attachedIds,
-  type AttachedRecord,
-  countPhrase,
-  deletionTargets,
-  findEntry,
-  orphanImageIds,
-  removeEntry,
-  summarise,
-  trashItem,
-  trashedIds,
-  type Trash,
-  type TrashEntry,
-} from './os/trash';
-import {
-  autoArrange,
-  pruneLayout,
-  trashPositionOf,
-  type DesktopLayout,
-  type IconPosition,
-} from './os/desktopLayout';
+import { attachedIds, countPhrase, trashedIds } from './os/trash';
+import { autoArrange, pruneLayout, trashPositionOf } from './os/desktopLayout';
 import { Settings } from './os/Settings';
 import { BuildStamp } from './os/BuildStamp';
 import { WallpaperSlides } from './os/WallpaperSlides';
 import { AppRail, type RailItem } from './os/AppRail';
 import { MOCK_TOOLS, MOCK_TOOL_NAMES } from './os/mock/tools';
 import { registerModule, registerPlannedModules } from './os/registry';
-import {
-  clampToViewport,
-  closeWindow,
-  focused as focusedWindow,
-  focusWindow,
-  dropTargetAt,
-  mergeAll,
-  mergeInto,
-  minimizedWindows,
-  minimizeWindow,
-  moveWindow,
-  pullOutTab,
-  renderGroups,
-  openWindow,
-  toggleWindow,
-  resizeWindow,
-  restorable,
-  stepTab,
-  tabsOf,
-  toggleZoom,
-  topZ,
-  type WindowKind,
-  type WindowState,
-} from './os/windows';
+import { renderGroups, topZ, type WindowKind, type WindowState } from './os/windows';
+import { openingWindows } from './os/startup';
+import { isApplePlatform, keyNames, keyText, undoKeys } from './os/keys';
 import {
   applyEdit,
   createDocument,
@@ -139,7 +77,6 @@ import {
   type Project,
 } from './project/project';
 import { FolderWindow } from './project/ui/FolderWindow';
-import { buildDemo, demoAlreadySeeded, drawDemoArtwork, markDemoSeeded } from './lib/demo';
 import {
   addWallpaper,
   prepareWallpaper,
@@ -174,7 +111,6 @@ import {
   type Show,
 } from './shows/shows';
 import { FinanceWindow } from './finance/ui/FinanceWindow';
-import type { Expense } from './finance/ledger';
 import { UpdatesPane } from './commission/ui/UpdatesPane';
 import {
   awaitingReply,
@@ -199,16 +135,10 @@ import { ImageEditor } from './photo/ui/ImageEditor';
 import { crossfadeSeconds, emptySlideshow, readySlides, secondsPerSlide } from './lib/slideshow';
 import { SHIPPED_PHOTOGRAPHS } from './lib/photographs';
 import { Repository, type StoredDocument } from './persistence/repository';
+import { imageIdsKey, type StudioRecords } from './persistence/records';
 import { onDbProblem, type DbProblem } from './persistence/db';
 import { onAppUpdate } from './lib/appUpdate';
-import {
-  isUndoKey,
-  nextUndoLabel,
-  popUndo,
-  pushUndo,
-  type UndoStack,
-} from './os/undo';
-import { describeSaveState, drainQueue, unavailableCloud } from './persistence/sync';
+import { describeSaveState, unavailableCloud } from './persistence/sync';
 import {
   exportDocument,
   exportExpenses,
@@ -221,43 +151,17 @@ import {
 } from './persistence/portable';
 import {
   BUNDLED_WALLPAPERS,
-  loadPaymentInstructions,
-  loadStudioDefaults,
-  loadTheme,
-  loadWallpaper,
-  loadDesktopLayout,
-  loadGuests,
-  loadSiteUrl,
-  loadTrash,
-  loadTrashPosition,
-  loadAskForSignature,
-  loadAutoTile,
-  loadMileageRate,
   loadRestoreWindows,
-  loadTileLayout,
-  loadWallpaperLibrary,
   loadWindows,
-  savePaymentInstructions,
-  saveStudioDefaults,
-  saveTheme,
-  saveWallpaper,
-  saveDesktopLayout,
-  saveGuests,
-  saveSiteUrl,
-  saveTrash,
-  saveTrashPosition,
-  saveAskForSignature,
-  saveAutoTile,
-  saveMileageRate,
-  saveRestoreWindows,
-  saveTileLayout,
-  saveWallpaperLibrary,
-  saveWindows,
-  type PaymentInstructions,
-  type StudioDefaults,
-  type Theme,
   type WallpaperChoice,
 } from './lib/prefs';
+import { usePrefs } from './app/usePrefs';
+import { useUndo } from './app/useUndo';
+import { useObjectUrls } from './app/useObjectUrls';
+import { useStudioData } from './app/useStudioData';
+import { useWindows } from './app/useWindows';
+import { useTrashActions, useTrashState } from './app/useTrash';
+import { useLauncherEntries, useShellKeys } from './app/useShellKeys';
 
 /**
  * Workspace id. With no auth in this phase there is one local workspace, but
@@ -274,9 +178,6 @@ const WORKSPACE_ID = 'local';
  */
 const cloud = unavailableCloud;
 
-/** Below this width a window becomes a full-screen sheet, not a window. */
-const COMPACT_WIDTH = 860;
-
 registerPlannedModules();
 // New commission leads the dock: it is the thing done most often, and it was
 // a tile marooned among the artist's own files before.
@@ -292,30 +193,79 @@ registerModule({ id: 'finance', name: 'Finance', icon: 'finance', available: tru
 // Last in the dock, the way the Trash is always last.
 registerModule({ id: 'trash', name: 'Trash', icon: 'trash', available: true, group: 'trash' });
 
+/**
+ * The shell. The state lives in hooks by concern — src/app/ — and the rules
+ * in the model modules beside their tests. What is left here is wiring: the
+ * actions that cross concerns, and drawing each window.
+ */
 export default function App() {
   const repo = useMemo(() => new Repository(WORKSPACE_ID), []);
+  const [message, setMessage] = useState<string | null>(null);
 
-  const [rows, setRows] = useState<StoredDocument[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [photos, setPhotos] = useState<Photo[]>([]);
-  const [clientUpdates, setClientUpdates] = useState<ClientUpdate[]>([]);
-  // Every update, trashed commissions included: the Trash has to count what
-  // emptying would take with it, and those are hidden from `clientUpdates`.
-  const [allUpdates, setAllUpdates] = useState<ClientUpdate[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [shows, setShows] = useState<Show[]>([]);
-  // Including the ones in the Trash, so emptying it can count their fee rows.
-  const [allShows, setAllShows] = useState<Show[]>([]);
-  const [mileageRate, setMileageRate] = useState<number | null>(loadMileageRate);
+  const {
+    theme,
+    setTheme,
+    wallpaper,
+    setWallpaper,
+    wallpaperLibrary,
+    setWallpaperLibrary,
+    studio,
+    setStudio,
+    payment,
+    setPayment,
+    askForSignature,
+    setAskForSignature,
+    restoreWindowsOn,
+    setRestoreWindowsOn,
+    mileageRate,
+    setMileageRate,
+    guests,
+    setGuests,
+    siteUrl,
+    setSiteUrl,
+    desktopLayout,
+    setDesktopLayout,
+    trashPosition,
+    setTrashPosition,
+  } = usePrefs();
+
+  const { undoLabel, pushUndoEntry, undoLast } = useUndo(setMessage);
+  const trashState = useTrashState();
+  const { trash, trashRef, hidden } = trashState;
+
+  const data = useStudioData({
+    repo,
+    cloud,
+    workspaceId: WORKSPACE_ID,
+    hidden,
+    onFirstRead: (records) => startWith(records),
+  });
+  const { loaded, rows, projects, invoices, photos, clientUpdates, expenses, shows, allUpdates, allShows } = data;
+
+  const wm = useWindows({ loaded, restoreWindowsOn });
+  const { windows, compact, viewport, desktopViewportRef, top, tray, frames, snapped, open } = wm;
+
+  /**
+   * First read of the studio: put back the windows that were open, now that
+   * there is something to check them against — or, when nothing comes back,
+   * open the newest commission so the app starts in work.
+   */
+  const startWith = (records: StudioRecords) => {
+    const opening = openingWindows({
+      restoreOn: loadRestoreWindows(),
+      saved: loadWindows(),
+      records,
+      hidden: trashedIds(trashRef.current),
+    });
+    if (opening.kind === 'restore') wm.setWindows(opening.windows);
+    else if (opening.kind === 'newest') {
+      open({ type: 'commission', docId: opening.docId }, 'Commission Studio', opening.documentNumber);
+    }
+  };
+
   const [importingImages, setImportingImages] = useState(false);
-  const [guests, setGuests] = useState<GuestEntry[]>(loadGuests);
-  const [siteUrl, setSiteUrl] = useState(loadSiteUrl);
   const [connectTab, setConnectTab] = useState<ConnectTab>('guestbook');
   const [connectPhotoId, setConnectPhotoId] = useState<string | null>(null);
-  /** False until the first read from IndexedDB has come back. */
-  const [loaded, setLoaded] = useState(false);
-  /** Set when the database cannot be opened — never left silent. */
   const [dockHeight, setDockHeight] = useState(84);
   /**
    * True once a newer build is being served. A tab left open at a show goes
@@ -331,54 +281,10 @@ export default function App() {
   const [preview, setPreview] = useState<{ ids: string[]; index: number } | null>(null);
   /** Read by the tab shortcuts, which must not fight the preview's arrows. */
   const previewOpenRef = useRef(false);
-  /**
-   * The frame a window being dragged would join as a tab if it were let go
-   * now, and the element the pointer is measured against — a rect is in the
-   * desktop's coordinates and a pointer is in the page's.
-   */
-  const [dropTarget, setDropTarget] = useState<string | null>(null);
-  const dropTargetRef = useRef<string | null>(null);
-  const desktopRef = useRef<HTMLElement>(null);
-  /** The arrangement is put back once, on the first read of the studio. */
-  const restoredRef = useRef(false);
+  /** Set when the database cannot be opened — never left silent. */
   const [dbProblem, setDbProblem] = useState<DbProblem | null>(null);
-  /**
-   * What Cmd/Ctrl+Z would put back. Only reversible things go on here —
-   * emptying the Trash is deliberately absent, because an undo that sometimes
-   * cannot undo teaches people to ignore the warning that matters.
-   */
-  const [undoStack, setUndoStack] = useState<UndoStack>([]);
-  /**
-   * The stack itself. React's state updaters do not run synchronously, so
-   * reading the top entry out of one gave nothing and undo silently did
-   * nothing at all — caught by the browser test. The ref is the truth; the
-   * state above exists only so the Undo button can render its label.
-   */
-  const undoRef = useRef<UndoStack>([]);
-
-  const [windows, setWindows] = useState<WindowState[]>([]);
-  const [viewport, setViewport] = useState(() => ({
-    width: typeof window === 'undefined' ? 1440 : window.innerWidth,
-    height: typeof window === 'undefined' ? 900 : window.innerHeight,
-  }));
-  const compact = viewport.width <= COMPACT_WIDTH;
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [desktopLayout, setDesktopLayout] = useState<DesktopLayout>(loadDesktopLayout);
-  const [trash, setTrash] = useState<Trash>(loadTrash);
-  const [trashPosition, setTrashPosition] = useState<IconPosition | null>(loadTrashPosition);
-  /**
-   * The desktop surface's own size, reported by Desktop. Smaller than the
-   * browser window — the system bar is above it and the dock below — and it
-   * is what the icon grid is laid out against, so Tidy up must use the same
-   * number.
-   *
-   * Windows are measured against it too. They are drawn inside this surface,
-   * which clips what hangs past it, so sizing them against the browser window
-   * cut the bottom off every tall one: no border, no resize grip, and no
-   * scrollbar to reach them with.
-   */
-  const desktopViewportRef = useRef(viewport);
   const [projectTabs, setProjectTabs] = useState<Record<string, ProjectTab>>({});
   /** A stage just ticked off, offered to the Client tab as a started update. */
   const [updateSeed, setUpdateSeed] = useState<{ docId: string; milestoneId: string } | null>(null);
@@ -386,347 +292,53 @@ export default function App() {
 
   const [search, setSearch] = useState('');
   const [showArchived, setShowArchived] = useState(false);
-  const [theme, setTheme] = useState<Theme>(loadTheme);
-  const [wallpaper, setWallpaper] = useState<WallpaperChoice>(loadWallpaper);
-  const [studio, setStudio] = useState<StudioDefaults>(loadStudioDefaults);
-  const [askForSignature, setAskForSignature] = useState<boolean>(loadAskForSignature);
-  const [restoreWindowsOn, setRestoreWindowsOn] = useState<boolean>(loadRestoreWindows);
-  const [autoTile, setAutoTile] = useState<boolean>(loadAutoTile);
-  const [tileLayout, setTileLayout] = useState<TileLayout>(loadTileLayout);
-  /** Read when the desktop changes size, from a handler made once. */
-  const tileLayoutRef = useRef(tileLayout);
-  /**
-   * The zone a window being dragged would snap into if let go now: drawn as
-   * a preview while the drag lasts. The ref is what the release reads.
-   */
-  const [snapPreview, setSnapPreview] = useState<Zone | null>(null);
-  const snapZoneRef = useRef<Zone | null>(null);
-  /** Goes up by one each time ⌘K, Ctrl+K or / asks for the search box. */
-  const [launcherSummon, setLauncherSummon] = useState(0);
-  const goRef = useRef<GoState>({ armedAt: null });
   /** A show chosen in the search box, for the Shows window to select. */
   const [showFocus, setShowFocus] = useState<{ id: string } | null>(null);
   const addImagesRef = useRef<HTMLInputElement>(null);
   const fullscreen = useFullscreen();
-  const [payment, setPayment] = useState<PaymentInstructions>(loadPaymentInstructions);
 
-  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
-  const [wallpaperLibrary, setWallpaperLibrary] = useState<CustomWallpaper[]>(loadWallpaperLibrary);
-  const [wallpaperUrls, setWallpaperUrls] = useState<Record<string, string>>({});
   const [wallpaperBusy, setWallpaperBusy] = useState(false);
   const [wallpaperError, setWallpaperError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => saveTheme(theme), [theme]);
-  useEffect(() => saveWallpaper(wallpaper), [wallpaper]);
-  useEffect(() => saveWallpaperLibrary(wallpaperLibrary), [wallpaperLibrary]);
-  useEffect(() => saveDesktopLayout(desktopLayout), [desktopLayout]);
-  useEffect(() => saveTrash(trash), [trash]);
-  useEffect(() => saveGuests(guests), [guests]);
-  useEffect(() => saveSiteUrl(siteUrl), [siteUrl]);
-  useEffect(() => saveTrashPosition(trashPosition), [trashPosition]);
-  useEffect(() => saveStudioDefaults(studio), [studio]);
-  useEffect(() => saveAskForSignature(askForSignature), [askForSignature]);
-  useEffect(() => saveRestoreWindows(restoreWindowsOn), [restoreWindowsOn]);
-  useEffect(() => saveMileageRate(mileageRate), [mileageRate]);
-  useEffect(() => saveAutoTile(autoTile), [autoTile]);
-  useEffect(() => {
-    saveTileLayout(tileLayout);
-    tileLayoutRef.current = tileLayout;
-  }, [tileLayout]);
-
-  /**
-   * The arrangement, kept so a reload picks the work back up. Written on a
-   * short delay because a drag changes the windows on every frame, and there
-   * is no reason to write to storage sixty times a second.
-   */
-  useEffect(() => {
-    if (!loaded) return undefined;
-    const timer = setTimeout(() => saveWindows(restoreWindowsOn ? windows : []), 400);
-    return () => clearTimeout(timer);
-  }, [loaded, restoreWindowsOn, windows]);
-  useEffect(() => savePaymentInstructions(payment), [payment]);
-
-  useEffect(() => {
-    const onResize = () => {
-      setViewport({ width: window.innerWidth, height: window.innerHeight });
-      // The windows follow the desktop surface in, not the browser window —
-      // see onDesktopViewport below, which the same resize triggers.
-    };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  /** The desktop surface has been measured, or has changed size. */
-  const onDesktopViewport = useCallback((size: { width: number; height: number }) => {
-    const previous = desktopViewportRef.current;
-    desktopViewportRef.current = size;
-    if (previous.width === size.width && previous.height === size.height) return;
-    // Windows follow the surface in, so none is left unreachable or clipped,
-    // and a snapped or tiled window keeps its share of the new size.
-    setWindows((current) => resnap(clampToViewport(current, size), size, tileLayoutRef.current));
-  }, []);
-
-  const open = useCallback((kind: WindowKind, title: string, subtitle?: string | null) => {
-    setWindows(
-      (current) => openWindow(current, { kind, title, subtitle }, desktopViewportRef.current).windows,
-    );
-  }, []);
-
-  // --- Data ---------------------------------------------------------------
-
-  // Read by `refresh`, which must see the current Trash rather than whatever
-  // it was when the callback was made.
-  const trashRef = useRef(trash);
-  useEffect(() => {
-    trashRef.current = trash;
-  }, [trash]);
+  /** ⌘ and ⌥ on a Mac or an iPad; Ctrl and Alt everywhere else. */
+  const apple = useMemo(
+    () => typeof navigator !== 'undefined' && isApplePlatform(navigator.userAgent),
+    [],
+  );
+  const keys = keyNames(apple);
 
   useEffect(() => onDbProblem(setDbProblem), []);
   useEffect(() => onAppUpdate(() => setUpdateReady(true)), []);
   useEffect(() => {
     previewOpenRef.current = preview !== null;
   }, [preview]);
-  // Read during a drag, which must see the windows as they are now.
-  const windowsRef = useRef(windows);
-  useEffect(() => {
-    windowsRef.current = windows;
-  }, [windows]);
-
-  const refresh = useCallback(async () => {
-    let documentRows: StoredDocument[];
-    let projectRows: Project[];
-    let invoiceRows: Invoice[];
-    let photoRows: Photo[];
-    let updateRows: ClientUpdate[];
-    let expenseRows: Expense[];
-    let showRows: Show[];
-    try {
-      [documentRows, projectRows, invoiceRows, photoRows, updateRows, expenseRows, showRows] = await Promise.all([
-        repo.list(),
-        repo.listProjects(),
-        repo.listInvoices(),
-        repo.listPhotos(),
-        repo.listUpdates(),
-        repo.listExpenses(),
-        repo.listShows(),
-      ]);
-    } catch (cause) {
-      // The database reports its own problem through onDbProblem; this stops
-      // the app pretending the studio is empty when it simply cannot be read.
-      // eslint-disable-next-line no-console
-      console.error('Could not read the studio', cause);
-      return;
-    }
-    // Everything in the Trash is hidden from the desktop, the Finder and the
-    // lists. The records themselves are untouched in storage — that is what
-    // makes Put back instant and lossless.
-    const hidden = trashedIds(trashRef.current);
-    setRows(documentRows.filter((row) => !hidden.has(row.id)));
-    setProjects(projectRows.filter((project) => !hidden.has(project.id)));
-    setInvoices(invoiceRows.filter((invoice) => !hidden.has(invoice.id)));
-    setPhotos(photoRows.filter((photo) => !hidden.has(photo.id)));
-    // An update belongs to its commission: one in the Trash takes its updates
-    // out of sight with it, and putting it back brings them back.
-    setClientUpdates(updateRows.filter((update) => !hidden.has(update.documentId)));
-    setAllUpdates(updateRows);
-    setExpenses(expenseRows);
-    setShows(showRows.filter((show) => !hidden.has(show.id)));
-    setAllShows(showRows);
-    setLoaded(true);
-
-    // First read of the studio: put back the windows that were open, now that
-    // there is something to check them against.
-    if (!restoredRef.current) {
-      restoredRef.current = true;
-      if (loadRestoreWindows()) {
-        const live = {
-          documents: new Set(documentRows.map((row) => row.id)),
-          invoices: new Set(invoiceRows.map((invoice) => invoice.id)),
-          projects: new Set(projectRows.map((project) => project.id)),
-          photos: new Set(photoRows.map((photo) => photo.id)),
-        };
-        const back = restorable(loadWindows(), (kind) => {
-          if (hidden.has(subjectIdOf(kind) ?? '')) return false;
-          switch (kind.type) {
-            case 'commission':
-              return live.documents.has(kind.docId);
-            case 'invoice':
-              return live.invoices.has(kind.invoiceId);
-            case 'folder':
-              return live.projects.has(kind.projectId);
-            case 'photo':
-            case 'photoEdit':
-              return live.photos.has(kind.photoId);
-            default:
-              return true;
-          }
-        });
-        if (back.length > 0) setWindows(back);
-      }
-    }
-  }, [repo]);
-
-  useEffect(() => {
-    void (async () => {
-      // First run only: seed one clearly-labelled demo commission so the app
-      // opens showing what it does. Seeded once, so removing it sticks.
-      if (!demoAlreadySeeded()) {
-        const existing = await repo.list();
-        if (existing.length === 0) {
-          const demo = buildDemo();
-          let doc = demo.document;
-          let project = demo.project;
-
-          const artwork = await drawDemoArtwork();
-          if (artwork) {
-            const imageId = newId();
-            try {
-              await repo.putImage(imageId, artwork);
-              doc = { ...doc, artwork: { ...doc.artwork, referenceImageIds: [imageId] } };
-              // The folder keeps its own face. The artwork belongs to the
-              // commission inside it, and shows when the folder is opened.
-            } catch {
-              // An image the store refuses is not worth failing the seed over.
-            }
-          }
-
-          await repo.save(doc, cloud.configured);
-          await repo.saveProject(project);
-        }
-        markDemoSeeded();
-      }
-
-      await refresh();
-      // Nothing here claims a sync: with no adapter configured the drain is a
-      // no-op, and the status bar says cloud sync is unconfigured.
-      await drainQueue(repo, WORKSPACE_ID, cloud);
-    })();
-  }, [refresh, repo]);
-
-  useEffect(() => {
-    const onOnline = () => void drainQueue(repo, WORKSPACE_ID, cloud).then(refresh);
-    window.addEventListener('online', onOnline);
-    return () => window.removeEventListener('online', onOnline);
-  }, [refresh, repo]);
-
-  // Open the most recent commission on first load, so the app starts in work.
-  const restored = useRef(false);
-  useEffect(() => {
-    if (restored.current || rows.length === 0) return;
-    restored.current = true;
-    const newest = rows[0];
-    if (newest) {
-      open({ type: 'commission', docId: newest.id }, 'Commission Studio', newest.document.documentNumber);
-    }
-  }, [rows, open]);
 
   // --- Images -------------------------------------------------------------
 
   /**
-   * Object URLs for every image any open window might show. One map for the
-   * whole app: two windows onto the same project would otherwise each make a
-   * URL for the same blob, and one closing would revoke the other's.
+   * Object URLs for every image any open window might show, and for every
+   * picture in the wallpaper library, so the picker can show thumbnails and
+   * the desktop can show the chosen one from the same map.
    */
-  const neededImageIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const row of rows) {
-      for (const id of row.document.artwork.referenceImageIds) ids.add(id);
-      if (row.document.studio.logoImageId) ids.add(row.document.studio.logoImageId);
-    }
-    for (const project of projects) if (project.coverImageId) ids.add(project.coverImageId);
-    for (const expense of expenses) for (const id of expense.receiptImageIds) ids.add(id);
-    for (const photo of photos) {
-      ids.add(photo.imageId);
-      // The editor works from the photograph, which is a second blob once an
-      // edit has been saved over it.
-      ids.add(sourceImageId(photo));
-    }
-    return [...ids].sort().join(',');
-  }, [rows, projects, photos, expenses]);
-
-  useEffect(() => {
-    const ids = neededImageIds ? neededImageIds.split(',') : [];
-    let cancelled = false;
-    const created: string[] = [];
-    void (async () => {
-      const map: Record<string, string> = {};
-      for (const id of ids) {
-        const image = await repo.getImage(id);
-        if (image) {
-          const url = URL.createObjectURL(image.blob);
-          created.push(url);
-          map[id] = url;
-        }
-      }
-      if (!cancelled) setImageUrls(map);
-    })();
-    return () => {
-      cancelled = true;
-      // Revoked a beat later: React can still paint one frame with the old
-      // src, and a revoked blob URL in an <img> is a console error.
-      const stale = [...created];
-      setTimeout(() => stale.forEach((url) => URL.revokeObjectURL(url)), 1000);
-    };
-  }, [neededImageIds, repo]);
-
-  // Object URLs for every picture in the library, so the picker can show
-  // thumbnails and the desktop can show the chosen one from the same map.
+  const neededImageIds = useMemo(
+    () => imageIdsKey({ documents: rows, projects, photos, expenses }),
+    [rows, projects, photos, expenses],
+  );
+  const imageUrls = useObjectUrls(repo, neededImageIds);
   const libraryIds = useMemo(
     () => wallpaperLibrary.map((w) => w.imageId).sort().join(','),
     [wallpaperLibrary],
   );
-
-  useEffect(() => {
-    const ids = libraryIds ? libraryIds.split(',') : [];
-    let cancelled = false;
-    const created: string[] = [];
-    void (async () => {
-      const map: Record<string, string> = {};
-      for (const id of ids) {
-        const image = await repo.getImage(id);
-        if (image) {
-          const url = URL.createObjectURL(image.blob);
-          created.push(url);
-          map[id] = url;
-        }
-      }
-      if (!cancelled) setWallpaperUrls(map);
-    })();
-    return () => {
-      cancelled = true;
-      const stale = [...created];
-      setTimeout(() => stale.forEach((url) => URL.revokeObjectURL(url)), 1000);
-    };
-  }, [libraryIds, repo]);
+  const wallpaperUrls = useObjectUrls(repo, libraryIds);
 
   // --- Saving -------------------------------------------------------------
 
-  const save = useCallback(
-    async (doc: CommissionDocument) => {
-      await repo.save(doc, cloud.configured);
-      await refresh();
-    },
-    [refresh, repo],
-  );
-
-  const saveInvoiceRecord = useCallback(
-    async (invoice: Invoice) => {
-      await repo.saveInvoice(invoice);
-      await refresh();
-    },
-    [refresh, repo],
-  );
-
-  const saveProjectRecord = useCallback(
-    async (project: Project) => {
-      await repo.saveProject(project);
-      await refresh();
-    },
-    [refresh, repo],
-  );
+  const save = data.saveDocument;
+  const saveInvoiceRecord = data.saveInvoice;
+  const saveProjectRecord = data.saveProject;
+  const savePhotoRecord = data.savePhoto;
 
   const docById = (id: string): CommissionDocument | null =>
     rows.find((row) => row.id === id)?.document ?? null;
@@ -809,7 +421,7 @@ export default function App() {
   const handleRemoveDemo = async (id: string) => {
     const folder = projects.find((p) => p.documentIds.includes(id));
     if (folder && folder.documentIds.length === 1 && folder.invoiceIds.length === 0) {
-      await repo.deleteProject(folder.id);
+      await data.deleteProject(folder.id);
     } else if (folder) {
       await repo.saveProject(removeFromProject(folder, id));
     }
@@ -817,10 +429,8 @@ export default function App() {
       await repo.deleteUpdate(updateId);
     }
     await repo.deleteDocument(id);
-    setWindows((current) =>
-      current.filter((w) => !(w.kind.type === 'commission' && w.kind.docId === id)),
-    );
-    await refresh();
+    wm.closeWindowsFor([id]);
+    await data.reload();
     setMessage('Demo removed.');
   };
 
@@ -939,8 +549,7 @@ export default function App() {
       return;
     }
     await save(result.document);
-    for (const update of result.updates) await repo.saveUpdate(update);
-    await refresh();
+    for (const update of result.updates) await data.saveUpdate(update);
     open(
       { type: 'commission', docId: result.document.id },
       'Commission Studio',
@@ -989,10 +598,10 @@ export default function App() {
       }
     } catch (cause) {
       setMessage(`The shows could not all be read in: ${String(cause)}`);
-      await refresh();
+      await data.reload();
       return;
     }
-    await refresh();
+    await data.reload();
     const already = result.shows.length - incoming.length;
     const parts = [
       `${incoming.length === 1 ? '1 show' : `${incoming.length} shows`} added`,
@@ -1023,7 +632,7 @@ export default function App() {
     }
     const incoming = newExpenses(result.expenses, expenses);
     for (const expense of incoming) await repo.saveExpense(expense);
-    await refresh();
+    await data.reload();
     const already = result.expenses.length - incoming.length;
     const parts = [
       `${incoming.length === 1 ? '1 row' : `${incoming.length} rows`} added`,
@@ -1098,109 +707,6 @@ export default function App() {
     }
   };
 
-  // --- Undo -----------------------------------------------------------------
-
-  const pushUndoEntry = (label: string, undo: () => void | Promise<void>) => {
-    undoRef.current = pushUndo(undoRef.current, { label, undo });
-    setUndoStack(undoRef.current);
-  };
-
-  const undoLast = useCallback(async () => {
-    // Taken off the stack before it runs, so a double-tap cannot run the same
-    // undo twice.
-    const { entry, stack } = popUndo(undoRef.current);
-    undoRef.current = stack;
-    setUndoStack(stack);
-    if (!entry) return;
-    await entry.undo();
-    setMessage(`Undone: ${entry.label.toLowerCase()}.`);
-  }, []);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (!isUndoKey(event)) return;
-      event.preventDefault();
-      void undoLast();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [undoLast]);
-
-  /**
-   * The shell's own keys, in one place so they cannot fight:
-   *  - ⌘K or Ctrl+K anywhere, and / when not typing: the search box.
-   *  - Ctrl/⌘ + Alt + an arrow steps through the tabs of the frame in front.
-   *    Not Ctrl+Tab: browsers keep that one for their own tabs. Alt with a
-   *    number jumps straight to a tab.
-   *  - Alt + Shift + an arrow snaps the window in front (tiling.ts).
-   *  - G, then a letter, opens a tool (launcher.ts).
-   * A key typed into a field is left to the field — except ⌘K, which is
-   * deliberate enough to mean the search box wherever the cursor is.
-   *
-   * Everything is decided from refs, here, before the handler returns. A
-   * state updater runs later, after the browser has already acted on the
-   * key, so a preventDefault inside one never prevented anything.
-   */
-  const keyActions = useRef<{ openTool: (id: string) => void; snapFront: (arrow: Arrow) => void }>({
-    openTool: () => undefined,
-    snapFront: () => undefined,
-  });
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      // The preview owns the keys while it is open.
-      if (previewOpenRef.current) return;
-      const mod = event.ctrlKey || event.metaKey;
-      const typing = isTypingTarget(event.target);
-
-      if (mod && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        setLauncherSummon((n) => n + 1);
-        return;
-      }
-      if (!typing && !mod && !event.altKey && event.key === '/') {
-        event.preventDefault();
-        setLauncherSummon((n) => n + 1);
-        return;
-      }
-
-      const current = windowsRef.current;
-      if (mod && event.altKey && (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) {
-        const front = focusedWindow(current);
-        if (!front) return;
-        event.preventDefault();
-        const next = stepTab(current, front.id, event.key === 'ArrowRight' ? 1 : -1);
-        if (next !== front.id) setWindows((c) => focusWindow(c, next));
-        return;
-      }
-      if (event.altKey && !mod && !event.shiftKey && /^[1-9]$/.test(event.key)) {
-        const front = focusedWindow(current);
-        if (!front) return;
-        const tabs = tabsOf(current, front.id);
-        const wanted = tabs[Number(event.key) - 1];
-        if (!wanted || tabs.length < 2) return;
-        event.preventDefault();
-        setWindows((c) => focusWindow(c, wanted.id));
-        return;
-      }
-
-      const arrow = ARROWS[event.key];
-      if (arrow && event.altKey && event.shiftKey && !mod && !typing) {
-        event.preventDefault();
-        keyActions.current.snapFront(arrow);
-        return;
-      }
-
-      if (!typing && !mod && !event.altKey && event.key.length === 1) {
-        const step = goStep(goRef.current, event.key, Date.now());
-        goRef.current = step.state;
-        if (step.consumed) event.preventDefault();
-        if (step.tool) keyActions.current.openTool(step.tool);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
   // --- Desktop ------------------------------------------------------------
 
   const filedDocs = filedDocumentIds(projects);
@@ -1270,7 +776,7 @@ export default function App() {
         trashPositionOf(trashPosition, surface),
       ]),
     );
-    setMessage('Desktop tidied up. ⌘Z puts it back.');
+    setMessage(`Desktop tidied up. ${undoKeys(apple)} puts it back.`);
   };
 
   const handleNewFolder = async () => {
@@ -1281,10 +787,7 @@ export default function App() {
     await saveProjectRecord(folder);
     // Undoing a brand new folder removes it. It is empty by definition, so
     // nothing can be lost by doing so.
-    pushUndoEntry(`New folder “${name}”`, async () => {
-      await repo.deleteProject(folder.id);
-      await refresh();
-    });
+    pushUndoEntry(`New folder “${name}”`, () => data.deleteProject(folder.id));
     setMessage(`“${name}” is on your desktop. Drag files onto it, or rename it inside.`);
   };
 
@@ -1306,7 +809,7 @@ export default function App() {
     const previous = folders.find(
       (p) => p.id !== folderId && projectItemIds(p).includes(itemId),
     );
-    if (previous) await repo.saveProject(removeFromProject(previous, itemId));
+    if (previous) await saveProjectRecord(removeFromProject(previous, itemId));
 
     const [storedPhoto, storedInvoice] = await Promise.all([
       repo.loadPhoto(itemId),
@@ -1334,16 +837,12 @@ export default function App() {
         if (previous) await handleFileInto(previous.id, itemId, true);
         else if (spot) setDesktopLayout((current) => ({ ...current, [itemId]: spot }));
       });
-      setMessage(`Filed into “${folder.name}”. ⌘Z undoes it.`);
+      setMessage(`Filed into “${folder.name}”. ${undoKeys(apple)} undoes it.`);
     }
   };
 
   // --- Pictures -------------------------------------------------------------
 
-  const savePhotoRecord = async (photo: Photo) => {
-    await repo.savePhoto(photo);
-    await refresh();
-  };
 
   /**
    * Brings pictures in from the Add images square, from a file picker or a
@@ -1397,7 +896,7 @@ export default function App() {
     }
 
     if (folder) await repo.saveProject(folder);
-    await refresh();
+    await data.reload();
     setImportingImages(false);
 
     if (added > 0) {
@@ -1418,180 +917,26 @@ export default function App() {
 
   // --- Trash ---------------------------------------------------------------
 
-  /**
-   * Moving something to the Trash hides it; it never deletes it. The record
-   * stays in IndexedDB exactly as it was, which is why Put back is instant.
-   */
-  const applyTrash = async (next: Trash) => {
-    trashRef.current = next;
-    setTrash(next);
-    await refresh();
-  };
-
-  /** Windows onto a record that has just been hidden or destroyed. */
-  const closeWindowsFor = (ids: string[]) => {
-    setWindows((current) =>
-      current.filter((w) => {
-        const kind = w.kind;
-        if (kind.type === 'commission') return !ids.includes(kind.docId);
-        if (kind.type === 'invoice') return !ids.includes(kind.invoiceId);
-        if (kind.type === 'folder') return !ids.includes(kind.projectId);
-        if (kind.type === 'photo') return !ids.includes(kind.photoId);
-        if (kind.type === 'photoEdit') return !ids.includes(kind.photoId);
-        return true;
-      }),
-    );
-  };
-
-  /** What goes with a trashed record when it is emptied: updates and fee rows. */
-  const trashAttached: AttachedRecord[] = [
-    ...allUpdates,
-    ...allShows
-      .filter((show) => expenses.some((row) => row.id === feeExpenseId(show.id)))
-      .map((show) => ({ id: feeExpenseId(show.id), documentId: show.id, kind: 'fee' as const })),
-  ];
-
-  const handleTrash = async (itemId: string) => {
-    const project = projects.find((p) => p.id === itemId);
-    const doc = docById(itemId);
-    const invoice = invoices.find((i) => i.id === itemId);
-    const photo = photos.find((p) => p.id === itemId);
-    const show = shows.find((one) => one.id === itemId);
-    if (!project && !doc && !invoice && !photo && !show) return;
-
-    const entry: TrashEntry = project
-      ? {
-          id: project.id,
-          kind: 'project',
-          name: project.name,
-          deletedAt: new Date().toISOString(),
-          // The contents go in with the folder and come back out with it.
-          contains: projectItemIds(project),
-          fromFolderId: null,
-        }
-      : {
-          id: itemId,
-          kind: show ? 'show' : photo ? 'photo' : doc ? 'document' : 'invoice',
-          name: show
-            ? show.name
-            : photo
-            ? photo.title
-            : doc
-              ? doc.title.trim() || doc.documentNumber
-              : invoice?.invoiceNumber ?? 'Invoice',
-          deletedAt: new Date().toISOString(),
-          contains: [],
-          fromFolderId: projectContaining(itemId)?.id ?? null,
-        };
-
-    await applyTrash(trashItem(trashRef.current, entry));
-    if (selectedId === itemId) setSelectedId(null);
-    pushUndoEntry(`Move “${entry.name}” to the Trash`, () => handlePutBack(itemId, true));
-    // The record is hidden now, so a window onto it would only show a
-    // tombstone. Closing it loses nothing: Put back is one click away.
-    closeWindowsFor(deletionTargets(entry));
-    setMessage(
-      entry.contains.length > 0
-        ? `“${entry.name}” and the ${countPhrase(entry.contains.length)} inside it went to the Trash. Nothing has been deleted.`
-        : `“${entry.name}” went to the Trash. Nothing has been deleted.`,
-    );
-  };
-
-  const handlePutBack = async (itemId: string, quiet = false) => {
-    const entry = findEntry(trashRef.current, itemId);
-    if (!entry) return;
-    await applyTrash(removeEntry(trashRef.current, itemId));
-    if (quiet) return;
-    pushUndoEntry(`Put “${entry.name}” back`, () => handleTrash(itemId));
-    setMessage(
-      entry.fromFolderId
-        ? `“${entry.name}” is back in its folder.`
-        : `“${entry.name}” is back on the desktop.`,
-    );
-  };
-
-  /**
-   * The only code in the app that destroys anything. Both callers ask the
-   * artist a second question first, in TrashWindow.
-   */
-  const destroy = async (entries: TrashEntry[]) => {
-    const ids = entries.flatMap(deletionTargets);
-    const removedImages: string[] = [];
-
-    // A commission's updates are its own records and have no life without it.
-    // Left behind they are orphans: invisible everywhere, and still stored.
-    for (const updateId of attachedIds(ids, await repo.listUpdates())) {
-      await repo.deleteUpdate(updateId);
-    }
-
-    // A show takes its booth-fee row with it and gives its pieces back.
-    const allStoredShows = await repo.listShows();
-    for (const show of allStoredShows.filter((one) => ids.includes(one.id))) {
-      let current = show;
-      const others = allStoredShows.filter((one) => !ids.includes(one.id) || one.id === show.id);
-      for (const pieceId of show.pieceIds) {
-        const piece = await repo.loadPhoto(pieceId);
-        if (!piece) continue;
-        const result = removePiece(current, piece, others);
-        current = result.show;
-        if (result.location !== undefined) await repo.savePhoto(editPhoto(piece, { location: result.location }));
-      }
-      await repo.deleteExpense(feeExpenseId(show.id));
-      await repo.deleteShow(show.id);
-    }
-
-    for (const id of ids) {
-      const storedPhoto = await repo.loadPhoto(id);
-      if (storedPhoto) {
-        removedImages.push(storedPhoto.imageId, sourceImageId(storedPhoto));
-        await repo.deletePhoto(id);
-        continue;
-      }
-      const stored = await repo.load(id);
-      if (stored) {
-        removedImages.push(...stored.document.artwork.referenceImageIds);
-        await repo.deleteDocument(id);
-        continue;
-      }
-      if (await repo.loadInvoice(id)) {
-        await repo.deleteInvoice(id);
-        continue;
-      }
-      if (await repo.loadProject(id)) await repo.deleteProject(id);
-    }
-
-    // A photograph another commission still uses is never taken with it, and
-    // neither is one being used as a desktop picture.
-    const [remaining, remainingPhotos] = await Promise.all([repo.list(), repo.listPhotos()]);
-    const stillUsed = new Set<string>([
-      ...remaining.flatMap((row) => row.document.artwork.referenceImageIds),
-      ...remainingPhotos.flatMap((photo) => [photo.imageId, sourceImageId(photo)]),
-      ...wallpaperLibrary.map((picture) => picture.imageId),
-    ]);
-    for (const imageId of orphanImageIds(removedImages, stillUsed)) {
-      await repo.deleteImage(imageId);
-    }
-
-    closeWindowsFor(ids);
-
-    const keep = trashRef.current.filter((e) => !entries.some((gone) => gone.id === e.id));
-    await applyTrash(keep);
-  };
-
-  const handleDeleteForever = async (itemId: string) => {
-    const entry = findEntry(trashRef.current, itemId);
-    if (!entry) return;
-    await destroy([entry]);
-    setMessage(`“${entry.name}” has been deleted for good.`);
-  };
-
-  const handleEmptyTrash = async () => {
-    const going = trashRef.current;
-    if (going.length === 0) return;
-    const { records } = summarise(going, trashAttached);
-    await destroy(going);
-    setMessage(`Trash emptied. ${countPhrase(records, 'record')} deleted for good.`);
-  };
+  const { trashAttached, handleTrash, handlePutBack, handleDeleteForever, handleEmptyTrash } =
+    useTrashActions({
+      repo,
+      trashState,
+      rows,
+      projects,
+      invoices,
+      photos,
+      shows,
+      allUpdates,
+      allShows,
+      expenses,
+      reload: data.reload,
+      wallpaperLibrary,
+      closeWindowsFor: wm.closeWindowsFor,
+      pushUndoEntry,
+      say: setMessage,
+      selectedId,
+      setSelectedId,
+    });
 
   /**
    * A folder's picture, if it ever had one, belonged to something inside it.
@@ -1720,36 +1065,25 @@ export default function App() {
     setPreview({ ids, index: Math.max(0, ids.indexOf(photoId)) });
   };
 
-  /**
-   * An edit saved over what the studio shows.
-   *
-   * The photograph itself is kept as a second blob and the numbers are stored
-   * on the record, so the edit can be reopened, changed or undone, and the
-   * editor always starts from the photograph rather than from the last edit.
-   * Everything else in the app goes on reading `imageId` and knows nothing
-   * about any of this.
-   */
   // --- The books ------------------------------------------------------------
 
-  const saveExpenseRecord = async (expense: Expense) => {
-    await repo.saveExpense(expense);
-    await refresh();
-  };
+  const saveExpenseRecord = data.saveExpense;
 
   // --- Shows ----------------------------------------------------------------
 
   /** Saves a show and keeps its booth-fee row in the books in step. */
   const saveShowRecord = async (show: Show) => {
     try {
-      await repo.saveShow(show);
+      await data.saveShow(show);
       const existing = expenses.find((row) => row.id === feeExpenseId(show.id)) ?? null;
       const row = feeExpense(show, existing, localToday());
-      if (row) await repo.saveExpense(row);
-      else if (existing) await repo.deleteExpense(existing.id);
+      if (row) await data.saveExpense(row);
+      else if (existing) await data.deleteExpense(existing.id);
     } catch (cause) {
       setMessage(`The show could not be saved: ${String(cause)}`);
+      // Whatever did get written is what the screen should show.
+      await data.reload();
     }
-    await refresh();
   };
 
   /** A piece on or off a show; its location in Artwork follows. */
@@ -1758,17 +1092,16 @@ export default function App() {
       ? removePiece(show, photo, shows)
       : addPiece(show, photo);
     try {
-      await repo.saveShow(result.show);
-      if (result.location !== undefined) await repo.savePhoto(editPhoto(photo, { location: result.location }));
+      await data.saveShow(result.show);
+      if (result.location !== undefined) await savePhotoRecord(editPhoto(photo, { location: result.location }));
     } catch (cause) {
       setMessage(`The piece could not be moved: ${String(cause)}`);
+      await data.reload();
     }
-    await refresh();
   };
 
   const deleteExpenseRecord = async (id: string) => {
-    await repo.deleteExpense(id);
-    await refresh();
+    await data.deleteExpense(id);
     setMessage('Row removed.');
   };
 
@@ -1790,20 +1123,15 @@ export default function App() {
         setMessage(`${file.name} could not be read as an image.`);
       }
     }
-    if (ids.length > 0) await refresh();
     return ids;
   };
 
   // --- Client updates -------------------------------------------------------
 
-  const saveClientUpdate = async (update: ClientUpdate) => {
-    await repo.saveUpdate(update);
-    await refresh();
-  };
+  const saveClientUpdate = data.saveUpdate;
 
   const deleteClientUpdate = async (id: string) => {
-    await repo.deleteUpdate(id);
-    await refresh();
+    await data.deleteUpdate(id);
     setMessage('Update removed. What was already handed over is still out there.');
   };
 
@@ -1882,6 +1210,15 @@ export default function App() {
     await saveClientUpdate(recordHandoff(update, channel));
   };
 
+  /**
+   * An edit saved over what the studio shows.
+   *
+   * The photograph itself is kept as a second blob and the numbers are stored
+   * on the record, so the edit can be reopened, changed or undone, and the
+   * editor always starts from the photograph rather than from the last edit.
+   * Everything else in the app goes on reading `imageId` and knows nothing
+   * about any of this.
+   */
   const savePhotoEdit = async (
     photo: Photo,
     blob: Blob,
@@ -1942,8 +1279,7 @@ export default function App() {
       currency: source.currency,
       note: [`Edited from “${source.title}”.`, changes.join(', ')].filter(Boolean).join(' '),
     });
-    await repo.savePhoto(copy);
-    await refresh();
+    await savePhotoRecord(copy);
     setMessage(`Saved as “${copy.title}”. The original is untouched.`);
     // Opened from the record in hand: `photos` in this closure is the list as
     // it was before the copy existed, so looking it up there finds nothing.
@@ -1974,65 +1310,9 @@ export default function App() {
     }
   };
 
-  // --- Window plumbing ----------------------------------------------------
-
-  const top = focusedWindow(windows);
-  const tray = minimizedWindows(windows);
-
-  const focusWin = (id: string) => setWindows((c) => focusWindow(c, id));
-  const closeWin = (id: string) => setWindows((c) => closeWindow(c, id));
-  const minimizeWin = (id: string) => setWindows((c) => minimizeWindow(c, id));
-  const zoomWin = (id: string) => setWindows((c) => toggleZoom(c, id, desktopViewportRef.current));
-
-  /**
-   * A window being dragged by its titlebar. Pushed against an edge of the
-   * desktop, the zone it would snap into is drawn; over the top of another
-   * frame, that frame lights up to take it as a tab. The edge wins where both
-   * could apply: pushing at the side of the screen is a request, brushing a
-   * titlebar on the way there is not.
-   */
-  const onDragWindow = useCallback((id: string, point: { x: number; y: number }) => {
-    const surface = desktopRef.current?.getBoundingClientRect();
-    if (!surface) return;
-    const local = { x: point.x - surface.left, y: point.y - surface.top };
-
-    const zone = zoneAt(local, desktopViewportRef.current);
-    if (zone !== snapZoneRef.current) {
-      snapZoneRef.current = zone;
-      setSnapPreview(zone);
-    }
-
-    const target = zone ? null : (dropTargetAt(windowsRef.current, id, local)?.id ?? null);
-    if (target !== dropTargetRef.current) {
-      dropTargetRef.current = target;
-      setDropTarget(target);
-    }
-  }, []);
-
-  /**
-   * Let go. The frame moved itself during the drag; this is the one time the
-   * desktop hears where it ended up, and decides what that means: a snap, a
-   * tab, or a window that has been moved — at its own size again, if it had
-   * been snapped when it was picked up.
-   */
-  const onDragEndWindow = useCallback((id: string, to: { x: number; y: number }) => {
-    const zone = snapZoneRef.current;
-    const target = dropTargetRef.current;
-    snapZoneRef.current = null;
-    dropTargetRef.current = null;
-    setSnapPreview(null);
-    setDropTarget(null);
-    if (zone) setWindows((current) => snapWindow(current, id, zone, desktopViewportRef.current));
-    else if (target) setWindows((current) => mergeInto(current, id, target));
-    else setWindows((current) => moveWindow(unsnapWindow(current, id), id, to.x, to.y));
-  }, []);
-
   // --- Tools, tiling and the search box -----------------------------------
 
-  const frames = visibleFrames(windows);
   const hasFocused = top !== null;
-  const snapped = anySnapped(windows);
-  const apple = useMemo(onApple, []);
 
   /** What a tool's window is called and shows, by dock id. */
   const toolSpec = (id: string): { kind: WindowKind; title: string; subtitle: string } => {
@@ -2058,8 +1338,8 @@ export default function App() {
     }
   };
 
-  /** Show the desktop: everything goes to the tray, nothing is lost. */
-  const showDesktop = () => setWindows((c) => c.map((w) => ({ ...w, minimized: true })));
+
+  const showDesktop = wm.showDesktop;
 
   /**
    * Opens a tool, or brings it forward. Unlike a dock button this never puts
@@ -2072,84 +1352,28 @@ export default function App() {
     open(spec.kind, spec.title, spec.subtitle);
   };
 
-  /** Alt+Shift and an arrow, on the window in front. Nothing to do on a phone. */
-  const snapFront = (arrow: Arrow) => {
-    if (compact) return;
-    const front = focusedWindow(windowsRef.current);
-    if (!front) return;
-    const next = snapByArrow(front.snap, arrow);
-    if (next === null) return;
-    setWindows((c) =>
-      next === 'restore' ? unsnapWindow(c, front.id) : snapWindow(c, front.id, next, desktopViewportRef.current),
-    );
-  };
-  keyActions.current = { openTool, snapFront };
 
-  /** Straight into a zone, whatever the window was doing: the search box's snaps. */
-  const snapFrontTo = (zone: Zone) => {
-    const front = focusedWindow(windowsRef.current);
-    if (front) setWindows((c) => snapWindow(c, front.id, zone, desktopViewportRef.current));
-  };
+  const shell = useShellKeys({
+    previewOpenRef,
+    windowsRef: wm.windowsRef,
+    focusTab: wm.focusTab,
+    openTool,
+    snapFront: wm.snapFront,
+  });
 
-  const tile = (layout: TileLayout) => {
-    setTileLayout(layout);
-    setWindows((c) => tileAll(c, layout, desktopViewportRef.current, focusedWindow(c)?.id ?? null));
-  };
-
-  /**
-   * Auto-tiling: whenever a frame opens, closes, comes back from the tray or
-   * joins a group, everything on screen is laid out again. A lone window is
-   * given back its own size — a single tile filling the screen is just a
-   * zoomed window nobody asked for.
-   */
-  const frameKey = frames
-    .map((frame) => frame.groupId ?? frame.id)
-    .sort()
-    .join('|');
-  useEffect(() => {
-    if (!autoTile || compact || !loaded) return;
-    setWindows((c) =>
-      visibleFrames(c).length < 2
-        ? untileAll(c)
-        : tileAll(c, tileLayoutRef.current, desktopViewportRef.current, focusedWindow(c)?.id ?? null),
-    );
-  }, [autoTile, compact, frameKey, loaded]);
-
-  const undoLabel = nextUndoLabel(undoStack);
-  const launcherEntries = useMemo(
-    () => [
-      ...toolEntries(),
-      ...actionEntries({
-        frames: frames.length,
-        hasFocused,
-        compact,
-        undoLabel,
-        theme,
-        fullscreen: fullscreen.supported ? (fullscreen.active ? 'on' : 'off') : 'unsupported',
-        autoTile,
-        snapped,
-        mac: apple,
-      }),
-      ...recordEntries({ documents: rows, invoices, projects, photos, shows, guests }),
-    ],
-    [
-      frames.length,
+  const launcherEntries = useLauncherEntries(
+    {
+      frames: frames.length,
       hasFocused,
       compact,
       undoLabel,
       theme,
-      fullscreen.supported,
-      fullscreen.active,
-      autoTile,
+      fullscreen: fullscreen.supported ? (fullscreen.active ? 'on' : 'off') : 'unsupported',
+      autoTile: wm.autoTile,
       snapped,
-      apple,
-      rows,
-      invoices,
-      projects,
-      photos,
-      shows,
-      guests,
-    ],
+      mac: apple,
+    },
+    { documents: rows, invoices, projects, photos, shows, guests },
   );
 
   const toggleFullscreen = async () => {
@@ -2181,7 +1405,6 @@ export default function App() {
   };
 
   const runAction = (id: string) => {
-    const viewportNow = desktopViewportRef.current;
     switch (id) {
       case 'new-commission':
         return void handleNew();
@@ -2207,29 +1430,31 @@ export default function App() {
         return setTheme(theme === 'dark' ? 'light' : 'dark');
       case 'fullscreen':
         return void toggleFullscreen();
+      case 'shortcuts':
+        return shell.openShortcuts();
       case 'tile-columns':
-        return tile('columns');
+        return wm.tile('columns');
       case 'tile-grid':
-        return tile('grid');
+        return wm.tile('grid');
       case 'tile-main':
-        return tile('main');
+        return wm.tile('main');
       case 'tile-rows':
-        return tile('rows');
+        return wm.tile('rows');
       case 'cascade':
-        return setWindows((c) => cascadeAll(c, viewportNow));
+        return wm.cascade();
       case 'untile':
-        return setWindows(untileAll);
+        return wm.untile();
       case 'merge':
-        setWindows((c) => mergeAll(c));
+        wm.merge();
         return setMessage('Windows merged into tabs. ⧉ on a tab moves it back out.');
       case 'snap-left':
-        return snapFrontTo('left');
+        return wm.snapFrontTo('left');
       case 'snap-right':
-        return snapFrontTo('right');
+        return wm.snapFrontTo('right');
       case 'snap-fill':
-        return snapFrontTo('fill');
+        return wm.snapFrontTo('fill');
       case 'auto-tile':
-        return setAutoTile(!autoTile);
+        return wm.setAutoTile(!wm.autoTile);
       default:
         return undefined;
     }
@@ -2632,7 +1857,7 @@ export default function App() {
           onSearch={setSearch}
           onOpen={openDocumentWindow}
           onDuplicate={(id) => void handleDuplicate(id)}
-          onArchive={(id) => void repo.archive(id).then(refresh)}
+          onArchive={(id) => void data.archiveDocument(id)}
           onNew={handleNew}
           showArchived={showArchived}
           onToggleArchived={() => setShowArchived(!showArchived)}
@@ -2871,9 +2096,9 @@ export default function App() {
           <Launcher
             entries={launcherEntries}
             onChoose={onLaunch}
-            summon={launcherSummon}
+            summon={shell.launcherSummon}
             compact={compact}
-            summonKeys={apple ? ['⌘', 'K'] : ['Ctrl', 'K']}
+            summonKeys={[keys.mod, 'K']}
           />
         }
         arrange={
@@ -2882,13 +2107,13 @@ export default function App() {
             : {
                 frames: frames.length,
                 snapped,
-                autoTile,
-                layout: tileLayout,
-                onTile: tile,
-                onCascade: () => setWindows((c) => cascadeAll(c, desktopViewportRef.current)),
-                onUntile: () => setWindows(untileAll),
-                onAutoTile: setAutoTile,
-                snapKeys: apple ? '⌥⇧' : 'Alt+Shift',
+                autoTile: wm.autoTile,
+                layout: wm.tileLayout,
+                onTile: wm.tile,
+                onCascade: wm.cascade,
+                onUntile: wm.untile,
+                onAutoTile: wm.setAutoTile,
+                snapKeys: keyText([keys.alt, keys.shift], apple),
               }
         }
         statusText={statusText}
@@ -2898,7 +2123,7 @@ export default function App() {
         onOpenSettings={() => open({ type: 'settings' }, 'Settings', null)}
         openWindows={windows.filter((w) => !w.minimized).length}
         onMergeWindows={() => {
-          setWindows((c) => mergeAll(c));
+          wm.merge();
           setMessage('Windows merged into tabs. ⧉ on a tab moves it back out.');
         }}
         initials={initialsOf(studio.name)}
@@ -2957,7 +2182,7 @@ export default function App() {
         </div>
       )}
 
-      <main className="desktop" ref={desktopRef}>
+      <main className="desktop" ref={wm.desktopRef}>
         <Desktop
           items={desktopItems}
           panel={
@@ -2985,7 +2210,7 @@ export default function App() {
           onMove={handleMoveIcon}
           onFileInto={(folderId, itemId) => void handleFileInto(folderId, itemId)}
           onNewFolder={() => void handleNewFolder()}
-          undoLabel={nextUndoLabel(undoStack)}
+          undoLabel={undoLabel}
           onUndo={() => void undoLast()}
           onAddImages={(files) => void handleImportPhotos(files)}
           importing={importingImages}
@@ -2999,17 +2224,17 @@ export default function App() {
           }}
           onTrash={(id) => void handleTrash(id)}
           onOpenTrash={openTrashWindow}
-          onViewport={onDesktopViewport}
+          onViewport={wm.onDesktopViewport}
         />
 
         {/* Where a window being dragged will land if let go now. Drawn at the
             top z but before the frames, so the window itself stays over it. */}
-        {snapPreview && !compact && (
+        {wm.snapPreview && !compact && (
           <div
             className="snap-preview no-print"
             aria-hidden="true"
             style={(() => {
-              const r = zoneRect(snapPreview, desktopViewportRef.current);
+              const r = zoneRect(wm.snapPreview!, desktopViewportRef.current);
               return { left: r.x, top: r.y, width: r.width, height: r.height, zIndex: topZ(windows) };
             })()}
           />
@@ -3020,11 +2245,9 @@ export default function App() {
               key={win.groupId ?? win.id}
               window={win}
               tabs={tabs}
-              onSelectTab={focusWin}
-              onCloseTab={closeWin}
-              onPullOutTab={(id) =>
-                setWindows((c) => pullOutTab(c, id, desktopViewportRef.current))
-              }
+              onSelectTab={wm.focusWin}
+              onCloseTab={wm.closeWin}
+              onPullOutTab={wm.pullOut}
               focused={top?.id === win.id}
               compact={compact}
               toolbar={renderToolbar(win)}
@@ -3038,25 +2261,16 @@ export default function App() {
                   ? renderInspector(win.kind.docId)
                   : undefined
               }
-              onFocus={() => focusWin(win.id)}
-              onClose={() => closeWin(win.id)}
-              onMinimize={() => minimizeWin(win.id)}
-              onZoom={() => zoomWin(win.id)}
-              onDragEnd={(to) => onDragEndWindow(win.id, to)}
-              onResize={(w, h) => setWindows((c) => resizeWindow(c, win.id, w, h))}
-              onSnap={
-                compact
-                  ? undefined
-                  : (zone) =>
-                      setWindows((c) =>
-                        zone === 'restore'
-                          ? unsnapWindow(c, win.id)
-                          : focusWindow(snapWindow(c, win.id, zone, desktopViewportRef.current), win.id),
-                      )
-              }
+              onFocus={() => wm.focusWin(win.id)}
+              onClose={() => wm.closeWin(win.id)}
+              onMinimize={() => wm.minimizeWin(win.id)}
+              onZoom={() => wm.zoomWin(win.id)}
+              onDragEnd={(to) => wm.onDragEndWindow(win.id, to)}
+              onResize={(w, h) => wm.resizeWin(win.id, w, h)}
+              onSnap={compact ? undefined : (zone) => wm.snapWin(win.id, zone)}
               fills={win.kind.type === 'photoEdit'}
-              onDragTo={(point) => onDragWindow(win.id, point)}
-              dropTarget={tabs.some((tab) => tab.id === dropTarget)}
+              onDragTo={(point) => wm.onDragWindow(win.id, point)}
+              dropTarget={tabs.some((tab) => tab.id === wm.dropTarget)}
             >
               {message && top?.id === win.id && (
                 <div className="notice no-print">
@@ -3097,10 +2311,14 @@ export default function App() {
         />
       )}
 
+      {shell.shortcutsOpen && (
+        <ShortcutSheet mac={apple} compact={compact} onClose={shell.closeShortcuts} />
+      )}
+
       {tray.length > 0 && (
         <div className="tray no-print" aria-label="Minimised windows">
           {tray.map((win) => (
-            <button key={win.id} className="tray-item" onClick={() => focusWin(win.id)}>
+            <button key={win.id} className="tray-item" onClick={() => wm.focusWin(win.id)}>
               <span className="tray-dot" aria-hidden="true" />
               {win.title}
             </button>
@@ -3126,8 +2344,7 @@ export default function App() {
           }
           // Every other dock button is a switch for its tool: open it, bring
           // it forward, or put it away. See toggleWindow.
-          const spec = toolSpec(id);
-          setWindows((c) => toggleWindow(c, spec, desktopViewportRef.current).windows);
+          wm.toggle(toolSpec(id));
         }}
       />
     </div>
@@ -3146,47 +2363,6 @@ export default function App() {
   }
 }
 
-const ARROWS: Record<string, Arrow | undefined> = {
-  ArrowLeft: 'left',
-  ArrowRight: 'right',
-  ArrowUp: 'up',
-  ArrowDown: 'down',
-};
-
-/** A key pressed here belongs to what is being typed, not to the shell. */
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  if (target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return true;
-  if (target instanceof HTMLInputElement) {
-    return !['button', 'checkbox', 'radio', 'range', 'color', 'file', 'submit', 'reset', 'image'].includes(
-      target.type,
-    );
-  }
-  return false;
-}
-
-/** ⌘ and ⌥ on a Mac or an iPad; Ctrl and Alt everywhere else. */
-function onApple(): boolean {
-  return typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
-}
-
-/** The record a window is a view onto, when it is a view onto one. */
-function subjectIdOf(kind: WindowKind): string | null {
-  switch (kind.type) {
-    case 'commission':
-      return kind.docId;
-    case 'invoice':
-      return kind.invoiceId;
-    case 'folder':
-      return kind.projectId;
-    case 'photo':
-    case 'photoEdit':
-      return kind.photoId;
-    default:
-      return null;
-  }
-}
 
 /** The pixel size of a blob, or null when the browser cannot decode it. */
 async function imageSize(blob: Blob): Promise<{ width: number; height: number } | null> {

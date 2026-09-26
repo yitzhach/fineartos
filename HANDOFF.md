@@ -7,84 +7,84 @@
 
 ## Now
 
-- Tree green, 621 tests, IndexedDB v6. Phase 0 done; nothing half-finished.
+- Tree green, 646 tests, IndexedDB v6. Phase 1 part 1 done; part 2 not started.
+- First-load JS 162 KB gzip (one 537 KB chunk); <100 KB target is part 2.
 
 ## Done
 
-- Search box (`launcher.ts` + `Launcher.tsx`), system bar centre: Ctrl/⌘K
-  anywhere, / when not typing. Tools by synonyms, actions only when they can
-  run, records (commissions, invoices, folders, pieces, shows, guests).
-  Phone: a button that opens a sheet. G then a letter opens a tool.
-- Tiling (`tiling.ts`, `WindowState.snap`): Arrange menu (4 layouts, cascade,
-  put back, auto-tile pref), drag titlebar to edge/corner with preview,
-  Alt+Shift+arrows, titlebar snap menu, resnap when the desktop resizes.
-- Frames move/resize themselves during a drag; App state set once on release
-  (was a full App re-render per pointer move).
-- Fixed: windows outranked bar/dock/search after ~20 focuses (`.desktop` layer
-  ≥861px); desktop buttons drew over low-z windows (surface z 0); Alt+1–9
-  preventDefault synchronous; titlebar `touch-action: none`; Projects list
-  keeps its own filter at all widths; Coming up opens the show clicked.
-- `BUILD_PLAN.md`: audit table, ideas, free/paid proposal, phases 0–10.
+- Phase 0: search box (`launcher.ts`, `Launcher.tsx`) and tiling (`tiling.ts`).
+- Phase 1 part 1:
+  - `App.tsx` 3,258 → ~2,430 lines. State in `src/app/`: `useStudioData`,
+    `useWindows`, `useTrash` (state + actions), `useShellKeys` (keys, search
+    box entries, `?` sheet), `usePrefs`, `useUndo`, `useObjectUrls`.
+  - One-record saves: `persistence/records.ts` holds the store orders (the
+    repository sorts with them too), upsert/remove, trash filters, image key.
+    A save puts its record into state; no store re-read. `reload()` only for
+    bulk writes (imports, photo import, empty Trash, remove demo, online).
+  - State holds every record, Trash included; visible lists are derived, so
+    Trash/Put back need no read.
+  - Startup (`os/startup.ts`): restore saved windows, else newest commission.
+  - Keys: `os/keys.ts` (⌘/Ctrl names), `os/shortcuts.ts` + `ShortcutSheet.tsx`;
+    `?` opens it, search box "Keyboard shortcuts" too (not on phone).
+  - Fixed: Ctrl+Z after Put back said "Undone" and did nothing (stale lists).
 
 ## Decisions (keep)
 
 - System bar search is the launcher; the old doc filter does not go back there.
 - Launcher offers an action only when it can run now (rule 8).
-- Snap keys Alt+Shift+arrows: Ctrl/⌘+Alt+arrows already step tabs; Super
-  belongs to the OS. G sequences and / only outside text fields; ⌘K anywhere.
+- Snap keys Alt+Shift+arrows; tab keys Ctrl/⌘+Alt+arrows and Alt+1–9 work
+  while typing (the sheet says so). G, / and ? only outside text fields.
+- The shortcut sheet lists only keys with a handler; snapping left out on phone.
 - After a live drag, Frame resets its style to the last-drawn rect before
   committing: React diffs props, not the DOM.
-- Free = runs on the device; paid = costs money to run. No plan shown in the
-  app before billing exists.
-- Tool windows render in `renderContent` only; `renderToolbar` gives a caption.
-- Printing hands off to the browser (hidden iframe); no PDF is written here.
-- Updates belong to their commission and travel in its export file.
-- The books file is the two-way door; the CSV is the accountant's one-way one.
-  An amount nobody recorded stays null through a round trip.
-- Payment due: an invoiced commission drops out; totals one per currency;
-  draft invoices named beside the total; a commission has terms, not a due date.
+- Free = runs on the device; paid = costs money. No plan shown before billing.
+- Tools render in `renderContent`; `renderToolbar` is a caption. Print = browser.
+- Updates travel with their commission's export. Books file two-way, CSV one-way.
+- Payment due: an invoiced commission drops out; totals one per currency.
+- Emptying the Trash reloads BEFORE the entries leave the Trash, else the
+  destroyed records flash back for a frame.
+- Direct `repo.save*` in App only where `data.reload()` follows, else stale.
 - `PROJECT_GUIDE.md` predates Finance and tiling. Do not assume it is current.
 
 ## Dead ends (do not retry)
 
 - Upgrade check with two builds of one commit: same `sw.js?v=` → SW never
   updates. Commit before building the new one. Kill stray `vite preview`.
-- Live-DOM drag without the style reset on release: a snap that kept the old
-  top left the window where the pointer let go.
+- Live-DOM drag without the style reset on release: window stayed at pointer.
+- `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 
 ## Next (numbered)
 
-1. BUILD_PLAN "Phase 1 — Speed and a lighter shell": lazy-load tools with idle
-   warm-up (offline must still work), thumbnails, per-record state updates,
-   split `App.tsx` (~3,200 lines), newest commission opens only when nothing
-   was restored, per-platform key names, "?" shortcut sheet.
+1. Phase 1 part 2: lazy-load tools (Finance, Connect+QR lib, darkroom,
+   Artwork, Shows, invoice editor, Settings) with idle warm-up so the SW has
+   all for offline, failed load says so + Reload; thumbnails (small WebP
+   beside each original, backfill existing photos, image map per image).
+   Done when: <100 KB gzip first load, 200 photos no stall, offline check.
 2. Phase 2: Clients + notes; guest book into IndexedDB v7 with visible failure.
 3. Visualizer scope: settle with the artist before Phase 4.
 
 ## Files (path — why)
 
-- `src/os/launcher.ts` — ranking, tool/action/record entries, G sequences.
-- `src/os/Launcher.tsx` — the box, the phone sheet.
-- `src/os/tiling.ts` — zones, layouts, snap/unsnap/resnap/cascade.
-- `src/os/Frame.tsx` — live drag and resize, snap menu. Arrange: `SystemBar.tsx`.
-- `src/App.tsx` — key handler, `runAction`, `onDragEndWindow`, auto-tile effect.
-- `scripts/check-launcher-tiling.mjs` — 20 browser checks.
+- `src/app/*` — the hooks. `src/App.tsx` — wiring, `runAction`, render.
+- `src/persistence/records.ts` — orders, upsert, visible lists, image key.
+- `src/os/startup.ts`, `src/os/keys.ts`, `src/os/shortcuts.ts` — pure, tested.
+- `scripts/check-shell-split.mjs` — 18 browser checks for part 1.
 
 ## Verify (tested / NOT tested)
 
-- Tested: unit 621; `check-launcher-tiling` (1440/1024/390, reload, 2nd tab,
-  z-order after 30 focuses — fails without the fix), `check-desktop`,
-  `check-coming-up`, `check-shows-trash`; dark-mode screenshots. Deployed URL
-  is blocked from the build container (proxy 403).
-- NOT tested: real iPad drag, real Mac ⌥⇧ keys, 861–1000px widths, auto-tile
-  with tab groups in a browser (unit only), deployed URL, guest-book picker,
-  show Put back/undo, real print output, iOS Safari printing.
+- Tested: unit 646; `check-shell-split` (0 store reads per keystroke — old
+  build did 7; startup restore vs newest; 2nd tab; Mac UA ⌘; phone sheet;
+  Put-back undo — old build fails it), `check-launcher-tiling`,
+  `check-desktop`, `check-coming-up`, `check-shows-trash`, `check-owed`,
+  `check-books-and-stage`: all pass.
+- NOT tested: shortcut sheet in dark mode, real Mac/iPad keyboards, a
+  database from before this change with many records, deployed URL (proxy
+  403 from container), real iPad drag, 861–1000px widths, iOS printing.
 - Nit, not fixed: desktop buttons show faintly through tiled titlebars.
 
 ## Resume
 
 - Read `CLAUDE.md`, then only the Phase 1 section of `BUILD_PLAN.md`.
 - The SessionStart hook installs deps and runs the suite; trust its line.
-- Push to `main` (deploys). If a session briefing names a `claude/*` branch,
-  push there too.
+- Push to `main` (deploys) and to the session's `claude/*` branch if named.
 - Browser checks: see `TESTING.md`.

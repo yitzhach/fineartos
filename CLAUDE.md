@@ -83,7 +83,9 @@ Trust its line; do not re-run the suite to confirm it.
 
 **Maths lives in DOM-free modules with tests; React only draws the result.**
 About to put a calculation or a rule inside a component? Put it in a model
-module beside its tests instead. `src/App.tsx` is the shell that wires them.
+module beside its tests instead. State lives in hooks by concern in `src/app/`
+(studio data, windows, trash, keys and the search box, prefs, undo);
+`src/App.tsx` is the shell that wires them and draws each window.
 
 ## Rules that are not negotiable
 

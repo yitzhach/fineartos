@@ -12,6 +12,14 @@ import type { Expense } from '../finance/ledger';
 import type { Show } from '../shows/shows';
 import type { Project } from '../project/project';
 import {
+  byCreated,
+  byDate,
+  byDocumentUpdated,
+  byUpdated,
+  invoiceWithImageIds,
+  withImageIds,
+} from './records';
+import {
   STORE_DOCUMENTS,
   STORE_EXPENSES,
   STORE_SHOWS,
@@ -90,19 +98,6 @@ interface ExpenseRow {
   expense: Expense;
 }
 
-/**
- * Fields added after a record was first written come back undefined from
- * storage. Filling them in on read means the rest of the app never has to
- * ask whether a folder is old or new.
- */
-function withImageIds(project: Project): Project {
-  return { ...project, imageIds: project.imageIds ?? [] };
-}
-
-function invoiceWithImageIds(invoice: Invoice): Invoice {
-  return { ...invoice, imageIds: invoice.imageIds ?? [] };
-}
-
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 export const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 
@@ -111,7 +106,7 @@ export class Repository {
 
   async list(): Promise<StoredDocument[]> {
     const rows = await listByWorkspace<StoredDocument>(STORE_DOCUMENTS, this.workspaceId);
-    return rows.sort((a, b) => b.document.updatedAt.localeCompare(a.document.updatedAt));
+    return rows.sort(byDocumentUpdated);
   }
 
   async load(id: string): Promise<StoredDocument | null> {
@@ -186,7 +181,7 @@ export class Repository {
     const rows = await listByWorkspace<ProjectRow>(STORE_PROJECTS, this.workspaceId);
     return rows
       .map((row) => withImageIds(row.project))
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      .sort(byUpdated);
   }
 
   async loadProject(id: string): Promise<Project | null> {
@@ -216,7 +211,7 @@ export class Repository {
     const rows = await listByWorkspace<InvoiceRow>(STORE_INVOICES, this.workspaceId);
     return rows
       .map((row) => invoiceWithImageIds(row.invoice))
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      .sort(byUpdated);
   }
 
   async loadInvoice(id: string): Promise<Invoice | null> {
@@ -241,7 +236,7 @@ export class Repository {
     const rows = await listByWorkspace<UpdateRow>(STORE_UPDATES, this.workspaceId);
     return rows
       .map((row) => row.update)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      .sort(byCreated);
   }
 
   async saveUpdate(update: ClientUpdate): Promise<void> {
@@ -256,7 +251,7 @@ export class Repository {
 
   async listExpenses(): Promise<Expense[]> {
     const rows = await listByWorkspace<ExpenseRow>(STORE_EXPENSES, this.workspaceId);
-    return rows.map((row) => row.expense).sort((a, b) => b.date.localeCompare(a.date));
+    return rows.map((row) => row.expense).sort(byDate);
   }
 
   async saveExpense(expense: Expense): Promise<void> {
@@ -271,7 +266,7 @@ export class Repository {
 
   async listShows(): Promise<Show[]> {
     const rows = await listByWorkspace<ShowRow>(STORE_SHOWS, this.workspaceId);
-    return rows.map((row) => row.show).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return rows.map((row) => row.show).sort(byCreated);
   }
 
   async saveShow(show: Show): Promise<void> {
@@ -288,7 +283,7 @@ export class Repository {
     const rows = await listByWorkspace<PhotoRow>(STORE_PHOTOS, this.workspaceId);
     return rows
       .map((row) => row.photo)
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      .sort(byUpdated);
   }
 
   async loadPhoto(id: string): Promise<Photo | null> {
