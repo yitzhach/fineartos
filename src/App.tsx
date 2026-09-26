@@ -133,6 +133,9 @@ import type { Framing } from './photo/crop';
 import { milestonesOf } from './commission/milestones';
 import { ArtworkWindow } from './artwork/ui/ArtworkWindow';
 import { ShowsWindow } from './shows/ui/ShowsWindow';
+import { ComingUp } from './os/ComingUp';
+import { comingUp } from './os/dashboard';
+import { allOwed } from './finance/owed';
 import {
   addPiece,
   feeExpense,
@@ -2688,6 +2691,20 @@ export default function App() {
       <main className="desktop" ref={desktopRef}>
         <Desktop
           items={desktopItems}
+          panel={
+            <ComingUp
+              items={comingUp({ shows, owed: allOwed({ invoices, documents: rows.map((row) => row.document) }), today: localToday() })}
+              onOpen={(item) => {
+                if (item.kind !== 'payment') {
+                  open({ type: 'tool', tool: 'shows' }, 'Shows', 'Fairs, openings and markets');
+                } else if (invoices.some((invoice) => invoice.id === item.openId)) {
+                  openInvoiceWindow(item.openId);
+                } else {
+                  openDocumentWindow(item.openId);
+                }
+              }}
+            />
+          }
           imageUrls={imageUrls}
           layout={desktopLayout}
           viewport={viewport}

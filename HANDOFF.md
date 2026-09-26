@@ -6,7 +6,7 @@
 
 ## Now
 
-- Tree green. 557 tests pass. IndexedDB now v6 (adds `shows`).
+- Tree green. 560 tests pass. IndexedDB now v6 (adds `shows`).
 - Nothing half-finished.
 - Dock built: New, Home, Projects, Invoices, Finder, Connect, Artwork,
   Shows, Finance, Trash. Placeholder: Visualizer.
@@ -16,6 +16,10 @@
   picks show from list (old typed names still pickable); taking a piece sets
   Artwork location "At a show", taking off restores prior; booth fee → books
   row `show-fee:<id>` (Show fees) only when Accepted/Done, null stays null.
+- Desktop "Coming up" panel (`src/os/dashboard.ts` + `ComingUp.tsx`): show
+  deadlines, shows starting/on, payments due or overdue, next 30 days.
+  Home shows it. Tested: `scripts/check-coming-up.mjs`, desktop + phone.
+  NOT tested: with many icons (panel can overlap a full icon grid), dark.
 - Shows go to the Trash (fee row + pieces untouched there); emptying deletes
   fee row, restores pieces, count includes the fee row. Shows file export/
   import (`portable.ts`); import re-adds a missing fee row, not locations.
@@ -49,8 +53,8 @@
 ## Next (numbered)
 
 1. Visualizer. No design yet — settle scope with the artist first.
-2. Show deadlines beyond the Shows window: Home is the bare desktop and
-   Calendar a PREVIEW mock, so needs a design call (dashboard? calendar?).
+2. Phone: desktop toolbar (New project folder … Move to Trash) runs off
+   the left edge at 390px — seen, pre-existing, not fixed.
 3. Sign-in gates everything else: cloud saving, guest book online, real email,
    Square, a client page that can receive an approval. See `FUTURE_BUILD.md`.
 

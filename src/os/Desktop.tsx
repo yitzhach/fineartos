@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import type { CommissionDocument } from '../commission/types';
 import type { Invoice } from '../invoice/types';
@@ -39,6 +40,8 @@ interface Props {
   /** A file dragged onto a folder is filed into it. */
   onFileInto: (folderId: string, itemId: string) => void;
   onNewFolder: () => void;
+  /** The Coming up panel, drawn on the desktop's right. */
+  panel?: ReactNode;
   /** What ⌘Z would put back, or null when there is nothing to undo. */
   undoLabel: string | null;
   onUndo: () => void;
@@ -204,6 +207,7 @@ export function Desktop(props: Props) {
       ref={surfaceRef}
       onClick={() => props.onSelect(null)}
     >
+      {props.panel}
       <div className="desktop-tools no-print">
         <button className="btn" data-variant="quiet" onClick={(e) => { e.stopPropagation(); props.onNewFolder(); }}>
           New project folder
