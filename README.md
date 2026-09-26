@@ -52,5 +52,7 @@ long session costs more the longer it runs. Short sessions, one task each, with
   non-negotiables, commands, gotchas, and the handoff contract.
 - **[PROJECT_GUIDE.md](PROJECT_GUIDE.md)** — the fuller architecture guide.
   Predates Finance; not fully current.
+- **[BUILD_PLAN.md](BUILD_PLAN.md)** — the audit and the phased build list.
+  Each work session takes the next one or two phases.
 - **[FUTURE_BUILD.md](FUTURE_BUILD.md)** — what is deliberately not built, and
   why. `COMMISSION_PHASE_1.md` is the original brief.

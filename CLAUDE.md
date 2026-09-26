@@ -9,7 +9,8 @@ server, honest about that everywhere it matters.
 - Stack: React 18 + TypeScript (strict, `noUncheckedIndexedAccess`), Vite,
   Vitest. IndexedDB for records, localStorage for preferences only.
 - `PROJECT_GUIDE.md` is the fuller guide. `FUTURE_BUILD.md` records what is
-  deliberately not built and why. `HANDOFF.md` is the baton, not the guide.
+  deliberately not built and why. `BUILD_PLAN.md` is the phased build list —
+  read only the phase being built. `HANDOFF.md` is the baton, not the guide.
 
 ## Handoff Contract
 
