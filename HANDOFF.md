@@ -16,6 +16,10 @@
   picks show from list (old typed names still pickable); taking a piece sets
   Artwork location "At a show", taking off restores prior; booth fee → books
   row `show-fee:<id>` (Show fees) only when Accepted/Done, null stays null.
+- Fixed: Artwork, Finance and Shows windows were drawn in the toolbar
+  (body held the caption), so the frame scrolled and lost its title bar.
+  Phone: desktop tools sit right of the icons, short labels; notice clears
+  the dock; build stamp hidden <1100px. `scripts/check-desktop.mjs`.
 - Desktop "Coming up" panel (`src/os/dashboard.ts` + `ComingUp.tsx`): show
   deadlines, shows starting/on, payments due or overdue, next 30 days.
   Home shows it. Tested: `scripts/check-coming-up.mjs`, desktop + phone.
@@ -29,6 +33,7 @@
   stage-done offer (see git log).
 
 ## Decisions (keep)
+- Tool windows render in `renderContent` only; `renderToolbar` gives a caption.
 
 - Printing hands off to the browser; no PDF is written here. On paper the
   mailto buttons are dead controls, so the printed page prints the address
@@ -53,9 +58,7 @@
 ## Next (numbered)
 
 1. Visualizer. No design yet — settle scope with the artist first.
-2. Phone: desktop toolbar (New project folder … Move to Trash) runs off
-   the left edge at 390px — seen, pre-existing, not fixed.
-3. Sign-in gates everything else: cloud saving, guest book online, real email,
+2. Sign-in gates everything else: cloud saving, guest book online, real email,
    Square, a client page that can receive an approval. See `FUTURE_BUILD.md`.
 
 ## Files (path — why)

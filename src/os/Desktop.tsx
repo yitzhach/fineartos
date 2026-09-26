@@ -210,7 +210,8 @@ export function Desktop(props: Props) {
       {props.panel}
       <div className="desktop-tools no-print">
         <button className="btn" data-variant="quiet" onClick={(e) => { e.stopPropagation(); props.onNewFolder(); }}>
-          New project folder
+          <span className="wide-only">New project folder</span>
+          <span className="narrow-only">New folder</span>
         </button>
         <button className="btn" data-variant="quiet" onClick={(e) => { e.stopPropagation(); props.onTidy(); }}>
           Tidy up
@@ -241,7 +242,8 @@ export function Desktop(props: Props) {
             if (props.selectedId) props.onTrash(props.selectedId);
           }}
         >
-          Move to Trash
+          <span className="wide-only">Move to Trash</span>
+          <span className="narrow-only">Trash</span>
         </button>
       </div>
 

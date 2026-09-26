@@ -2083,65 +2083,6 @@ export default function App() {
       );
     }
 
-    if (kind.type === 'tool' && kind.tool === 'shows') {
-      return (
-        <ShowsWindow
-          shows={shows}
-          photos={photos}
-          imageUrls={imageUrls}
-          guests={guests}
-          currency={invoices[0]?.quote.currency ?? photos[0]?.currency ?? 'USD'}
-          onSave={(show) => void saveShowRecord(show)}
-          onTrash={(show) => void handleTrash(show.id)}
-          onExport={handleExportShows}
-          onImport={(file) => void handleImportShows(file)}
-          onTogglePiece={(show, photo) => void toggleShowPiece(show, photo)}
-        />
-      );
-    }
-
-    if (kind.type === 'tool' && kind.tool === 'artwork') {
-      return (
-        <ArtworkWindow
-          photos={photos}
-          imageUrls={imageUrls}
-          onChange={(photo, changes) => void savePhotoRecord(editPhoto(photo, changes))}
-          onPreview={openPreview}
-          onEdit={openEditor}
-          onMessage={setMessage}
-        />
-      );
-    }
-
-    if (kind.type === 'tool' && kind.tool === 'finance') {
-      return (
-        <FinanceWindow
-          photos={photos}
-          invoices={invoices}
-          documents={rows.map((row) => row.document)}
-          expenses={expenses}
-          imageUrls={imageUrls}
-          studio={studio}
-          mileageRate={mileageRate}
-          onMileageRate={setMileageRate}
-          onSaveExpense={(expense) => void saveExpenseRecord(expense)}
-          onDeleteExpense={(id) => void deleteExpenseRecord(id)}
-          onAddReceipts={addReceipts}
-          onMarkInvoiced={(photoId, invoiced) => {
-            const photo = photos.find((one) => one.id === photoId);
-            if (photo?.sale) {
-              void savePhotoRecord(editPhoto(photo, { sale: { ...photo.sale, invoiced } }));
-            }
-          }}
-          onOpenInvoice={openInvoiceWindow}
-          onOpenDocument={openDocumentWindow}
-          onExportBooks={handleExportExpenses}
-          onImportBooks={(file) => void handleImportExpenses(file)}
-          onMessage={setMessage}
-        />
-      );
-    }
-
     if (kind.type === 'tool' && kind.tool === 'trash') {
       return (
         <span className="faint" style={{ fontSize: 12 }}>
@@ -2349,30 +2290,6 @@ export default function App() {
           onPreview={() => openPreview(photo.id)}
           onEdit={() => openEditor(photo.id)}
         />
-      );
-    }
-
-    if (kind.type === 'tool' && kind.tool === 'shows') {
-      return (
-        <span className="faint" style={{ fontSize: 12 }}>
-          The events. Pieces taken read "At a show" in Artwork; accepted booth fees go in the books.
-        </span>
-      );
-    }
-
-    if (kind.type === 'tool' && kind.tool === 'artwork') {
-      return (
-        <span className="faint" style={{ fontSize: 12 }}>
-          Every picture in the studio. Edits here are the same records the desktop shows.
-        </span>
-      );
-    }
-
-    if (kind.type === 'tool' && kind.tool === 'finance') {
-      return (
-        <span className="faint" style={{ fontSize: 12 }}>
-          Your own records, for your accountant. Nothing here is tax advice.
-        </span>
       );
     }
 
