@@ -8,7 +8,7 @@
  */
 
 const DB_NAME = 'artist-os';
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 
 export const STORE_DOCUMENTS = 'documents';
 export const STORE_IMAGES = 'images';
@@ -24,6 +24,11 @@ export const STORE_UPDATES = 'clientUpdates';
 export const STORE_EXPENSES = 'expenses';
 /** Added in DB_VERSION 6: shows — the event, not the pieces. */
 export const STORE_SHOWS = 'shows';
+/** Added in DB_VERSION 7: the guest book (was localStorage), notes, client profiles, imported contacts. */
+export const STORE_GUESTS = 'guests';
+export const STORE_NOTES = 'notes';
+export const STORE_CLIENTS = 'clients';
+export const STORE_CONTACTS = 'contacts';
 
 export interface StoredImage {
   id: string;
@@ -160,6 +165,15 @@ export function openDb(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE_SHOWS)) {
         const store = db.createObjectStore(STORE_SHOWS, { keyPath: 'id' });
         store.createIndex('workspaceId', 'workspaceId');
+      }
+      // Version 7 adds three shelves. The guest book is copied in from
+      // localStorage by the app after opening, never here: an upgrade adds
+      // shelves and touches nothing already stored.
+      for (const name of [STORE_GUESTS, STORE_NOTES, STORE_CLIENTS, STORE_CONTACTS]) {
+        if (!db.objectStoreNames.contains(name)) {
+          const store = db.createObjectStore(name, { keyPath: 'id' });
+          store.createIndex('workspaceId', 'workspaceId');
+        }
       }
     };
     request.onsuccess = () => {

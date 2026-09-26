@@ -72,7 +72,10 @@ export const FolderWindow = lazyTool('The folder', () => import('../project/ui/F
 export const UpdatesPane = lazyTool('Client updates', () => import('../commission/ui/UpdatesPane').then((m) => m.UpdatesPane));
 export const PhotoWindow = lazyTool('Photos', () => import('../photo/ui/PhotoWindow').then((m) => m.PhotoWindow));
 export const PicturePreview = lazyTool('The picture', () => import('../photo/ui/PicturePreview').then((m) => m.PicturePreview));
-export const ProjectWindow = lazyTool('The commission', () => import('../commission/ui/ProjectWindow').then((m) => m.ProjectWindow));export const MockToolWindow = lazyTool('The preview', () => import('../os/mock/tools').then((m) => m.MockToolWindow));
+export const ProjectWindow = lazyTool('The commission', () => import('../commission/ui/ProjectWindow').then((m) => m.ProjectWindow));export const ClientsTool = lazyTool('Clients', () => import('./PeopleTools').then((m) => m.ClientsTool));
+export const NotesTool = lazyTool('Notes', () => import('./PeopleTools').then((m) => m.NotesTool));
+export const QuickCapture = lazyTool('Quick capture', () => import('./QuickCapture').then((m) => m.QuickCapture));
+export const MockToolWindow = lazyTool('The preview', () => import('../os/mock/tools').then((m) => m.MockToolWindow));
 
 // The slideshow sits behind everything, so it loads without a caption.
 export const WallpaperSlides = lazyTool(

@@ -4,13 +4,11 @@
  * changes. Records live in IndexedDB — see useStudioData.
  */
 import { useEffect, useState } from 'react';
-import type { GuestEntry } from '../connect/guestbook';
 import type { DesktopLayout, IconPosition } from '../os/desktopLayout';
 import type { CustomWallpaper } from '../lib/wallpapers';
 import {
   loadAskForSignature,
   loadDesktopLayout,
-  loadGuests,
   loadMileageRate,
   loadPaymentInstructions,
   loadRestoreWindows,
@@ -22,7 +20,6 @@ import {
   loadWallpaperLibrary,
   saveAskForSignature,
   saveDesktopLayout,
-  saveGuests,
   saveMileageRate,
   savePaymentInstructions,
   saveRestoreWindows,
@@ -47,7 +44,6 @@ export function usePrefs() {
   const [askForSignature, setAskForSignature] = useState<boolean>(loadAskForSignature);
   const [restoreWindowsOn, setRestoreWindowsOn] = useState<boolean>(loadRestoreWindows);
   const [mileageRate, setMileageRate] = useState<number | null>(loadMileageRate);
-  const [guests, setGuests] = useState<GuestEntry[]>(loadGuests);
   const [siteUrl, setSiteUrl] = useState(loadSiteUrl);
   const [desktopLayout, setDesktopLayout] = useState<DesktopLayout>(loadDesktopLayout);
   const [trashPosition, setTrashPosition] = useState<IconPosition | null>(loadTrashPosition);
@@ -60,7 +56,6 @@ export function usePrefs() {
   useEffect(() => saveAskForSignature(askForSignature), [askForSignature]);
   useEffect(() => saveRestoreWindows(restoreWindowsOn), [restoreWindowsOn]);
   useEffect(() => saveMileageRate(mileageRate), [mileageRate]);
-  useEffect(() => saveGuests(guests), [guests]);
   useEffect(() => saveSiteUrl(siteUrl), [siteUrl]);
   useEffect(() => saveDesktopLayout(desktopLayout), [desktopLayout]);
   useEffect(() => saveTrashPosition(trashPosition), [trashPosition]);
@@ -82,8 +77,6 @@ export function usePrefs() {
     setRestoreWindowsOn,
     mileageRate,
     setMileageRate,
-    guests,
-    setGuests,
     siteUrl,
     setSiteUrl,
     desktopLayout,

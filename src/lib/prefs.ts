@@ -328,7 +328,22 @@ export const savePaymentInstructions = (value: PaymentInstructions): void => wri
  * src/connect/contact.ts for why they cannot yet leave it.
  */
 export const loadGuests = (): GuestEntry[] => read<GuestEntry[]>(KEYS.guests, []);
-export const saveGuests = (value: GuestEntry[]): void => write(KEYS.guests, value);
+
+/**
+ * Since database version 7 the guest book lives in IndexedDB. The old copy is
+ * moved to a backup key once every entry is safely in the database — kept,
+ * not deleted, because an entry lost in a move cannot be asked for again.
+ */
+export const retireLocalGuests = (): void => {
+  try {
+    const old = localStorage.getItem(KEYS.guests);
+    if (old === null) return;
+    localStorage.setItem(`${KEYS.guests}.movedToDatabase`, old);
+    localStorage.removeItem(KEYS.guests);
+  } catch {
+    /* the next load tries again; the database copy is already whole */
+  }
+};
 
 /** The artist's own web address, for the QR code and the contact card. */
 export const loadSiteUrl = (): string => read<string>(KEYS.siteUrl, '');

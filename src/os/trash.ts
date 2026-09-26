@@ -10,7 +10,7 @@
  * DOM-free and tested, like the rest of the model layer.
  */
 
-export type TrashKind = 'project' | 'document' | 'invoice' | 'photo' | 'show';
+export type TrashKind = 'project' | 'document' | 'invoice' | 'photo' | 'show' | 'note';
 
 export interface TrashEntry {
   id: string;
@@ -95,6 +95,7 @@ export interface TrashSummary {
   invoices: number;
   pictures: number;
   shows: number;
+  notes: number;
   /** Booth-fee rows in the books that would go with the shows above. */
   fees: number;
   /** Client updates that would go with the commissions above. */
@@ -112,6 +113,7 @@ export function summarise(trash: Trash, attached: AttachedRecord[] = []): TrashS
   let invoices = 0;
   let pictures = 0;
   let shows = 0;
+  let notes = 0;
 
   for (const entry of trash) {
     records += deletionTargets(entry).length;
@@ -119,6 +121,7 @@ export function summarise(trash: Trash, attached: AttachedRecord[] = []): TrashS
     else if (entry.kind === 'document') documents += 1;
     else if (entry.kind === 'photo') pictures += 1;
     else if (entry.kind === 'show') shows += 1;
+    else if (entry.kind === 'note') notes += 1;
     else invoices += 1;
   }
 
@@ -137,6 +140,7 @@ export function summarise(trash: Trash, attached: AttachedRecord[] = []): TrashS
     invoices,
     pictures,
     shows,
+    notes,
     fees,
     updates,
   };

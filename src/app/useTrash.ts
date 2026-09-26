@@ -30,6 +30,7 @@ import type { Invoice } from '../invoice/types';
 import { editPhoto, sourceImageId, type Photo } from '../photo/photo';
 import type { ClientUpdate } from '../commission/updates';
 import type { Expense } from '../finance/ledger';
+import { noteTitle, type Note } from '../notes/notes';
 import { feeExpenseId, removePiece, type Show } from '../shows/shows';
 import type { CustomWallpaper } from '../lib/wallpapers';
 
@@ -58,6 +59,7 @@ export function useTrashActions(deps: {
   invoices: Invoice[];
   photos: Photo[];
   shows: Show[];
+  notes: Note[];
   allUpdates: ClientUpdate[];
   allShows: Show[];
   expenses: Expense[];
@@ -75,8 +77,8 @@ export function useTrashActions(deps: {
   // The lists as they are now. Undoing a Put back runs handleTrash from the
   // render where the item was still hidden, and looking it up in that
   // render's lists found nothing: the undo said it was done and did nothing.
-  const latest = useRef({ rows, projects, invoices, photos, shows });
-  latest.current = { rows, projects, invoices, photos, shows };
+  const latest = useRef({ rows, projects, invoices, photos, shows, notes: deps.notes });
+  latest.current = { rows, projects, invoices, photos, shows, notes: deps.notes };
 
   /** What goes with a trashed record when it is emptied: updates and fee rows. */
   const trashAttached: AttachedRecord[] = [
@@ -87,13 +89,14 @@ export function useTrashActions(deps: {
   ];
 
   const handleTrash = async (itemId: string) => {
-    const { rows, projects, invoices, photos, shows } = latest.current;
+    const { rows, projects, invoices, photos, shows, notes } = latest.current;
+    const note = notes.find((one) => one.id === itemId);
     const project = projects.find((p) => p.id === itemId);
     const doc = rows.find((row) => row.id === itemId)?.document ?? null;
     const invoice = invoices.find((i) => i.id === itemId);
     const photo = photos.find((p) => p.id === itemId);
     const show = shows.find((one) => one.id === itemId);
-    if (!project && !doc && !invoice && !photo && !show) return;
+    if (!project && !doc && !invoice && !photo && !show && !note) return;
 
     const entry: TrashEntry = project
       ? {
@@ -107,8 +110,10 @@ export function useTrashActions(deps: {
         }
       : {
           id: itemId,
-          kind: show ? 'show' : photo ? 'photo' : doc ? 'document' : 'invoice',
-          name: show
+          kind: note ? 'note' : show ? 'show' : photo ? 'photo' : doc ? 'document' : 'invoice',
+          name: note
+            ? noteTitle(note)
+            : show
             ? show.name
             : photo
             ? photo.title
@@ -188,6 +193,10 @@ export function useTrashActions(deps: {
       if (stored) {
         removedImages.push(...stored.document.artwork.referenceImageIds);
         await repo.deleteDocument(id);
+        continue;
+      }
+      if (await repo.loadNote(id)) {
+        await repo.deleteNote(id);
         continue;
       }
       if (await repo.loadInvoice(id)) {

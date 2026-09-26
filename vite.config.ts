@@ -32,6 +32,12 @@ function commitSha(): string {
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    // Terser shrinks the first load a few kilobytes more than esbuild; the
+    // shell has to stay under 100 KB gzip (BUILD_PLAN, Phase 1).
+    minify: 'terser',
+    terserOptions: { compress: { passes: 2 } },
+  },
   define: {
     __BUILD_COMMIT__: JSON.stringify(commitSha()),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),

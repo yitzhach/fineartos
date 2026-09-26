@@ -58,6 +58,8 @@ export const GO_KEYS: Record<string, string> = {
   a: 'artwork',
   s: 'shows',
   b: 'finance',
+  l: 'clients',
+  n: 'notes',
   t: 'trash',
   h: 'home',
 };
@@ -126,6 +128,18 @@ const TOOL_SPECS: ToolSpec[] = [
     title: 'Finance',
     hint: 'Expenses, receipts, mileage, income and profit and loss',
     keywords: ['money', 'books', 'bookkeeping', 'accounts', 'expenses', 'expense', 'receipts', 'receipt', 'mileage', 'miles', 'profit', 'loss', 'p&l', 'income', 'spending', 'accountant', 'tax', 'csv', 'statement'],
+  },
+  {
+    id: 'clients',
+    title: 'Clients',
+    hint: 'Everyone from commissions, invoices and the guest book, as one person each',
+    keywords: ['client', 'clients', 'people', 'person', 'contacts', 'contact', 'collectors', 'customers', 'buyers', 'follow up', 'follow-up', 'crm', 'vcard', 'address book'],
+  },
+  {
+    id: 'notes',
+    title: 'Notes',
+    hint: 'Quick notes and checklists, pinned to anything',
+    keywords: ['note', 'notes', 'checklist', 'todo', 'to do', 'list', 'memo', 'jot', 'reminder', 'dictate'],
   },
   {
     id: 'trash',
@@ -212,6 +226,12 @@ export function actionEntries(context: LauncherContext): LauncherEntry[] {
     title: 'Add images',
     hint: 'Bring pictures in from this device',
     keywords: ['upload', 'import', 'photos', 'pictures', 'images', 'camera', 'add'],
+  });
+  add({
+    id: 'action:quick-capture',
+    title: 'Quick capture',
+    hint: 'A note, a receipt photo, a new piece or a new contact',
+    keywords: ['capture', 'quick', 'note', 'receipt', 'photo', 'camera', 'contact', 'new piece'],
   });
   add({
     id: 'action:guest-book',
@@ -401,6 +421,8 @@ export interface LauncherRecords {
   photos: Photo[];
   shows: Show[];
   guests: GuestEntry[];
+  notes?: { id: string; title: string; hint: string; words: string }[];
+  people?: { id: string; name: string; hint: string; words: string }[];
 }
 
 const SHORT_DATE: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' };
@@ -442,6 +464,14 @@ export function recordEntries(records: LauncherRecords): LauncherEntry[] {
       label: 'Invoice',
       keywords: [client, invoice.invoiceNumber, invoice.sourceDocumentNumber ?? '', 'invoice'].filter(Boolean),
     });
+  }
+
+  for (const note of records.notes ?? []) {
+    out.push({ id: `note:${note.id}`, section: 'record', title: note.title, hint: note.hint, label: 'Note', keywords: [note.words, 'note'] });
+  }
+
+  for (const person of records.people ?? []) {
+    out.push({ id: `client:${person.id}`, section: 'record', title: person.name, hint: person.hint, label: 'Client', keywords: [person.words, 'client'] });
   }
 
   for (const project of records.projects) {

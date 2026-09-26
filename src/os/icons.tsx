@@ -24,6 +24,8 @@ export type IconName =
   | 'artwork'
   | 'visualizer'
   | 'finance'
+  | 'clients'
+  | 'notes'
   | 'eye'
   | 'eye-off'
   | 'trash';
@@ -164,6 +166,25 @@ const paths: Record<IconName, JSX.Element> = {
       <path d="M3.6 19.2h16.8" />
       <path d="m6.6 15.6 3.5-3.9 2.8 2.2 3.4-4.6" />
       <circle cx="17.6" cy="7.2" r="2.1" />
+    </>
+  ),
+
+  // Two people, one in front of the other.
+  clients: (
+    <>
+      <circle cx="9.4" cy="8.4" r="3.2" />
+      <path d="M3.6 19.4c.6-3.4 3-5.4 5.8-5.4s5.2 2 5.8 5.4" />
+      <path d="M15.2 5.6a3 3 0 0 1 0 5.8" />
+      <path d="M17.4 14.2c1.6.7 2.7 2.4 3 5.2" />
+    </>
+  ),
+
+  // A page with its corner turned and two lines of writing.
+  notes: (
+    <>
+      <path d="M5.6 3.8h9.2l3.6 3.6v12.8H5.6z" />
+      <path d="M14.8 3.8v3.6h3.6" />
+      <path d="M8.4 11.6h7.2M8.4 15.2h5" />
     </>
   ),
 

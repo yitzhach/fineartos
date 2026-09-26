@@ -150,7 +150,7 @@ mentions a plan until billing exists.
   without a stall; every browser check passes, including offline after one
   online visit.
 
-### Phase 2 — Clients and notes · Planned · Free
+### Phase 2 — Clients and notes · **Done** · Free
 
 - Clients tool (replaces the preview in the rail): a person record built from
   what exists — commission clients, invoice clients, guest-book entries —

@@ -8,7 +8,7 @@
 import { isOverdue, type OwedRow } from '../finance/owed';
 import { deadlinesAhead, type Show } from '../shows/shows';
 
-export type ComingKind = 'deadline' | 'show' | 'payment';
+export type ComingKind = 'deadline' | 'show' | 'payment' | 'followup';
 
 export interface ComingItem {
   id: string;
@@ -40,6 +40,8 @@ export function comingUp(input: {
   owed: OwedRow[];
   today: string;
   horizon?: number;
+  /** Client follow-ups already cut to the horizon (clients/clients.ts `followUpsDue`). */
+  followUps?: { id: string; date: string; title: string; overdue: boolean }[];
 }): ComingItem[] {
   const { shows, owed, today } = input;
   const until = addDays(today, input.horizon ?? 30);
@@ -73,6 +75,18 @@ export function comingUp(input: {
       label: overdue ? 'Payment overdue' : 'Payment due',
       overdue,
       openId: row.recordId,
+    });
+  }
+
+  for (const one of input.followUps ?? []) {
+    items.push({
+      id: `followup:${one.id}`,
+      kind: 'followup',
+      date: one.date,
+      title: one.title,
+      label: one.overdue ? 'Follow-up overdue' : 'Follow up',
+      overdue: one.overdue,
+      openId: one.id,
     });
   }
 

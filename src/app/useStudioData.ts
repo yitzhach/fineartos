@@ -33,6 +33,10 @@ import type { Photo } from '../photo/photo';
 import type { ClientUpdate } from '../commission/updates';
 import type { Expense } from '../finance/ledger';
 import type { Show } from '../shows/shows';
+import type { GuestEntry } from '../connect/guestbook';
+import type { Note } from '../notes/notes';
+import type { ClientProfile, ImportedContact } from '../clients/clients';
+import { loadGuests, retireLocalGuests } from '../lib/prefs';
 import { newId } from '../commission/document';
 import { demoAlreadySeeded, markDemoSeeded } from '../lib/demoSeeded';
 
@@ -42,6 +46,8 @@ export function useStudioData(options: {
   workspaceId: string;
   /** What is in the Trash: hidden from every list, kept in storage. */
   hidden: ReadonlySet<string>;
+  /** A failure the artist must see — a guest book that could not be moved. */
+  onProblem: (message: string) => void;
   /** Called once, after the first read that succeeds, with every record. */
   onFirstRead: (records: StudioRecords) => void;
 }) {
@@ -52,12 +58,14 @@ export function useStudioData(options: {
   const firstReadRef = useRef(false);
   const onFirstReadRef = useRef(options.onFirstRead);
   onFirstReadRef.current = options.onFirstRead;
+  const onProblemRef = useRef(options.onProblem);
+  onProblemRef.current = options.onProblem;
 
   /** Every store, read again. */
   const reload = useCallback(async (): Promise<StudioRecords | null> => {
     let records: StudioRecords;
     try {
-      const [documents, projects, invoices, photos, updates, expenses, shows] = await Promise.all([
+      const [documents, projects, invoices, photos, updates, expenses, shows, guests, notes, profiles, contacts] = await Promise.all([
         repo.list(),
         repo.listProjects(),
         repo.listInvoices(),
@@ -65,8 +73,12 @@ export function useStudioData(options: {
         repo.listUpdates(),
         repo.listExpenses(),
         repo.listShows(),
+        repo.listGuests(),
+        repo.listNotes(),
+        repo.listClientProfiles(),
+        repo.listContacts(),
       ]);
-      records = { documents, projects, invoices, photos, updates, expenses, shows };
+      records = { documents, projects, invoices, photos, updates, expenses, shows, guests, notes, profiles, contacts };
     } catch (cause) {
       // The database reports its own problem through onDbProblem; this stops
       // the app pretending the studio is empty when it simply cannot be read.
@@ -111,6 +123,21 @@ export function useStudioData(options: {
           await repo.saveProject(demo.project);
         }
         markDemoSeeded();
+      }
+
+      // Database version 7: the guest book moves in from localStorage. The
+      // old copy is retired only once every entry is in; a failure says so.
+      const local = loadGuests();
+      if (local.length > 0) {
+        try {
+          const stored = new Set((await repo.listGuests()).map((guest) => guest.id));
+          for (const guest of local) if (!stored.has(guest.id)) await repo.saveGuest(guest);
+          retireLocalGuests();
+        } catch (cause) {
+          onProblemRef.current(
+            `The guest book could not be moved into the studio database (${String(cause)}). It is still on this device; reload to try again.`,
+          );
+        }
       }
 
       await reload();
@@ -219,6 +246,65 @@ export function useStudioData(options: {
     [repo],
   );
 
+  const saveGuest = useCallback(
+    async (guest: GuestEntry) => {
+      await repo.saveGuest(guest);
+      setAll((s) => ({
+        ...s,
+        guests: upsertRecord(s.guests, guest, (a, b) => b.signedAt.localeCompare(a.signedAt)),
+      }));
+    },
+    [repo],
+  );
+
+  const deleteGuest = useCallback(
+    async (id: string) => {
+      await repo.deleteGuest(id);
+      setAll((s) => ({ ...s, guests: removeRecord(s.guests, id) }));
+    },
+    [repo],
+  );
+
+  const saveNote = useCallback(
+    async (note: Note) => {
+      await repo.saveNote(note);
+      setAll((s) => ({ ...s, notes: upsertRecord(s.notes, note, byUpdated) }));
+    },
+    [repo],
+  );
+
+  const deleteNote = useCallback(
+    async (id: string) => {
+      await repo.deleteNote(id);
+      setAll((s) => ({ ...s, notes: removeRecord(s.notes, id) }));
+    },
+    [repo],
+  );
+
+  const saveProfile = useCallback(
+    async (profile: ClientProfile) => {
+      await repo.saveClientProfile(profile);
+      setAll((s) => ({ ...s, profiles: upsertRecord(s.profiles, profile, byCreated) }));
+    },
+    [repo],
+  );
+
+  const deleteProfile = useCallback(
+    async (id: string) => {
+      await repo.deleteClientProfile(id);
+      setAll((s) => ({ ...s, profiles: removeRecord(s.profiles, id) }));
+    },
+    [repo],
+  );
+
+  const saveContacts = useCallback(
+    async (contacts: ImportedContact[]) => {
+      for (const contact of contacts) await repo.saveContact(contact);
+      setAll((s) => ({ ...s, contacts: [...s.contacts, ...contacts] }));
+    },
+    [repo],
+  );
+
   // --- What is on show ------------------------------------------------------
 
   // Each list is derived on its own, so a save to one store leaves the others
@@ -229,6 +315,7 @@ export function useStudioData(options: {
   const photos = useMemo(() => outOfTrash(all.photos, hidden), [all.photos, hidden]);
   const updates = useMemo(() => updatesInSight(all.updates, hidden), [all.updates, hidden]);
   const shows = useMemo(() => outOfTrash(all.shows, hidden), [all.shows, hidden]);
+  const notesInSight = useMemo(() => outOfTrash(all.notes, hidden), [all.notes, hidden]);
 
   return {
     loaded,
@@ -256,5 +343,17 @@ export function useStudioData(options: {
     saveExpense,
     deleteExpense,
     saveShow,
+    guests: all.guests,
+    notes: notesInSight,
+    allNotes: all.notes,
+    profiles: all.profiles,
+    contacts: all.contacts,
+    saveGuest,
+    deleteGuest,
+    saveNote,
+    deleteNote,
+    saveProfile,
+    deleteProfile,
+    saveContacts,
   };
 }

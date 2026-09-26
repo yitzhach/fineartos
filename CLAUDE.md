@@ -134,7 +134,8 @@ These came from real mistakes. Breaking them has broken the app before.
 
 - **Check in a real browser before shipping**, against an **existing**
   database and with a **second tab** open. Both have shipped broken.
-- IndexedDB is at version 6 (3 photos, 4 client updates, 5 the books, 6 shows).
+- IndexedDB is at version 7 (3 photos, 4 client updates, 5 the books, 6 shows,
+  7 guests, notes, client profiles, contacts).
   Version 3 hung the whole app: a second tab held the old version open, the
   app neither released its connection nor noticed being blocked, and every
   read waited forever behind a silent upgrade. `src/persistence/db.ts` now has

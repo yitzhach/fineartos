@@ -27,7 +27,7 @@ export const RAIL_ITEMS: RailItem[] = [
     kind: { type: 'tool', tool: 'invoices-list' },
     built: true,
   },
-  { id: 'clients', name: 'Clients', icon: '◉', kind: { type: 'tool', tool: 'clients' }, built: false },
+  { id: 'clients', name: 'Clients', icon: '◉', kind: { type: 'tool', tool: 'clients' }, built: true },
   { id: 'calendar', name: 'Calendar', icon: '▦', kind: { type: 'tool', tool: 'calendar' }, built: false },
   { id: 'files', name: 'Files', icon: '◧', kind: { type: 'tool', tool: 'files' }, built: false },
   {

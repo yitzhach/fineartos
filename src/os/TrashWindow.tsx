@@ -148,6 +148,7 @@ function kindLabel(kind: TrashEntry['kind']): string {
   if (kind === 'invoice') return 'Invoice';
   if (kind === 'photo') return 'Picture';
   if (kind === 'show') return 'Show';
+  if (kind === 'note') return 'Note';
   return 'Commission';
 }
 
@@ -162,6 +163,7 @@ function describeContents({
   invoices,
   pictures,
   shows,
+  notes,
   fees,
   records,
   entries,
@@ -173,6 +175,7 @@ function describeContents({
   if (invoices) parts.push(countPhrase(invoices, 'invoice'));
   if (pictures) parts.push(countPhrase(pictures, 'picture'));
   if (shows) parts.push(countPhrase(shows, 'show'));
+  if (notes) parts.push(countPhrase(notes, 'note'));
   const inside = records - entries - updates - fees;
   if (inside > 0) parts.push(`${countPhrase(inside)} filed inside`);
   // Named, because nobody put these in the Trash themselves: they follow the

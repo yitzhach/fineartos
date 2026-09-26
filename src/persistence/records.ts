@@ -14,6 +14,9 @@ import type { Invoice } from '../invoice/types';
 import type { ClientUpdate } from '../commission/updates';
 import type { Expense } from '../finance/ledger';
 import type { Show } from '../shows/shows';
+import type { GuestEntry } from '../connect/guestbook';
+import type { Note } from '../notes/notes';
+import type { ClientProfile, ImportedContact } from '../clients/clients';
 import { sourceImageId, type Photo } from '../photo/photo';
 
 // --- The order each store is listed in, newest first -------------------------
@@ -77,10 +80,26 @@ export interface StudioRecords {
   updates: ClientUpdate[];
   expenses: Expense[];
   shows: Show[];
+  guests: GuestEntry[];
+  notes: Note[];
+  profiles: ClientProfile[];
+  contacts: ImportedContact[];
 }
 
 export function emptyRecords(): StudioRecords {
-  return { documents: [], projects: [], invoices: [], photos: [], updates: [], expenses: [], shows: [] };
+  return {
+    documents: [],
+    projects: [],
+    invoices: [],
+    photos: [],
+    updates: [],
+    expenses: [],
+    shows: [],
+    guests: [],
+    notes: [],
+    profiles: [],
+    contacts: [],
+  };
 }
 
 /**
@@ -99,6 +118,10 @@ export function visibleRecords(all: StudioRecords, hidden: ReadonlySet<string>):
     updates: updatesInSight(all.updates, hidden),
     expenses: all.expenses,
     shows: outOfTrash(all.shows, hidden),
+    guests: all.guests,
+    notes: outOfTrash(all.notes, hidden),
+    profiles: all.profiles,
+    contacts: all.contacts,
   };
 }
 

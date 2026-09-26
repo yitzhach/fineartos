@@ -11,6 +11,9 @@ import type { ClientUpdate } from '../commission/updates';
 import type { Expense } from '../finance/ledger';
 import type { Show } from '../shows/shows';
 import type { Project } from '../project/project';
+import type { GuestEntry } from '../connect/guestbook';
+import type { Note } from '../notes/notes';
+import type { ClientProfile, ImportedContact } from '../clients/clients';
 import {
   byCreated,
   byDate,
@@ -23,6 +26,10 @@ import {
   STORE_DOCUMENTS,
   STORE_EXPENSES,
   STORE_SHOWS,
+  STORE_GUESTS,
+  STORE_NOTES,
+  STORE_CLIENTS,
+  STORE_CONTACTS,
   STORE_IMAGES,
   STORE_INVOICES,
   STORE_PHOTOS,
@@ -260,6 +267,69 @@ export class Repository {
 
   async deleteExpense(id: string): Promise<void> {
     await remove(STORE_EXPENSES, id);
+  }
+
+  // --- Version 7: guests, notes, client profiles, imported contacts ---------
+  // One shape for all four: the record sits under a field named for it.
+
+  private async listField<T>(store: string, field: string): Promise<T[]> {
+    const rows = await listByWorkspace<Record<string, unknown>>(store, this.workspaceId);
+    return rows.map((row) => row[field] as T);
+  }
+
+  async listGuests(): Promise<GuestEntry[]> {
+    const guests = await this.listField<GuestEntry>(STORE_GUESTS, 'guest');
+    return guests.sort((a, b) => b.signedAt.localeCompare(a.signedAt));
+  }
+
+  async saveGuest(guest: GuestEntry): Promise<void> {
+    await put(STORE_GUESTS, { id: guest.id, workspaceId: this.workspaceId, guest });
+  }
+
+  async deleteGuest(id: string): Promise<void> {
+    await remove(STORE_GUESTS, id);
+  }
+
+  async listNotes(): Promise<Note[]> {
+    return (await this.listField<Note>(STORE_NOTES, 'note')).sort(byUpdated);
+  }
+
+  async saveNote(note: Note): Promise<void> {
+    await put(STORE_NOTES, { id: note.id, workspaceId: this.workspaceId, note });
+  }
+
+  async loadNote(id: string): Promise<Note | null> {
+    const row = await get<{ workspaceId: string; note: Note }>(STORE_NOTES, id);
+    return row && row.workspaceId === this.workspaceId ? row.note : null;
+  }
+
+  async deleteNote(id: string): Promise<void> {
+    await remove(STORE_NOTES, id);
+  }
+
+  async listClientProfiles(): Promise<ClientProfile[]> {
+    return (await this.listField<ClientProfile>(STORE_CLIENTS, 'profile')).sort(byCreated);
+  }
+
+  async saveClientProfile(profile: ClientProfile): Promise<void> {
+    await put(STORE_CLIENTS, { id: profile.id, workspaceId: this.workspaceId, profile });
+  }
+
+  async deleteClientProfile(id: string): Promise<void> {
+    await remove(STORE_CLIENTS, id);
+  }
+
+  async listContacts(): Promise<ImportedContact[]> {
+    const contacts = await this.listField<ImportedContact>(STORE_CONTACTS, 'contact');
+    return contacts.sort((a, b) => a.importedAt.localeCompare(b.importedAt));
+  }
+
+  async saveContact(contact: ImportedContact): Promise<void> {
+    await put(STORE_CONTACTS, { id: contact.id, workspaceId: this.workspaceId, contact });
+  }
+
+  async deleteContact(id: string): Promise<void> {
+    await remove(STORE_CONTACTS, id);
   }
 
   // --- Shows --------------------------------------------------------------

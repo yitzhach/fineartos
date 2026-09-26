@@ -11,6 +11,7 @@ import { Frame } from './os/Frame';
 import { Desktop, type DesktopItem } from './os/Desktop';
 import { TrashButton } from './os/TrashButton';
 import type { ConnectTab } from './connect/ui/Connect';
+import type { GuestEntry } from './connect/guestbook';
 import { attachedIds, countPhrase, trashedIds } from './os/trash';
 import { autoArrange, pruneLayout, trashPositionOf } from './os/desktopLayout';
 import { BuildStamp } from './os/BuildStamp';
@@ -78,7 +79,10 @@ import type { Adjustments } from './photo/adjust';
 import type { Framing } from './photo/crop';
 import { milestonesOf } from './commission/milestones';
 import { ComingUp } from './os/ComingUp';
-import { comingUp } from './os/dashboard';
+import { addDays, comingUp } from './os/dashboard';
+import { followUpsDue } from './clients/followUps';
+import type { ImportedContact } from './clients/clients';
+import { checklistProgress, noteTitle, type Pin } from './notes/notes';
 import { allOwed } from './finance/owed';
 import {
   addPiece,
@@ -117,6 +121,9 @@ import {
 import { usePrefs } from './app/usePrefs';
 import {
   ArtworkWindow,
+  QuickCapture,
+  ClientsTool,
+  NotesTool,
   Connect,
   ClientPreview,
   DocumentList,
@@ -175,6 +182,8 @@ registerModule({ id: 'connect', name: 'Connect', icon: 'connect', available: tru
 registerModule({ id: 'artwork', name: 'Artwork', icon: 'artwork', available: true, group: 'tool' });
 registerModule({ id: 'shows', name: 'Shows', icon: 'shows', available: true, group: 'tool' });
 registerModule({ id: 'finance', name: 'Finance', icon: 'finance', available: true, group: 'tool' });
+registerModule({ id: 'clients', name: 'Clients', icon: 'clients', available: true, group: 'tool' });
+registerModule({ id: 'notes', name: 'Notes', icon: 'notes', available: true, group: 'tool' });
 // Last in the dock, the way the Trash is always last.
 registerModule({ id: 'trash', name: 'Trash', icon: 'trash', available: true, group: 'trash' });
 
@@ -204,8 +213,6 @@ export default function App() {
     setRestoreWindowsOn,
     mileageRate,
     setMileageRate,
-    guests,
-    setGuests,
     siteUrl,
     setSiteUrl,
     desktopLayout,
@@ -223,9 +230,26 @@ export default function App() {
     cloud,
     workspaceId: WORKSPACE_ID,
     hidden,
+    onProblem: setMessage,
     onFirstRead: (records) => startWith(records),
   });
-  const { loaded, rows, projects, invoices, photos, clientUpdates, expenses, shows, allUpdates, allShows } = data;
+  const { loaded, rows, projects, invoices, photos, clientUpdates, expenses, shows, allUpdates, allShows, guests } = data;
+
+  /**
+   * The guest book hands back its whole list; only what changed is written.
+   * A write that fails is said out loud — a signature lost quietly at a show
+   * cannot be asked for again (rule 5).
+   */
+  const setGuests = async (next: GuestEntry[]) => {
+    const before = new Map(guests.map((guest) => [guest.id, guest]));
+    const after = new Set(next.map((guest) => guest.id));
+    try {
+      for (const guest of next) if (before.get(guest.id) !== guest) await data.saveGuest(guest);
+      for (const id of before.keys()) if (!after.has(id)) await data.deleteGuest(id);
+    } catch (cause) {
+      setMessage(`The guest book could not be saved: ${String(cause)}. That entry is not kept — please take it again.`);
+    }
+  };
 
   const wm = useWindows({ loaded, restoreWindowsOn });
   const { windows, compact, viewport, desktopViewportRef, top, tray, frames, snapped, open } = wm;
@@ -279,6 +303,9 @@ export default function App() {
   const [showArchived, setShowArchived] = useState(false);
   /** A show chosen in the search box, for the Shows window to select. */
   const [showFocus, setShowFocus] = useState<{ id: string } | null>(null);
+  const [clientFocus, setClientFocus] = useState<{ id: string } | null>(null);
+  const [noteFocus, setNoteFocus] = useState<{ id: string } | { newPin: Pin | null } | null>(null);
+  const [capturing, setCapturing] = useState(false);
   const addImagesRef = useRef<HTMLInputElement>(null);
   const fullscreen = useFullscreen();
 
@@ -950,6 +977,7 @@ export default function App() {
       invoices,
       photos,
       shows,
+      notes: data.notes,
       allUpdates,
       allShows,
       expenses,
@@ -1363,6 +1391,10 @@ export default function App() {
         return { kind: { type: 'tool', tool: 'finance' }, title: 'Finance', subtitle: 'The books' };
       case 'shows':
         return { kind: { type: 'tool', tool: 'shows' }, title: 'Shows', subtitle: 'Fairs, openings and markets' };
+      case 'clients':
+        return { kind: { type: 'tool', tool: 'clients' }, title: 'Clients', subtitle: 'Everyone, from every record' };
+      case 'notes':
+        return { kind: { type: 'tool', tool: 'notes' }, title: 'Notes', subtitle: 'Notes and checklists' };
       default:
         return { kind: { type: 'tool', tool: id }, title: MOCK_TOOL_NAMES[id] ?? id, subtitle: 'Preview' };
     }
@@ -1391,6 +1423,111 @@ export default function App() {
     snapFront: wm.snapFront,
   });
 
+  // --- Clients and notes ----------------------------------------------------
+  // The tools themselves build every person from the records (app/PeopleTools,
+  // loaded on open). The shell keeps only what the search box and Coming up
+  // need, read off the stored notes and profiles.
+
+  const openClients = (id?: string) => {
+    if (id) setClientFocus({ id });
+    open({ type: 'tool', tool: 'clients' }, 'Clients', 'Everyone, from every record');
+  };
+  const openNotes = (focus?: { id: string } | { newPin: Pin | null }) => {
+    if (focus) setNoteFocus(focus);
+    open({ type: 'tool', tool: 'notes' }, 'Notes', 'Notes and checklists');
+  };
+
+  const openPin = (pin: Pin) => {
+    if (pin.kind === 'client') openClients(pin.id);
+    else if (pin.kind === 'commission') openDocumentWindow(pin.id);
+    else if (pin.kind === 'invoice') openInvoiceWindow(pin.id);
+    else if (pin.kind === 'photo') openPhotoWindow(pin.id);
+    else if (pin.kind === 'show') {
+      setShowFocus({ id: pin.id });
+      openTool('shows');
+    } else {
+      const project = projects.find((p) => p.id === pin.id);
+      if (project) open({ type: 'folder', projectId: pin.id }, project.name, 'Project folder');
+    }
+  };
+
+  const peopleRecords = {
+    rows,
+    invoices,
+    guests,
+    contacts: data.contacts,
+    profiles: data.profiles,
+    notes: data.notes,
+    shows,
+    projects,
+    photos,
+  };
+  const peopleActions = {
+    saveProfile: data.saveProfile,
+    deleteProfile: data.deleteProfile,
+    saveNote: data.saveNote,
+    saveContacts: data.saveContacts,
+    reload: data.reload,
+    trash: (id: string) => void handleTrash(id),
+    say: setMessage,
+    openPin,
+    openGuestBook: () => openConnect('guestbook'),
+    openNotes,
+  };
+
+  // Quick capture, for a phone: each lands where it belongs and says so.
+  const captureReceipt = async (files: File[]) => {
+    setCapturing(false);
+    const ids = await addReceipts(files);
+    if (ids.length === 0) return;
+    const { createExpense, emptyExpenseDraft } = await import('./finance/ledger');
+    const row = createExpense(
+      { ...emptyExpenseDraft(localToday()), category: 'other', what: 'Receipt — say what it was', receiptImageIds: ids },
+      { amount: null, ratePerMile: null },
+    );
+    try {
+      await data.saveExpense(row);
+      setMessage('Receipt kept in the books with no amount yet. Open Finance to say what it was and what it cost.');
+    } catch (cause) {
+      setMessage(`The receipt could not be saved: ${String(cause)}`);
+    }
+  };
+  const capturePiece = async (files: File[]) => {
+    setCapturing(false);
+    await handleImportPhotos(files);
+    openTool('artwork');
+  };
+  const captureContact = async (contact: ImportedContact) => {
+    setCapturing(false);
+    try {
+      await data.saveContacts([contact]);
+      setMessage(`${contact.name || contact.email || contact.phone} is in Clients.`);
+    } catch (cause) {
+      setMessage(`The contact could not be saved: ${String(cause)}`);
+    }
+  };
+
+  const launcherNotes = useMemo(
+    () =>
+      data.notes.map((note) => ({
+        id: note.id,
+        title: noteTitle(note),
+        hint: ['Note', checklistProgress(note)].filter(Boolean).join(' · '),
+        words: [note.text, ...note.checklist.map((i) => i.text)].join(' ').slice(0, 400),
+      })),
+    [data.notes],
+  );
+  const launcherPeople = useMemo(
+    () =>
+      data.profiles.map((p) => ({
+        id: p.id,
+        name: p.name || p.label || 'A client',
+        hint: p.tags.join(', ') || 'Client',
+        words: [...p.tags, p.note ?? ''].join(' ').slice(0, 400),
+      })),
+    [data.profiles],
+  );
+
   const launcherEntries = useLauncherEntries(
     {
       frames: frames.length,
@@ -1403,7 +1540,7 @@ export default function App() {
       snapped,
       mac: apple,
     },
-    { documents: rows, invoices, projects, photos, shows, guests },
+    { documents: rows, invoices, projects, photos, shows, guests, notes: launcherNotes, people: launcherPeople },
   );
 
   const toggleFullscreen = async () => {
@@ -1432,6 +1569,8 @@ export default function App() {
       setShowFocus({ id: ref });
       openTool('shows');
     } else if (kind === 'guest') openConnect('guestbook');
+    else if (kind === 'note') openNotes({ id: ref });
+    else if (kind === 'client') openClients(ref);
   };
 
   const runAction = (id: string) => {
@@ -1442,6 +1581,8 @@ export default function App() {
         return void makeInvoice(null, null);
       case 'new-folder':
         return void handleNewFolder();
+      case 'quick-capture':
+        return setCapturing(true);
       case 'add-images':
         return addImagesRef.current?.click();
       case 'guest-book':
@@ -1674,6 +1815,14 @@ export default function App() {
           The events. Pieces taken read "At a show" in Artwork; accepted booth fees go in the books.
         </span>
       );
+    }
+
+    if (kind.type === 'tool' && kind.tool === 'clients') {
+      return <ClientsTool records={peopleRecords} actions={peopleActions} focus={clientFocus} />;
+    }
+
+    if (kind.type === 'tool' && kind.tool === 'notes') {
+      return <NotesTool records={peopleRecords} actions={peopleActions} focus={noteFocus} />;
     }
 
     if (kind.type === 'tool' && kind.tool === 'artwork') {
@@ -1943,7 +2092,7 @@ export default function App() {
           guests={guests}
           showNames={pickableShows(shows, localToday()).map((show) => show.name)}
           currentShowName={shows.find((show) => whenIs(show, localToday()) === 'on' && show.status !== 'declined')?.name ?? null}
-          onGuests={setGuests}
+          onGuests={(next) => void setGuests(next)}
           importing={importingImages}
           onAddImages={(files, markCurrentShow) =>
             void handleImportPhotos(files, undefined, markCurrentShow)
@@ -2216,9 +2365,15 @@ export default function App() {
           items={desktopItems}
           panel={
             <ComingUp
-              items={comingUp({ shows, owed: allOwed({ invoices, documents: rows.map((row) => row.document) }), today: localToday() })}
+              items={comingUp({
+                shows,
+                owed: allOwed({ invoices, documents: rows.map((row) => row.document) }),
+                today: localToday(),
+                followUps: followUpsDue(data.profiles, localToday(), addDays(localToday(), 30)),
+              })}
               onOpen={(item) => {
-                if (item.kind !== 'payment') {
+                if (item.kind === 'followup') openClients(item.openId);
+                else if (item.kind !== 'payment') {
                   // Straight to the show that was clicked, not the first one.
                   setShowFocus({ id: item.openId });
                   open({ type: 'tool', tool: 'shows' }, 'Shows', 'Fairs, openings and markets');
@@ -2338,6 +2493,36 @@ export default function App() {
             openEditor(photoId);
           }}
         />
+      )}
+
+      {compact && !capturing && (
+        <button className="qc-fab" aria-label="Quick capture" onClick={() => setCapturing(true)}>
+          +
+        </button>
+      )}
+      {capturing && (
+        <div className="qc-backdrop" onClick={() => setCapturing(false)}>
+          <div
+            className="qc-panel"
+            role="dialog"
+            aria-label="Quick capture"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setCapturing(false);
+            }}
+          >
+            <QuickCapture
+              onNote={() => {
+                setCapturing(false);
+                openNotes({ newPin: null });
+              }}
+              onReceipt={(files) => void captureReceipt(files)}
+              onPiece={(files) => void capturePiece(files)}
+              onContact={(contact) => void captureContact(contact)}
+              onClose={() => setCapturing(false)}
+            />
+          </div>
+        </div>
       )}
 
       {shell.shortcutsOpen && (

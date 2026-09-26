@@ -127,12 +127,12 @@ export function useShellKeys(options: {
  */
 export function useLauncherEntries(context: LauncherContext, records: LauncherRecords): LauncherEntry[] {
   const { frames, hasFocused, compact, undoLabel, theme, fullscreen, autoTile, snapped, mac } = context;
-  const { documents, invoices, projects, photos, shows, guests } = records;
+  const { documents, invoices, projects, photos, shows, guests, notes, people } = records;
   return useMemo(
     () => [
       ...toolEntries(),
       ...actionEntries({ frames, hasFocused, compact, undoLabel, theme, fullscreen, autoTile, snapped, mac }),
-      ...recordEntries({ documents, invoices, projects, photos, shows, guests }),
+      ...recordEntries({ documents, invoices, projects, photos, shows, guests, notes, people }),
     ],
     [
       frames,
@@ -150,6 +150,8 @@ export function useLauncherEntries(context: LauncherContext, records: LauncherRe
       photos,
       shows,
       guests,
+      notes,
+      people,
     ],
   );
 }

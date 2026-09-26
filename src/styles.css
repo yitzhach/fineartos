@@ -4224,8 +4224,47 @@ fieldset.section > legend {
 .tool-loading,
 .tool-load-failed {
   padding: 24px;
-  color: var(--muted, inherit);
+  color: var(--ink-soft);
 }
 .tool-load-failed p {
   margin: 0 0 12px;
+}
+
+/* Clients and Notes share the Shows layout: a list, and the one picked. */
+.sh-empty { margin: 0; }
+.linkish {
+  background: none; border: 0; padding: 2px 0; color: inherit; text-align: left; cursor: pointer; font: inherit;
+}
+.linkish:hover { text-decoration: underline; }
+.cl-pairs { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.cl-pairs h3 { margin: 0; font-size: 14px; }
+.cl-pair { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; }
+.cl-pair span { flex: 1 1 240px; }
+.cl-facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 13px; }
+.cl-facts dt { color: var(--ink-soft); }
+.cl-facts dd { margin: 0; }
+.cl-sources { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.cl-detail h2 { margin: 0; font-family: var(--serif); font-weight: 400; }
+.cl-detail h3 { margin: 8px 0 0; font-size: 14px; }
+.nt-check { display: flex; gap: 8px; align-items: center; }
+.nt-check input[type='text'] { flex: 1; min-width: 0; }
+.nt-check[data-done='true'] span { text-decoration: line-through; opacity: 0.6; }
+.nt-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.nt-detail textarea { width: 100%; min-height: 140px; font: inherit; }
+.nt-pin { font-size: 13px; }
+.qc-sheet { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
+.qc-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.qc-choices .btn { min-height: 64px; }
+.qc-fab {
+  position: fixed; right: 16px; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); z-index: 900;
+  width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 28px; line-height: 1;
+  background: var(--accent); color: var(--accent-ink); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25); cursor: pointer;
+}
+.qc-backdrop {
+  position: fixed; inset: 0; z-index: 1000; background: rgba(0, 0, 0, 0.35);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.qc-panel {
+  width: min(480px, 100%); background: var(--panel-solid); color: var(--ink);
+  border-radius: 14px 14px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px);
 }
