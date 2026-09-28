@@ -1,5 +1,4 @@
 # HANDOFF — baton only. Rules and commands live in `CLAUDE.md`.
-
 ## Goal
 
 - Artist OS: desktop-OS business suite for one artist. Browser-only, no server.
