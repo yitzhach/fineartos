@@ -7,8 +7,8 @@
 
 ## Now
 
-- Tree green, 671 tests, IndexedDB v7. Phases 1 and 2 done. Phase 3 next.
-- First-load JS 98.7 KB gzip (terser). ~1 KB headroom: new code goes lazy.
+- Tree green, 681 tests, IndexedDB v7 (unchanged). Phase 3 part 1 done.
+- First-load JS 99.2 KB gzip (terser). ~0.5 KB headroom: new code goes lazy.
 
 ## Done
 
@@ -26,6 +26,11 @@
   keeps tags, follow-up (Coming up), note, merges, `label`. Notes
   (`notes/notes.ts`) pin to anything, go to the Trash. vCard/CSV import.
   Quick capture (phone + button, search box action). G L clients, G N notes.
+- Phase 3 part 1: `booth/booth.ts` (PIN hash+salt, lockout, panels, pieces,
+  price line, idle/slide timing), `booth/storage.ts` (settings + on-flag in
+  localStorage), `booth/ui/BoothSetup` (Connect → "Booth mode" tab),
+  lazy `booth/ui/BoothMode` (loop = slideshow of show pieces, panels, PIN pad).
+  App returns only BoothMode while on; capture keydown holds shell keys/undo.
 
 ## Decisions (keep)
 
@@ -53,6 +58,11 @@
 - Thumb mode never shows an original while its thumb is missing (200 full
   decodes = the stall). Blank tile until the backfill reaches it.
 
+- Booth on-flag persists: a reload must land back in the booth, not the studio.
+- Website panel only after the artist ticks "I can see my site" (no detection
+  possible); otherwise the QR panel covers it.
+- Booth pieces = today's show pieceIds ∪ inCurrentShow, minus hidden.
+
 ## Dead ends (do not retry)
 
 - Upgrade check with two builds of one commit: same `sw.js?v=` → SW never
@@ -61,8 +71,10 @@
 
 ## Next (numbered)
 
-1. Phase 3 (Show mode) — read only that section of `BUILD_PLAN.md`.
-2. Phase 4 — Visualizer scope settled: true size + perspective + lighting
+1. Phase 3 part 2: profile video for the loop (needs a stored file → DB v8
+   or the images store; test v7→v8 with an old tab open); phone dock shows
+   fewer items (audit 14); likes ("pieces you like") in the booth sign-up.
+2. Then Phase 4 — Visualizer scope settled: true size + perspective + lighting
    (see `BUILD_PLAN.md` Phase 4).
 
 ## Files (path — why)
@@ -71,10 +83,15 @@
 - `src/persistence/records.ts` — orders, upsert, visible lists, image key.
 - `scripts/check-lazy-thumbs.mjs` — Phase 1 part 2 (size, offline, 200 photos).
 - `scripts/check-clients-notes.mjs` — Phase 2; needs `OLD_DIST` (v6 build).
+- `scripts/check-booth.mjs` — Phase 3; 22 checks, tablet + phone, offline.
 
 ## Verify (tested / NOT tested)
 
-- Tested: unit 671; `check-clients-notes` 15/15 (v6→v7 with old tab open,
+- Tested: unit 681; `check-booth` 22/22 (tablet+phone offline: no-PIN start
+  blocked, loop, sign-up stored, QR, Ctrl+K held, wrong PIN, reload stays in
+  booth, PIN out). NOT: website iframe on a real site, loop with real photos,
+  idle return timing by hand, full-screen on iPad.
+- Earlier: `check-clients-notes` 15/15 (v6→v7 with old tab open,
   guest moved, guest+commission one person, follow-up in Coming up, note
   found after reload, note in Trash, phone quick capture); `check-lazy-thumbs`
   (size, offline, failed load, 200 photos longest task 370 ms); all older
@@ -86,6 +103,7 @@
 ## Resume
 
 - Read `CLAUDE.md`, then only the Phase 3 section of `BUILD_PLAN.md`.
+- Booth code is all in `src/booth/`; setup is Connect's "Booth mode" tab.
 - The SessionStart hook installs deps and runs the suite; trust its line.
 - Push to `main` (deploys) and to the session's `claude/*` branch if named.
 - Browser checks: see `TESTING.md`.

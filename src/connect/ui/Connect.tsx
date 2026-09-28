@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
+import { BoothSetup } from '../../booth/ui/BoothSetup';
 import type { StudioDefaults } from '../../lib/prefs';
 import {
   describePrice,
@@ -34,7 +35,7 @@ import {
   type GuestEntry,
 } from '../guestbook';
 
-export type ConnectTab = 'guestbook' | 'send' | 'qr';
+export type ConnectTab = 'guestbook' | 'send' | 'qr' | 'booth';
 
 interface Props {
   tab: ConnectTab;
@@ -66,6 +67,9 @@ interface Props {
   siteUrl: string;
   onSiteUrl: (url: string) => void;
   onMessage: (text: string) => void;
+  /** Pieces the Shows tool took to today's show, for the booth. */
+  showPieceIds: string[];
+  onStartBooth: () => void;
 }
 
 /**
@@ -84,11 +88,21 @@ export function Connect(props: Props) {
         <Tab id="guestbook" current={props.tab} onTab={props.onTab}>Guest book</Tab>
         <Tab id="send" current={props.tab} onTab={props.onTab}>Send a picture</Tab>
         <Tab id="qr" current={props.tab} onTab={props.onTab}>QR &amp; contact card</Tab>
+        <Tab id="booth" current={props.tab} onTab={props.onTab}>Booth mode</Tab>
       </div>
 
       {props.tab === 'guestbook' && <GuestBook {...props} />}
       {props.tab === 'send' && <SendPicture {...props} />}
       {props.tab === 'qr' && <QrPanel {...props} />}
+      {props.tab === 'booth' && (
+        <BoothSetup
+          siteUrl={props.siteUrl}
+          photos={props.photos}
+          showPieceIds={props.showPieceIds}
+          onStart={props.onStartBooth}
+          onMessage={props.onMessage}
+        />
+      )}
     </div>
   );
 }

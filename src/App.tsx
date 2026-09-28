@@ -140,6 +140,7 @@ import {
   TrashWindow,
   UpdatesPane,
   WallpaperSlides,
+  BoothMode,
   FinanceWindow,
   ImageEditor,
   InvoiceEditor,
@@ -148,6 +149,7 @@ import {
   isLoadFailure,
   warmTools,
 } from './app/lazyTools';
+import { boothIsOn, setBoothOn } from './booth/storage';
 import { useUndo } from './app/useUndo';
 import { useObjectUrls } from './app/useObjectUrls';
 import { useStudioData } from './app/useStudioData';
@@ -276,6 +278,8 @@ export default function App() {
   const [connectTab, setConnectTab] = useState<ConnectTab>('guestbook');
   const [connectPhotoId, setConnectPhotoId] = useState<string | null>(null);
   const [dockHeight, setDockHeight] = useState(84);
+  /** Booth mode survives a reload, so a visitor cannot refresh into the studio. */
+  const [boothOn, setBoothOnState] = useState(boothIsOn);
   /**
    * True once a newer build is being served. A tab left open at a show goes
    * on running the JavaScript it loaded, which looks exactly like a deploy
@@ -2112,6 +2116,8 @@ export default function App() {
           siteUrl={siteUrl}
           onSiteUrl={setSiteUrl}
           onMessage={setMessage}
+          showPieceIds={todayShow?.pieceIds ?? []}
+          onStartBooth={startBooth}
         />
       );
     }
@@ -2247,6 +2253,37 @@ export default function App() {
     .filter((url): url is string => Boolean(url));
   const slideSeconds = secondsPerSlide(slideshow, slideUrls.length);
   const slideCrossfade = crossfadeSeconds(slideshow, slideUrls.length);
+
+  const todayShow = shows.find((show) => whenIs(show, localToday()) === 'on' && show.status !== 'declined') ?? null;
+
+  function startBooth() {
+    const problem = setBoothOn(true);
+    if (problem) setMessage(problem);
+    setBoothOnState(true);
+    // Full screen where the browser allows it; the booth works either way.
+    document.documentElement.requestFullscreen?.().catch(() => undefined);
+  }
+
+  if (boothOn) {
+    return (
+      <BoothMode
+        studio={studio}
+        siteUrl={siteUrl}
+        photos={photos}
+        imageUrls={imageUrls}
+        guests={guests}
+        onGuests={(next) => void setGuests(next)}
+        showName={todayShow?.name ?? null}
+        showPieceIds={todayShow?.pieceIds ?? []}
+        onExit={() => {
+          const problem = setBoothOn(false);
+          setBoothOnState(false);
+          if (problem) setMessage(problem);
+          if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined);
+        }}
+      />
+    );
+  }
 
   return (
     <div

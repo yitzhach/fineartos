@@ -166,7 +166,7 @@ mentions a plan until billing exists.
 - Done when: a guest who signs at a show and later commissions a piece is one
   person with both in their record; upgrade from v6 tested with a second tab.
 
-### Phase 3 — Show mode · Planned · Free
+### Phase 3 — Show mode · Part 1 done · Free
 
 - Booth mode: full screen, visitor panels only, the studio's money, clients
   and notes out of reach; leaving needs the artist's PIN.

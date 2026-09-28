@@ -75,6 +75,7 @@ export const PicturePreview = lazyTool('The picture', () => import('../photo/ui/
 export const ProjectWindow = lazyTool('The commission', () => import('../commission/ui/ProjectWindow').then((m) => m.ProjectWindow));export const ClientsTool = lazyTool('Clients', () => import('./PeopleTools').then((m) => m.ClientsTool));
 export const NotesTool = lazyTool('Notes', () => import('./PeopleTools').then((m) => m.NotesTool));
 export const QuickCapture = lazyTool('Quick capture', () => import('./QuickCapture').then((m) => m.QuickCapture));
+export const BoothMode = lazyTool('Booth mode', () => import('../booth/ui/BoothMode').then((m) => m.BoothMode));
 export const MockToolWindow = lazyTool('The preview', () => import('../os/mock/tools').then((m) => m.MockToolWindow));
 
 // The slideshow sits behind everything, so it loads without a caption.

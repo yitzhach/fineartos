@@ -4268,3 +4268,56 @@ fieldset.section > legend {
   width: min(480px, 100%); background: var(--panel-solid); color: var(--ink);
   border-radius: 14px 14px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+
+/* --- Booth mode ------------------------------------------------------------ */
+.booth {
+  position: fixed; inset: 0; z-index: 10000;
+  display: flex; flex-direction: column;
+  background: var(--stone-900); color: var(--ink);
+  overflow: hidden;
+}
+.booth-loop { cursor: pointer; justify-content: flex-end; background: #171614; }
+.booth-slide { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; animation: booth-fade 1.2s ease; }
+@keyframes booth-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .booth-slide { animation: none; } }
+.booth-loop-caption {
+  position: relative; padding: 28px 32px 40px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.72)); color: #f4f1ea;
+}
+.booth-loop-caption h1 { font-family: var(--serif); font-size: clamp(28px, 5vw, 56px); margin: 0 0 6px; }
+.booth-tap { opacity: 0.8; margin-top: 14px; }
+.booth-tabs { display: flex; gap: 8px; padding: 12px 16px; overflow-x: auto; border-bottom: 1px solid var(--line); }
+.booth-tabs button { min-height: 48px; padding: 0 18px; font-size: 16px; white-space: nowrap; }
+.booth-artist { margin-left: auto; opacity: 0.55; }
+.booth-body { flex: 1; overflow: auto; padding: 24px 16px; }
+.booth-form, .booth-thanks, .booth-statement, .booth-qr { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.booth-form label { display: flex; flex-direction: column; gap: 6px; font-size: 16px; }
+.booth-form input, .booth-form textarea { font-size: 18px; min-height: 48px; padding: 8px 12px; }
+.booth-form label.booth-consent { flex-direction: row; align-items: center; gap: 10px; }
+.booth-consent input { min-height: 0; width: 24px; height: 24px; }
+.booth-form button[type='submit'], .booth-thanks button { min-height: 56px; font-size: 18px; }
+.booth-problem { color: var(--danger); }
+.booth-statement { font-family: var(--serif); font-size: 19px; line-height: 1.6; }
+.booth-pieces { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.booth-pieces li { display: flex; flex-direction: column; gap: 4px; }
+.booth-pieces img, .booth-noimg { width: 100%; aspect-ratio: 1; object-fit: contain; background: var(--raised); border-radius: var(--radius-sm); }
+.booth-price { font-weight: 600; }
+.booth-empty { text-align: center; opacity: 0.7; }
+.booth-site { width: 100%; height: 100%; border: 0; background: #fff; border-radius: var(--radius-sm); }
+.booth-body:has(.booth-site) { padding: 0; }
+.booth-qr { flex-direction: row; flex-wrap: wrap; justify-content: center; max-width: none; }
+.booth-qr figure { margin: 0; text-align: center; }
+.booth-qr canvas { background: #fff; padding: 10px; border-radius: 8px; }
+.booth-qr .hint { flex-basis: 100%; text-align: center; }
+.booth-pin { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, 0.6); }
+.booth-pin-card { background: var(--panel-solid); padding: 24px; border-radius: var(--radius); display: flex; flex-direction: column; gap: 12px; align-items: center; width: min(320px, calc(100vw - 32px)); }
+.booth-pin-dots { font-size: 28px; letter-spacing: 6px; min-height: 36px; }
+.booth-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; }
+.booth-keys button { min-height: 60px; font-size: 22px; }
+.booth-setup { display: flex; flex-direction: column; gap: 18px; max-width: 640px; }
+.booth-setup section { display: flex; flex-direction: column; gap: 8px; }
+.booth-setup h3 { margin: 0; }
+.booth-setup-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.booth-setup-row input[type='number'] { width: 80px; }
+.booth-setup-check { display: flex; gap: 8px; align-items: center; }
+.booth-site-check { width: 100%; height: 280px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: #fff; }
