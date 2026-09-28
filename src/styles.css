@@ -4321,3 +4321,7 @@ fieldset.section > legend {
 .booth-setup-row input[type='number'] { width: 80px; }
 .booth-setup-check { display: flex; gap: 8px; align-items: center; }
 .booth-site-check { width: 100%; height: 280px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: #fff; }
+.booth-likes { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.booth-likes legend { margin-bottom: 6px; }
+.booth-likes .btn { flex-direction: column; gap: 4px; padding: 6px; max-width: 120px; white-space: normal; }
+.booth-likes img { width: 100px; height: 100px; object-fit: cover; border-radius: 6px; }

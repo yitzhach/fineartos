@@ -13,7 +13,7 @@ import {
   type BoothPanel,
 } from '../booth';
 import { readBoothRaw } from '../storage';
-import { addEntry, draftProblem, emptyDraft, signGuestBook, type GuestEntry } from '../../connect/guestbook';
+import { addEntry, draftProblem, emptyDraft, signGuestBook, togglePhotoLike, type GuestEntry } from '../../connect/guestbook';
 import { normaliseUrl, vcardFor } from '../../connect/contact';
 import { describePhoto, type Photo } from '../../photo/photo';
 import type { StudioDefaults } from '../../lib/prefs';
@@ -131,7 +131,14 @@ export function BoothMode(props: Props) {
       </header>
       <main className="booth-body">
         {panel === 'guestbook' && (
-          <BoothGuestBook key={visit} guests={props.guests} onGuests={props.onGuests} showName={props.showName} />
+          <BoothGuestBook
+            key={visit}
+            guests={props.guests}
+            onGuests={props.onGuests}
+            showName={props.showName}
+            pieces={pieces}
+            imageUrls={props.imageUrls}
+          />
         )}
         {panel === 'pieces' && <BoothPieces pieces={pieces} imageUrls={props.imageUrls} />}
         {panel === 'statement' && (
@@ -156,10 +163,14 @@ function BoothGuestBook({
   guests,
   onGuests,
   showName,
+  pieces,
+  imageUrls,
 }: {
   guests: GuestEntry[];
   onGuests: (guests: GuestEntry[]) => void;
   showName: string | null;
+  pieces: Photo[];
+  imageUrls: Record<string, string>;
 }) {
   const [draft, setDraft] = useState(() => emptyDraft(showName ?? ''));
   const [problem, setProblem] = useState<string | null>(null);
@@ -208,6 +219,26 @@ function BoothGuestBook({
         A note <span className="hint">optional</span>
         <textarea rows={2} value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
       </label>
+      {pieces.length > 0 && (
+        <fieldset className="booth-likes">
+          <legend>
+            Pieces you like <span className="hint">optional</span>
+          </legend>
+          {pieces.map((piece) => (
+            <button
+              key={piece.id}
+              type="button"
+              className="btn"
+              aria-pressed={draft.likedPhotoIds.includes(piece.id)}
+              data-variant={draft.likedPhotoIds.includes(piece.id) ? 'primary' : 'quiet'}
+              onClick={() => setDraft(togglePhotoLike(draft, piece.id))}
+            >
+              {imageUrls[piece.imageId] && <img src={imageUrls[piece.imageId]} alt="" />}
+              {piece.title}
+            </button>
+          ))}
+        </fieldset>
+      )}
       <label className="booth-consent">
         <input type="checkbox" checked={draft.consented} onChange={(e) => setDraft({ ...draft, consented: e.target.checked })} />
         Yes, the studio may contact me about new work.

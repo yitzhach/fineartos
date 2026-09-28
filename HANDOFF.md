@@ -24,7 +24,7 @@
 - Phase 3 part 1: `booth/booth.ts` (PIN hash+salt, lockout, panels, pieces,
   price line, idle/slide timing), `booth/storage.ts` (settings + on-flag in
   localStorage), `booth/ui/BoothSetup` (Connect → "Booth mode" tab),
-  lazy `booth/ui/BoothMode` (loop = slideshow of show pieces, panels, PIN pad).
+  lazy `booth/ui/BoothMode` (loop, panels, likes on sign-up, PIN pad).
   App returns only BoothMode while on; capture keydown holds shell keys/undo.
 
 ## Decisions (keep)
@@ -62,7 +62,7 @@
 
 1. Phase 3 part 2: profile video for the loop (needs a stored file → DB v8
    or the images store; test v7→v8 with an old tab open); phone dock shows
-   fewer items (audit 14); likes ("pieces you like") in the booth sign-up.
+   fewer items (audit 14). Check booth likes with a real show piece (script has none).
 2. Then Phase 4 — Visualizer scope settled: true size + perspective + lighting
    (see `BUILD_PLAN.md` Phase 4).
 

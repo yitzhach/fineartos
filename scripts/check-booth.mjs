@@ -30,6 +30,7 @@ for (const [label, viewport] of [['tablet', { width: 1024, height: 768 }], ['pho
   const other = await ctx.newPage(); await other.goto(URL); await wait(1500);
   await page.bringToFront();
 
+  await page.locator('main input[type=file][accept^="image/png"]').setInputFiles('public/icon-512.png'); await wait(2500);
   await page.evaluate(() => localStorage.setItem('artistOS.booth', JSON.stringify({ statement: 'I paint rivers.' })));
   await page.reload(); await wait(3000);
   await ctx.setOffline(true);
@@ -51,6 +52,9 @@ for (const [label, viewport] of [['tablet', { width: 1024, height: 768 }], ['pho
   ok(`${label}: panels ${tabs.join('/')}`, tabs.includes('About the artist') && tabs.includes('Take my details') && !tabs.includes('Website'));
   await page.getByLabel('Name').fill('Ada Visitor');
   await page.getByLabel(/Email/).fill('ada@example.com');
+  const likes = page.locator('.booth-likes button');
+  if (await likes.count()) await likes.first().click();
+  console.log(`${label}: pieces offered to like`, await likes.count());
   await page.getByRole('button', { name: 'Sign' }).click(); await wait(600);
   ok(`${label}: thanks shown`, (await page.locator('.booth-thanks').count()) === 1);
   await page.screenshot({ path: `${OUT}/booth-${label}-thanks.png` });
