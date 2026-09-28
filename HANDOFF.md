@@ -12,12 +12,8 @@
 
 ## Done
 
-- Phase 0 (search box, tiling), Phase 1 part 1 (hooks in `src/app/`,
-  one-record saves, startup restore, key names + `?` sheet).
-- Phase 1 part 2: `app/lazyTools.tsx` (tools lazy, warm-up 3 s after load,
-  "could not load" + Reload, `isLoadFailure` message). Thumbnails in
-  `StoredImage.thumb` (null = cannot make), backfilled by `useObjectUrls`
-  (per-id patch, 2 at a time); originals only where shown full.
+- Phases 0–1: search box, tiling, hooks in `src/app/`, lazy tools
+  (`app/lazyTools.tsx`), thumbnails backfilled by `useObjectUrls`.
 - Phase 2: v7 stores guests/notes/clients/contacts (`persistence/db.ts`).
   Guest book copied from localStorage on load, old key moved to
   `artistOS.guestBook.movedToDatabase`; write failures shown. Clients
@@ -34,21 +30,16 @@
 
 ## Decisions (keep)
 
-- System bar search is the launcher; the old doc filter does not go back there.
-- Launcher offers an action only when it can run now (rule 8).
+- System bar search is the launcher; actions only when runnable (rule 8).
 - Snap keys Alt+Shift+arrows; tab keys Ctrl/⌘+Alt+arrows and Alt+1–9 work
   while typing (the sheet says so). G, / and ? only outside text fields.
-- The shortcut sheet lists only keys with a handler; snapping left out on phone.
-- After a live drag, Frame resets its style to the last-drawn rect before
-  committing: React diffs props, not the DOM.
-- Free = runs on the device; paid = costs money. No plan shown before billing.
-- Tools render in `renderContent`; `renderToolbar` is a caption. Print = browser.
+- After a live drag, Frame resets style to the last-drawn rect (React diffs props).
+- Free = runs on device; paid = costs money. No plan shown before billing.
 - Updates travel with their commission's export. Books file two-way, CSV
   one-way. Payment due: invoiced commission drops out; totals per currency.
 - Emptying the Trash reloads BEFORE the entries leave the Trash, else the
   destroyed records flash back for a frame.
-- Direct `repo.save*` in App only where `data.reload()` follows, else stale.
-- `PROJECT_GUIDE.md` predates Finance and tiling. Do not assume it is current.
+- Direct `repo.save*` in App only where `data.reload()` follows.
 - A module shared by the entry and a lazy chunk lands whole in the entry:
   split cheap helpers out (`photo/neutral.ts`, `invoice/mailto.ts`,
   `lib/demoSeeded.ts`, `os/mock/names.ts`) — do not re-export them back.
@@ -65,8 +56,7 @@
 
 ## Dead ends (do not retry)
 
-- Upgrade check with two builds of one commit: same `sw.js?v=` → SW never
-  updates. Commit before building the new one. Kill stray `vite preview`.
+- Two builds of one commit share `sw.js?v=` → SW never updates. Commit first.
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 
 ## Next (numbered)
@@ -80,8 +70,6 @@
 ## Files (path — why)
 
 - `src/app/*` — the hooks. `src/App.tsx` — wiring, `runAction`, render.
-- `src/persistence/records.ts` — orders, upsert, visible lists, image key.
-- `scripts/check-lazy-thumbs.mjs` — Phase 1 part 2 (size, offline, 200 photos).
 - `scripts/check-clients-notes.mjs` — Phase 2; needs `OLD_DIST` (v6 build).
 - `scripts/check-booth.mjs` — Phase 3; 22 checks, tablet + phone, offline.
 
@@ -91,19 +79,13 @@
   blocked, loop, sign-up stored, QR, Ctrl+K held, wrong PIN, reload stays in
   booth, PIN out). NOT: website iframe on a real site, loop with real photos,
   idle return timing by hand, full-screen on iPad.
-- Earlier: `check-clients-notes` 15/15 (v6→v7 with old tab open,
-  guest moved, guest+commission one person, follow-up in Coming up, note
-  found after reload, note in Trash, phone quick capture); `check-lazy-thumbs`
-  (size, offline, failed load, 200 photos longest task 370 ms); all older
-  `scripts/check-*` pass.
-- NOT tested: real microphone dictation, vCard from a real phone, camera
-  capture on a device, merge UI by hand, dark-mode sheets, real Mac/iPad
-  keys and drag, deployed URL (proxy 403), 861–1000px widths, iOS print. Nit: desktop buttons show faintly through tiled titlebars.
+- Earlier phases: all `scripts/check-*` pass. NOT tested: real mic, real
+  vCard, device camera, merge UI by hand, dark sheets, real Mac/iPad keys,
+  deployed URL (proxy 403), 861–1000px, iOS print.
 
 ## Resume
 
 - Read `CLAUDE.md`, then only the Phase 3 section of `BUILD_PLAN.md`.
 - Booth code is all in `src/booth/`; setup is Connect's "Booth mode" tab.
-- The SessionStart hook installs deps and runs the suite; trust its line.
 - Push to `main` (deploys) and to the session's `claude/*` branch if named.
 - Browser checks: see `TESTING.md`.
