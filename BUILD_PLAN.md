@@ -191,8 +191,10 @@ mentions a plan until billing exists.
   payment link or QR per piece where the artist has one.
 - The day's tally per show, pieces still out, consignment splits.
 - Print: price list, wall labels, certificate of authenticity.
-- Visualizer (*scope to settle with the artist first*): a room photo, a known
-  length marked on it, the piece placed at true size.
+- Visualizer (scope settled 28 Sep 2026): a room photo, a known length
+  marked on it, the piece placed at true size; plus perspective (four wall
+  corners → the piece follows the wall's angle) and lighting (match the
+  room's brightness and warmth, a soft shadow). Maths DOM-free and tested.
 - Done when: a sale at a show changes Artwork, Finance and the show's tally
   together, and the Trash can undo it cleanly.
 

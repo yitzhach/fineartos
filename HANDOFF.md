@@ -62,7 +62,8 @@
 ## Next (numbered)
 
 1. Phase 3 (Show mode) — read only that section of `BUILD_PLAN.md`.
-2. Visualizer scope: settle with the artist before Phase 4 (asked in chat).
+2. Phase 4 — Visualizer scope settled: true size + perspective + lighting
+   (see `BUILD_PLAN.md` Phase 4).
 
 ## Files (path — why)
 
