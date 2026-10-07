@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { noteTitle, type Note } from '../notes/notes';
 import { useEffect, useRef, useState } from 'react';
 import type { CommissionDocument } from '../commission/types';
 import type { Invoice } from '../invoice/types';
@@ -25,7 +26,8 @@ export type DesktopItem =
   | { kind: 'project'; id: string; project: Project }
   | { kind: 'document'; id: string; document: CommissionDocument }
   | { kind: 'invoice'; id: string; invoice: Invoice }
-  | { kind: 'photo'; id: string; photo: Photo };
+  | { kind: 'photo'; id: string; photo: Photo }
+  | { kind: 'note'; id: string; note: Note };
 
 interface Props {
   items: DesktopItem[];
@@ -429,6 +431,10 @@ function describe(item: DesktopItem): {
       thumbId: item.photo.imageId,
       badge: null,
     };
+  }
+
+  if (item.kind === 'note') {
+    return { name: noteTitle(item.note), caption: 'Note', thumbId: null, badge: 'NOTE' };
   }
 
   if (item.kind === 'invoice') {

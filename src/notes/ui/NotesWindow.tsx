@@ -5,6 +5,8 @@ import {
   createNote,
   editNote,
   noteTitle,
+  placeNote,
+  placeOf,
   removeCheckItem,
   searchNotes,
   speechSupport,
@@ -42,7 +44,8 @@ export function NotesWindow({ notes, targets, onSave, onDelete, onOpenPin, onMes
   const handled = useRef<unknown>(null);
 
   const make = (pin: Pin | null) => {
-    const note = createNote('', pin);
+    // A plain new note lands on the home screen; one made for a record stays with it.
+    const note = pin ? createNote('', pin) : placeNote(createNote(''), { type: 'desktop' });
     onSave(note);
     setSelectedId(note.id);
   };
@@ -138,9 +141,12 @@ function NoteDetail(props: {
   onMessage: (message: string) => void;
 }) {
   const { note, targets, pinLabel, onSave, onDelete, onOpenPin, onMessage } = props;
+  const [title, setTitle] = useState(note.title ?? '');
   const [text, setText] = useState(note.text);
   const [item, setItem] = useState('');
   const [listening, setListening] = useState(false);
+  const titleRef = useRef(title);
+  titleRef.current = title;
   const textRef = useRef(text);
   textRef.current = text;
   const latest = useRef(note);
@@ -149,8 +155,39 @@ function NoteDetail(props: {
   // The microphone appears only where the browser can listen (rule 8).
   const speech = speechSupport(window as unknown as Record<string, unknown>);
 
+  /** The stored note with whatever is typed but not yet saved. */
+  const current = (): Note => ({ ...latest.current, title: titleRef.current, text: textRef.current });
+  const dirty = () => titleRef.current !== (latest.current.title ?? '') || textRef.current !== latest.current.text;
+
+  const gone = useRef(false);
   const saveText = () => {
-    if (textRef.current !== latest.current.text) onSave(editNote(latest.current, { text: textRef.current }));
+    if (!gone.current && dirty()) onSave(editNote(latest.current, { title: titleRef.current, text: textRef.current }));
+  };
+
+  // Typing saves itself shortly after it stops, and on closing the window or
+  // switching notes — a blur never fires on unmount, which lost notes before.
+  useEffect(() => {
+    const timer = window.setTimeout(saveText, 800);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, text]);
+  useEffect(() => () => saveText(), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const place = placeOf(note);
+  const placeValue = place.type === 'folder' ? `folder:${place.id}` : place.type;
+  const folders = targets.filter((t) => t.pin.kind === 'project');
+  const pins = targets.filter((t) => t.pin.kind !== 'project');
+
+  const saveNow = () => {
+    onSave(editNote(latest.current, { title: titleRef.current, text: textRef.current }));
+    const where = folders.find((f) => place.type === 'folder' && f.pin.id === place.id)?.label.replace(/^Folder · /, '');
+    onMessage(
+      place.type === 'desktop'
+        ? 'Note saved, and on the home screen.'
+        : where
+          ? `Note saved in the folder “${where}”.`
+          : 'Note saved in Notes.',
+    );
   };
 
   const dictate = () => {
@@ -188,6 +225,15 @@ function NoteDetail(props: {
 
   return (
     <div className="sh-detail nt-detail">
+      <input
+        type="text"
+        className="nt-title"
+        aria-label="Title"
+        placeholder="Title"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        onBlur={saveText}
+      />
       <textarea
         aria-label="Note"
         value={text}
@@ -211,10 +257,10 @@ function NoteDetail(props: {
               type="checkbox"
               checked={check.done}
               aria-label={check.text}
-              onChange={() => onSave(toggleCheckItem(note, check.id))}
+              onChange={() => onSave(toggleCheckItem(current(), check.id))}
             />
             <span>{check.text}</span>
-            <button className="btn" data-variant="quiet" aria-label={`Remove ${check.text}`} onClick={() => onSave(removeCheckItem(note, check.id))}>
+            <button className="btn" data-variant="quiet" aria-label={`Remove ${check.text}`} onClick={() => onSave(removeCheckItem(current(), check.id))}>
               ✕
             </button>
           </li>
@@ -224,8 +270,7 @@ function NoteDetail(props: {
         className="nt-check"
         onSubmit={(e) => {
           e.preventDefault();
-          saveText();
-          onSave(addCheckItem({ ...latest.current, text: textRef.current }, item));
+          onSave(addCheckItem(current(), item));
           setItem('');
         }}
       >
@@ -236,23 +281,50 @@ function NoteDetail(props: {
       </form>
 
       <label className="field nt-pin">
+        <span>Keep it on</span>
+        <select
+          aria-label="Keep it on"
+          value={placeValue}
+          onChange={(e) => {
+            const value = e.target.value;
+            const next = value.startsWith('folder:')
+              ? placeNote(current(), { type: 'folder', id: value.slice('folder:'.length) })
+              : placeNote(current(), { type: value === 'desktop' ? 'desktop' : 'notes' });
+            onSave(next);
+          }}
+        >
+          <option value="notes">Notes only</option>
+          <option value="desktop">Home screen</option>
+          {place.type === 'folder' && !folders.some((f) => f.pin.id === place.id) && (
+            <option value={placeValue}>A folder since removed</option>
+          )}
+          {folders.map((f) => (
+            <option key={f.pin.id} value={`folder:${f.pin.id}`}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {place.type !== 'folder' && (
+      <label className="field nt-pin">
         <span>Pinned to</span>
         <select
           value={note.pin ? `${note.pin.kind}:${note.pin.id}` : ''}
           onChange={(e) => {
-            const target = targets.find((t) => `${t.pin.kind}:${t.pin.id}` === e.target.value);
-            onSave(editNote({ ...note, text: textRef.current }, { pin: target?.pin ?? null }));
+            const target = pins.find((t) => `${t.pin.kind}:${t.pin.id}` === e.target.value);
+            onSave(editNote(current(), { pin: target?.pin ?? null }));
           }}
         >
           <option value="">Nothing</option>
           {note.pin && !pinLabel && <option value={`${note.pin.kind}:${note.pin.id}`}>Something since removed</option>}
-          {targets.map((t) => (
+          {pins.map((t) => (
             <option key={`${t.pin.kind}:${t.pin.id}`} value={`${t.pin.kind}:${t.pin.id}`}>
               {t.label}
             </option>
           ))}
         </select>
       </label>
+      )}
       {note.pin && pinLabel && (
         <button className="linkish" onClick={() => onOpenPin(note.pin!)}>
           Open {pinLabel}
@@ -260,7 +332,13 @@ function NoteDetail(props: {
       )}
 
       <div className="sh-foot">
-        <button className="btn" data-variant="quiet" onClick={() => onDelete(note)}>
+        <button className="btn" data-variant="primary" onClick={saveNow}>
+          Save
+        </button>
+        <button className="btn" data-variant="quiet" onClick={() => {
+            gone.current = true;
+            onDelete(current());
+          }}>
           Move to Trash
         </button>
       </div>

@@ -4251,6 +4251,7 @@ fieldset.section > legend {
 .nt-check[data-done='true'] span { text-decoration: line-through; opacity: 0.6; }
 .nt-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .nt-detail textarea { width: 100%; min-height: 140px; font: inherit; }
+.nt-detail .nt-title { width: 100%; font: inherit; font-size: 17px; font-weight: 600; }
 .nt-pin { font-size: 13px; }
 .qc-sheet { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
 .qc-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }

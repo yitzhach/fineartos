@@ -7,7 +7,9 @@
 ## Now
 
 - Tree green, 681 tests, IndexedDB v7 (unchanged). Phase 3 part 1 done.
-- First-load JS 99.2 KB gzip (terser). ~0.5 KB headroom: new code goes lazy.
+- First-load JS 99.6 KB gzip (terser). Headroom ~0.1 KB: new code MUST go lazy.
+- Notes fix (2026-10-07): typing autosaves (0.8 s + on close; blur alone lost
+  notes), Title field, Save button, "Keep it on" Notes only / Home screen / folder.
 
 ## Done
 
@@ -28,6 +30,9 @@
   App returns only BoothMode while on; capture keydown holds shell keys/undo.
 
 ## Decisions (keep)
+
+- Note in a folder = `pin {kind:'project'}`; folder record holds no notes.
+  Home screen = optional `onDesktop`. Old notes stay Notes-only. No DB bump.
 
 - System bar search is the launcher; actions only when runnable (rule 8).
 - Snap keys Alt+Shift+arrows; tab keys Ctrl/⌘+Alt+arrows and Alt+1–9 work
@@ -60,6 +65,10 @@
 
 ## Next (numbered)
 
+0. Owner asked for the studio AI assistant (Art-Talk-Back `studio-assistant`)
+   inside Artist OS. Needs sign-in + `/v1` binding like booth-studio — breaks
+   "no server, no sign-in": plan it with the owner first.
+
 1. Phase 3 part 2: profile video for the loop (needs a stored file → DB v8
    or the images store; test v7→v8 with an old tab open); phone dock shows
    fewer items (audit 14). Check booth likes with a real show piece (script has none).
@@ -70,6 +79,7 @@
 
 - `src/app/*` — the hooks. `src/App.tsx` — wiring, `runAction`, render.
 - `scripts/check-clients-notes.mjs` — Phase 2; needs `OLD_DIST` (v6 build).
+- `scripts/check-notes-place.mjs` — notes save on close, home screen, folder; 8/8.
 - `scripts/check-booth.mjs` — Phase 3; 22 checks, tablet + phone, offline.
 
 ## Verify (tested / NOT tested)

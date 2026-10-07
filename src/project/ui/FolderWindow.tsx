@@ -1,4 +1,5 @@
 import { calculateTotals, formatMoney } from '../../commission/calc';
+import { noteTitle, type Note } from '../../notes/notes';
 import type { CommissionDocument } from '../../commission/types';
 import type { Photo } from '../../photo/photo';
 import { describePhoto } from '../../photo/photo';
@@ -15,6 +16,10 @@ interface Props {
   onNewInvoice: () => void;
   onRemoveItem: (id: string) => void;
   photos: Photo[];
+  /** Notes filed here. A note is filed by pointing at the folder. */
+  notes: Note[];
+  onOpenNote: (id: string) => void;
+  onTakeOutNote: (note: Note) => void;
   imageUrls: Record<string, string>;
   onOpenPhoto: (id: string) => void;
 }
@@ -29,8 +34,8 @@ const NO_DEPOSIT = { kind: 'percent' as const, value: null };
  * desktop, and the row says so.
  */
 export function FolderWindow(props: Props) {
-  const { project, documents, invoices, photos } = props;
-  const empty = documents.length === 0 && invoices.length === 0 && photos.length === 0;
+  const { project, documents, invoices, photos, notes } = props;
+  const empty = documents.length === 0 && invoices.length === 0 && photos.length === 0 && notes.length === 0;
 
   return (
     <div className="folder-window">
@@ -48,7 +53,7 @@ export function FolderWindow(props: Props) {
         <div className="empty">
           <h3>This folder is empty</h3>
           <p>
-            Documents, invoices and pictures you file here show up in this window. Drag an icon
+            Documents, invoices, pictures and notes you file here show up in this window. Drag an icon
             onto the folder on the desktop, or use Add images above.
           </p>
         </div>
@@ -86,6 +91,32 @@ export function FolderWindow(props: Props) {
                 </li>
               );
             })}
+          </ul>
+        </>
+      )}
+
+      {notes.length > 0 && (
+        <>
+          <h3 className="folder-heading">Notes</h3>
+          <ul className="doc-list">
+            {notes.map((note) => (
+              <li key={note.id} className="doc-row" onDoubleClick={() => props.onOpenNote(note.id)} title="Double-click to open">
+                <span className="grow">
+                  <span className="name">{noteTitle(note)}</span>
+                  <br />
+                  <span className="num">Edited {note.updatedAt.slice(0, 10)}</span>
+                </span>
+                <button className="btn" onClick={() => props.onOpenNote(note.id)}>Open</button>
+                <button
+                  className="btn"
+                  data-variant="quiet"
+                  title="Move this note to the home screen. It is not deleted."
+                  onClick={() => props.onTakeOutNote(note)}
+                >
+                  Take out
+                </button>
+              </li>
+            ))}
           </ul>
         </>
       )}
