@@ -58,9 +58,8 @@
 
 ## Next (numbered)
 
-0. Owner asked for the studio AI assistant (Art-Talk-Back `studio-assistant`)
-   inside Artist OS. Needs sign-in + `/v1` binding like booth-studio — breaks
-   "no server, no sign-in": plan it with the owner first.
+0. Owner OK'd sign-in + studio assistant (2026-10-07, Art-Talk-Back D-078/D-079).
+   Plan: Art-Talk-Back `docs/phase-6-fineartos.md`. Next: its step 2 (platform).
 
 1. Phase 3 part 2: profile video for the loop (needs a stored file → DB v8
    or the images store; test v7→v8 with an old tab open); phone dock shows

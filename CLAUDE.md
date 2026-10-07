@@ -77,7 +77,9 @@ Trust its line; do not re-run the suite to confirm it.
   progress bar. Parchment (`--accent`) is the primary action.
 - Desktop, tablet and phone all have to work. Windows become full-screen
   sheets below 860px; the inspector folds away between 861 and 1180.
-- There is no billing and no sign-in yet. Nothing may imply either.
+- There is no billing. Nothing may imply it. Studio sign-in is approved (owner,
+  2026-10-07; Art-Talk-Back D-078) and being built — until it ships, nothing
+  may imply it. Signed out, the app must work exactly as before, offline.
 
 ## The codebase rule
 
