@@ -1,16 +1,15 @@
 # HANDOFF — baton only. Rules and commands live in `CLAUDE.md`.
 ## Goal
-
 - Artist OS: desktop-OS business suite for one artist. Browser-only, no server.
 - Build `BUILD_PLAN.md` phase by phase.
 
 ## Now
-
 - Tree green, 681 tests, IndexedDB v7 (unchanged). Phase 3 part 1 done.
-- First-load JS 99.2 KB gzip (terser). ~0.5 KB headroom: new code goes lazy.
+- First-load JS 99.6 KB gzip (terser). Headroom ~0.1 KB: new code MUST go lazy.
+- Notes fix (2026-10-07): typing autosaves (0.8 s + on close; blur alone lost
+  notes), Title field, Save button, "Keep it on" Notes only / Home screen / folder.
 
 ## Done
-
 - Phases 0–1: search box, tiling, hooks in `src/app/`, lazy tools
   (`app/lazyTools.tsx`), thumbnails backfilled by `useObjectUrls`.
 - Phase 2: v7 stores guests/notes/clients/contacts (`persistence/db.ts`).
@@ -28,7 +27,8 @@
   App returns only BoothMode while on; capture keydown holds shell keys/undo.
 
 ## Decisions (keep)
-
+- Note in a folder = `pin {kind:'project'}`; folder record holds no notes.
+  Home screen = optional `onDesktop`. Old notes stay Notes-only. No DB bump.
 - System bar search is the launcher; actions only when runnable (rule 8).
 - Snap keys Alt+Shift+arrows; tab keys Ctrl/⌘+Alt+arrows and Alt+1–9 work
   while typing (the sheet says so). G, / and ? only outside text fields.
@@ -47,18 +47,20 @@
   the entry chunk. Person id = first identity key; resolve via `personFor`.
 - Thumb mode never shows an original while its thumb is missing (200 full
   decodes = the stall). Blank tile until the backfill reaches it.
-
 - Booth on-flag persists: a reload must land back in the booth, not the studio.
 - Website panel only after the artist ticks "I can see my site" (no detection
   possible); otherwise the QR panel covers it.
 - Booth pieces = today's show pieceIds ∪ inCurrentShow, minus hidden.
 
 ## Dead ends (do not retry)
-
 - Two builds of one commit share `sw.js?v=` → SW never updates. Commit first.
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 
 ## Next (numbered)
+
+0. Owner asked for the studio AI assistant (Art-Talk-Back `studio-assistant`)
+   inside Artist OS. Needs sign-in + `/v1` binding like booth-studio — breaks
+   "no server, no sign-in": plan it with the owner first.
 
 1. Phase 3 part 2: profile video for the loop (needs a stored file → DB v8
    or the images store; test v7→v8 with an old tab open); phone dock shows
@@ -67,13 +69,12 @@
    (see `BUILD_PLAN.md` Phase 4).
 
 ## Files (path — why)
-
 - `src/app/*` — the hooks. `src/App.tsx` — wiring, `runAction`, render.
 - `scripts/check-clients-notes.mjs` — Phase 2; needs `OLD_DIST` (v6 build).
+- `scripts/check-notes-place.mjs` — notes save on close, home screen, folder; 8/8.
 - `scripts/check-booth.mjs` — Phase 3; 22 checks, tablet + phone, offline.
 
 ## Verify (tested / NOT tested)
-
 - Tested: unit 681; `check-booth` 22/22 (tablet+phone offline: no-PIN start
   blocked, loop, sign-up stored, QR, Ctrl+K held, wrong PIN, reload stays in
   booth, PIN out). NOT: website iframe on a real site, loop with real photos,
@@ -83,7 +84,6 @@
   deployed URL (proxy 403), 861–1000px, iOS print.
 
 ## Resume
-
 - Read `CLAUDE.md`, then only the Phase 3 section of `BUILD_PLAN.md`.
 - Booth code is all in `src/booth/`; setup is Connect's "Booth mode" tab.
 - Push to `main` (deploys) and to the session's `claude/*` branch if named.

@@ -82,7 +82,7 @@ import { ComingUp } from './os/ComingUp';
 import { addDays, comingUp } from './os/dashboard';
 import { followUpsDue } from './clients/followUps';
 import type { ImportedContact } from './clients/clients';
-import { checklistProgress, noteTitle, type Pin } from './notes/notes';
+import { checklistProgress, noteTitle, notesInFolder, notesOnDesktop, placeNote, type Pin } from './notes/notes';
 import { allOwed } from './finance/owed';
 import {
   addPiece,
@@ -779,6 +779,7 @@ export default function App() {
     ...photos
       .filter((photo) => !filedPhotos.has(photo.id))
       .map((photo) => ({ kind: 'photo' as const, id: photo.id, photo })),
+    ...notesOnDesktop(data.notes).map((note) => ({ kind: 'note' as const, id: note.id, note })),
   ];
 
   /** Which folder each filed item is in, for the Finder. */
@@ -857,6 +858,17 @@ export default function App() {
   const handleFileInto = async (folderId: string, itemId: string, quiet = false) => {
     const folders = await repo.listProjects();
     const folder = folders.find((p) => p.id === folderId);
+    // A note is filed by pointing it at the folder; the folder record holds no notes.
+    const storedNote = folder ? await repo.loadNote(itemId) : null;
+    if (folder && storedNote) {
+      await data.saveNote(placeNote(storedNote, { type: 'folder', id: folder.id }));
+      setDesktopLayout((current) => {
+        const { [itemId]: _gone, ...rest } = current;
+        return rest;
+      });
+      if (!quiet) setMessage(`Note filed into “${folder.name}”. Open the folder to see it.`);
+      return;
+    }
     // Never a folder into a folder, and never a folder into itself.
     if (!folder || folder.id === itemId || folders.some((p) => p.id === itemId)) return;
 
@@ -1355,6 +1367,8 @@ export default function App() {
       openDocumentWindow(item.id);
     } else if (item.kind === 'photo') {
       openPhotoWindow(item.id);
+    } else if (item.kind === 'note') {
+      openNotes({ id: item.id });
     } else {
       openInvoiceWindow(item.id);
     }
@@ -1986,6 +2000,14 @@ export default function App() {
           documents={rows.filter((row) => project.documentIds.includes(row.id)).map((r) => r.document)}
           invoices={invoices.filter((invoice) => project.invoiceIds.includes(invoice.id))}
           photos={photos.filter((photo) => (project.imageIds ?? []).includes(photo.id))}
+          notes={notesInFolder(data.notes, project.id)}
+          onOpenNote={(id) => openNotes({ id })}
+          onTakeOutNote={(note) => {
+            void data.saveNote(placeNote(note, { type: 'desktop' })).then(
+              () => setMessage('Note moved to the home screen. Nothing was deleted.'),
+              (cause) => setMessage(`The note could not be moved: ${String(cause)}`),
+            );
+          }}
           imageUrls={imageUrls}
           onOpenPhoto={openPhotoWindow}
           onOpenDocument={openDocumentWindow}
