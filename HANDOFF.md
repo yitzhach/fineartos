@@ -70,12 +70,12 @@
 - `src/app/*` — the hooks. `src/App.tsx` — wiring, `runAction`, render.
 - `scripts/check-clients-notes.mjs` — Phase 2; needs `OLD_DIST` (v6 build).
 - `src/studio/` — assistant: actions (device tools), snapshot, session hint, UI.
-- `scripts/check-assistant.mjs` — platform faked at network; 16/16.
+- `scripts/check-assistant.mjs` — platform faked at network; 19/19.
 - `scripts/check-notes-place.mjs` — notes save on close, home screen, folder; 8/8.
 - `scripts/check-booth.mjs` — Phase 3; 22 checks, tablet + phone, offline.
 
 ## Verify (tested / NOT tested)
-- Tested: unit 699; check-assistant 16/16 (real model/studio NOT tested); `check-booth` 22/22 (tablet+phone offline: no-PIN start
+- Tested: unit 701; check-assistant 19/19 (real model/studio NOT tested); `check-booth` 22/22 (tablet+phone offline: no-PIN start
   blocked, loop, sign-up stored, QR, Ctrl+K held, wrong PIN, reload stays in
   booth, PIN out). NOT: website iframe on a real site, loop with real photos,
   idle return timing by hand, full-screen on iPad.
