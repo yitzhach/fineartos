@@ -8,6 +8,10 @@
   // broken build when nothing is actually wrong with the build.
   "workers_dev": true,
 
+  // Only the studio platform's paths run the Worker; the app stays static
+  // assets (Art-Talk-Back D-078). worker/index.ts forwards them by binding.
+  "main": "worker/index.ts",
+
   // Build the app before any wrangler command that needs the output.
   //
   // This lives here rather than only in `npm run deploy` because Cloudflare
@@ -25,9 +29,17 @@
 
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/v1/*", "/assistant/*"],
     // The app is one page; anything else should still land on it rather than
     // a Cloudflare 404. The service worker and manifest are real files in
     // dist/, so they are served as themselves.
     "not_found_handling": "single-page-application"
-  }
+  },
+
+  // The studio's API and assistant, as Booth Studio binds them.
+  "services": [
+    { "binding": "API", "service": "studio-api" },
+    { "binding": "ASSISTANT", "service": "studio-assistant" }
+  ]
 }

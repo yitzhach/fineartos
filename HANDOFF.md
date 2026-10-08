@@ -5,7 +5,7 @@
 
 ## Now
 - Tree green, 681 tests, IndexedDB v7 (unchanged). Phase 3 part 1 done.
-- First-load JS 99.6 KB gzip (terser). Headroom ~0.1 KB: new code MUST go lazy.
+- First-load JS 97.7 KiB gzip (check-lazy-thumbs measures KiB; budget 100).
 - Notes fix (2026-10-07): typing autosaves (0.8 s + on close; blur alone lost
   notes), Title field, Save button, "Keep it on" Notes only / Home screen / folder.
 
@@ -27,6 +27,8 @@
   App returns only BoothMode while on; capture keydown holds shell keys/undo.
 
 ## Decisions (keep)
+- `/v1/*`, `/assistant/*` never cached by `sw.js` (live sign-in data).
+- Clients/Notes/Assistant render in the window body, not the toolbar.
 - Note in a folder = `pin {kind:'project'}`; folder record holds no notes.
   Home screen = optional `onDesktop`. Old notes stay Notes-only. No DB bump.
 - System bar search is the launcher; actions only when runnable (rule 8).
@@ -57,24 +59,24 @@
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 
 ## Next (numbered)
-
-0. Owner OK'd sign-in + studio assistant (2026-10-07, Art-Talk-Back D-078/D-079).
-   Plan: Art-Talk-Back `docs/phase-6-fineartos.md`. Next: its step 2 (platform).
-
+0. Studio sign-in + Assistant built (Art-Talk-Back phase-6 steps 3–6). Live chat
+   needs Art-Talk-Back#37 merged + owner's "Deploy production assistant" run.
+   Then: try it on the live site; add commission/invoice draft actions.
 1. Phase 3 part 2: profile video for the loop (needs a stored file → DB v8
    or the images store; test v7→v8 with an old tab open); phone dock shows
    fewer items (audit 14). Check booth likes with a real show piece (script has none).
 2. Then Phase 4 — Visualizer scope settled: true size + perspective + lighting
    (see `BUILD_PLAN.md` Phase 4).
-
 ## Files (path — why)
 - `src/app/*` — the hooks. `src/App.tsx` — wiring, `runAction`, render.
 - `scripts/check-clients-notes.mjs` — Phase 2; needs `OLD_DIST` (v6 build).
+- `src/studio/` — assistant: actions (device tools), snapshot, session hint, UI.
+- `scripts/check-assistant.mjs` — platform faked at network; 16/16.
 - `scripts/check-notes-place.mjs` — notes save on close, home screen, folder; 8/8.
 - `scripts/check-booth.mjs` — Phase 3; 22 checks, tablet + phone, offline.
 
 ## Verify (tested / NOT tested)
-- Tested: unit 681; `check-booth` 22/22 (tablet+phone offline: no-PIN start
+- Tested: unit 699; check-assistant 16/16 (real model/studio NOT tested); `check-booth` 22/22 (tablet+phone offline: no-PIN start
   blocked, loop, sign-up stored, QR, Ctrl+K held, wrong PIN, reload stays in
   booth, PIN out). NOT: website iframe on a real site, loop with real photos,
   idle return timing by hand, full-screen on iPad.

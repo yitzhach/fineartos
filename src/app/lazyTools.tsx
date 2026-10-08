@@ -73,6 +73,7 @@ export const UpdatesPane = lazyTool('Client updates', () => import('../commissio
 export const PhotoWindow = lazyTool('Photos', () => import('../photo/ui/PhotoWindow').then((m) => m.PhotoWindow));
 export const PicturePreview = lazyTool('The picture', () => import('../photo/ui/PicturePreview').then((m) => m.PicturePreview));
 export const ProjectWindow = lazyTool('The commission', () => import('../commission/ui/ProjectWindow').then((m) => m.ProjectWindow));export const ClientsTool = lazyTool('Clients', () => import('./PeopleTools').then((m) => m.ClientsTool));
+export const AssistantTool = lazyTool('The assistant', () => import('../studio/ui/AssistantTool').then((m) => m.AssistantTool));
 export const NotesTool = lazyTool('Notes', () => import('./PeopleTools').then((m) => m.NotesTool));
 export const QuickCapture = lazyTool('Quick capture', () => import('./QuickCapture').then((m) => m.QuickCapture));
 export const BoothMode = lazyTool('Booth mode', () => import('../booth/ui/BoothMode').then((m) => m.BoothMode));

@@ -26,6 +26,7 @@ export type IconName =
   | 'finance'
   | 'clients'
   | 'notes'
+  | 'assistant'
   | 'eye'
   | 'eye-off'
   | 'trash';
@@ -185,6 +186,14 @@ const paths: Record<IconName, JSX.Element> = {
       <path d="M5.6 3.8h9.2l3.6 3.6v12.8H5.6z" />
       <path d="M14.8 3.8v3.6h3.6" />
       <path d="M8.4 11.6h7.2M8.4 15.2h5" />
+    </>
+  ),
+
+  // A speech bubble with a spark: ask the studio assistant.
+  assistant: (
+    <>
+      <path d="M4.4 5.6h15.2v10H11l-4.4 3.6v-3.6H4.4z" />
+      <path d="M12 8.2v4.4M9.8 10.4h4.4" />
     </>
   ),
 
