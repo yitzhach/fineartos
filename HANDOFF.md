@@ -53,7 +53,6 @@
 - Website panel only after the artist ticks "I can see my site" (no detection
   possible); otherwise the QR panel covers it.
 - Booth pieces = today's show pieceIds ∪ inCurrentShow, minus hidden.
-
 ## Dead ends (do not retry)
 - Two builds of one commit share `sw.js?v=` → SW never updates. Commit first.
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
