@@ -58,9 +58,8 @@
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 
 ## Next (numbered)
-0. Studio sign-in + Assistant built (Art-Talk-Back phase-6 steps 3–6). Live chat
-   needs Art-Talk-Back#37 merged + owner's "Deploy production assistant" run.
-   Then: try it on the live site; add commission/invoice draft actions.
+0. Live since 2026-10-08 (fineartos#2; prod assistant redeployed). Ask owner how it
+   went; fix. Then commission/invoice draft device actions (`src/studio/`).
 1. Phase 3 part 2: profile video for the loop (needs a stored file → DB v8
    or the images store; test v7→v8 with an old tab open); phone dock shows
    fewer items (audit 14). Check booth likes with a real show piece (script has none).
