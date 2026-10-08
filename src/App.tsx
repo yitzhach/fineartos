@@ -118,7 +118,7 @@ import {
   loadWindows,
   type WallpaperChoice,
 } from './lib/prefs';
-import type { StudioRecords as AssistantRecords } from './studio/snapshot';
+import type { StudioRecords as AssistantRecords, CommissionFill } from './studio/snapshot';
 import { usePrefs } from './app/usePrefs';
 import {
   ArtworkWindow,
@@ -404,6 +404,26 @@ export default function App() {
     open({ type: 'commission', docId: doc.id }, 'Commission Studio', doc.documentNumber);
   };
 
+  /** The assistant's commission_draft: "New commission" with fields filled, maybe filed. */
+  const newCommissionFor = async (fill: CommissionFill, folderId: string | null): Promise<string> => {
+    const numbers = rows.map((row) => row.document.documentNumber);
+    let doc = createDocument(nextDocumentNumber(numbers, new Date().getFullYear()));
+    const line = doc.quote.lineItems[0]!;
+    doc = {
+      ...doc,
+      title: fill.title,
+      studio: { ...doc.studio, ...studio },
+      client: { ...doc.client, name: fill.clientName, email: fill.clientEmail },
+      artwork: { ...doc.artwork, description: fill.description },
+      quote: { ...doc.quote, lineItems: [{ ...line, description: fill.title, unitPrice: fill.priceCents ?? line.unitPrice }] },
+    };
+    await save(doc);
+    const folder = folderId ? projects.find((p) => p.id === folderId) : undefined;
+    if (folder) await saveProjectRecord(addDocumentToProject(folder, doc.id));
+    open({ type: 'commission', docId: doc.id }, 'Commission Studio', doc.documentNumber);
+    return doc.documentNumber;
+  };
+
   const handleChange = async (docId: string, changes: Partial<CommissionDocument>) => {
     const doc = docById(docId);
     if (!doc) return;
@@ -510,7 +530,11 @@ export default function App() {
 
   // --- Invoices -----------------------------------------------------------
 
-  const makeInvoice = async (fromDocument: CommissionDocument | null, project: Project | null) => {
+  const makeInvoice = async (
+    fromDocument: CommissionDocument | null,
+    project: Project | null,
+    fill?: (invoice: Invoice) => Invoice,
+  ): Promise<string> => {
     const number = nextInvoiceNumber(
       invoices.map((i) => i.invoiceNumber),
       new Date().getFullYear(),
@@ -520,6 +544,7 @@ export default function App() {
       : createBlankInvoice(number, payment);
 
     if (!fromDocument) invoice = { ...invoice, studio: { ...invoice.studio, ...studio } };
+    if (fill) invoice = fill(invoice);
 
     const folder = project ?? (fromDocument ? projectContaining(fromDocument.id) : null);
     if (folder) {
@@ -538,6 +563,7 @@ export default function App() {
         ? `Invoice ${invoice.invoiceNumber} created from ${fromDocument.documentNumber}. Editing the commission from here on will not change it.`
         : `Invoice ${invoice.invoiceNumber} created.`,
     );
+    return invoice.invoiceNumber;
   };
 
   const logoDataUrlFor = useCallback(
@@ -2278,6 +2304,20 @@ export default function App() {
             newFolder: (name) => handleNewFolder(name),
             fileInto: (folderId, itemId) => handleFileInto(folderId, itemId),
             trash: (id) => handleTrash(id),
+            newCommission: newCommissionFor,
+            newInvoice: (fromId, fill, folderId) => {
+              const fromDoc = fromId ? docById(fromId) : null;
+              if (fromId && !fromDoc) return Promise.reject(new Error('That commission is no longer here.'));
+              const folder = folderId ? projects.find((p) => p.id === folderId) ?? null : null;
+              return makeInvoice(fromDoc, folder, fromDoc ? undefined : (inv) => {
+                const line = inv.quote.lineItems[0]!;
+                return {
+                  ...inv,
+                  client: { ...inv.client, name: fill.clientName },
+                  quote: { ...inv.quote, lineItems: [{ ...line, description: fill.description, unitPrice: fill.amountCents ?? line.unitPrice }] },
+                };
+              });
+            },
           }}
           openPlace={(place, control) => {
             const p = place.trim().toLowerCase();

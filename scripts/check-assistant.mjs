@@ -52,7 +52,11 @@ await ctx.route(/\/(v1|assistant)\//, async (route) => {
     const body = req.postDataJSON();
     chats.push(body);
     const folder = /Folders: ([^\n,]+)/.exec(body.appMap)?.[1] ?? '';
-    const events = /books/.test(body.message)
+    const events = /commission/.test(body.message)
+      ? [{ type: 'device', id: 'toolu_2', name: 'commission_draft', input: { title: 'Harbour mural', client_name: 'Ana', price: 1200, folder }, summary: 'Commission draft' }, { type: 'end', reason: 'end_turn' }]
+      : /invoice/.test(body.message)
+      ? [{ type: 'device', id: 'toolu_3', name: 'invoice_draft', input: { client_name: 'Ben', description: 'Print', amount: 85 }, summary: 'Invoice draft' }, { type: 'end', reason: 'end_turn' }]
+      : /books/.test(body.message)
       ? [{ type: 'open', place: 'Dock', control: 'Finance' }, { type: 'text', text: 'The books are open.' }, { type: 'end', reason: 'end_turn' }]
       : [{ type: 'device', id: 'toolu_1', name: 'note_create', input: { title: 'Framing quote', checklist: ['Measure'], keep_on: 'folder', folder }, summary: `Note “Framing quote” in ${folder}` }, { type: 'end', reason: 'end_turn' }];
     return route.fulfill({ status: 200, contentType: 'text/event-stream', body: sse(events) });
@@ -85,7 +89,7 @@ await win().getByLabel('Ask the assistant').press('Enter'); await wait(1500);
 const titles = await page.locator('.frame .frame-title, .frame [class*="title"]').allInnerTexts();
 check('the reply opened Finance', titles.some((t) => /Finance/.test(t)), titles.slice(0, 6).join(' | '));
 const sent = chats[0] ?? {};
-check('the chat sent device actions, the map and the snapshot', sent.app === 'fineartos' && sent.deviceActions?.length === 5 && /Dock: .*Notes/.test(sent.appMap ?? '') && /Folders:/.test(sent.appData ?? ''));
+check('the chat sent device actions, the map and the snapshot', sent.app === 'fineartos' && sent.deviceActions?.length === 7 && /Dock: .*Notes/.test(sent.appMap ?? '') && /Folders:/.test(sent.appData ?? ''));
 
 await page.locator('.dock button[title="Assistant"]').click(); await wait(800);
 if (!(await win().getByLabel('Ask the assistant').count())) { await page.locator('.dock button[title="Assistant"]').click(); await wait(800); }
@@ -113,6 +117,34 @@ check('the second tab saw no database problem', (await other.locator('.db-proble
 
 await page.locator('.dock button[title="Assistant"]').click(); await wait(1500);
 check('still signed in after a reload', await win().getByLabel('Ask the assistant').count() === 1);
+
+const records = (store) => page.evaluate(async (store) => {
+  const db = await new Promise((r) => { const q = indexedDB.open('artist-os'); q.onsuccess = () => r(q.result); });
+  const all = await new Promise((r) => { const q = db.transaction(store).objectStore(store).getAll(); q.onsuccess = () => r(q.result); });
+  db.close(); return all.map((r) => r.document ?? r.project ?? r.invoice ?? r);
+}, store);
+const ask = async (text) => {
+  if (!(await win().getByLabel('Ask the assistant').count())) { await page.locator('.dock button[title="Assistant"]').click(); await wait(800); }
+  await win().getByLabel('Ask the assistant').fill(text);
+  await win().getByLabel('Ask the assistant').press('Enter'); await wait(1500);
+};
+const confirmCard = async () => {
+  if (!(await win().getByRole('button', { name: 'Confirm' }).count())) { await page.locator('.dock button[title="Assistant"]').click(); await wait(800); }
+  await win().getByRole('button', { name: 'Confirm' }).click(); await wait(1500);
+};
+const docsBefore = (await records('documents')).length;
+await ask('start a commission for Ana, harbour mural, 1200');
+await confirmCard();
+const docs = await records('documents');
+const mural = docs.find((d) => d.title === 'Harbour mural');
+check('Confirm made one commission draft with the price', docs.length === docsBefore + 1 && mural?.state === 'draft' && mural?.client?.name === 'Ana' && mural?.quote?.lineItems?.[0]?.unitPrice === 120000, JSON.stringify(mural ?? docs.at(-1))?.slice(0, 300));
+const filedIn = (await records('projects')).find((p) => p.name === folderName);
+check('the commission is filed in the folder', Boolean(mural && filedIn?.documentIds?.includes(mural.id)));
+await ask('make an invoice for Ben, a print, 85 dollars');
+await confirmCard();
+const inv = (await records('invoices')).find((i) => i.client?.name === 'Ben');
+check('Confirm made an invoice draft with the amount', inv?.state === 'draft' && inv?.quote?.lineItems?.[0]?.unitPrice === 8500, JSON.stringify(inv ?? null)?.slice(0, 300));
+if (!(await win().getByRole('button', { name: 'Sign out' }).count())) { await page.locator('.dock button[title="Assistant"]').click(); await wait(800); }
 await win().getByRole('button', { name: 'Sign out' }).click(); await wait(800);
 check('sign out goes back to sign-in', await win().getByText('Sign in to your studio').count() === 1);
 check('no page errors', errors.length === 0, errors.join(' | '));

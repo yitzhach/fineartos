@@ -58,8 +58,9 @@
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 
 ## Next (numbered)
-0. Live since 2026-10-08 (fineartos#2; prod assistant redeployed). Ask owner how it
-   went; fix. Then commission/invoice draft device actions (`src/studio/`).
+0. Assistant live; owner tested note-in-folder 2026-10-08: all worked. Draft actions
+   `commission_draft` / `invoice_draft` added (7 device actions; drafts only,
+   price null unless said, optional folder) — check on the live site with owner.
 1. Phase 3 part 2: profile video for the loop (needs a stored file → DB v8
    or the images store; test v7→v8 with an old tab open); phone dock shows
    fewer items (audit 14). Check booth likes with a real show piece (script has none).

@@ -52,6 +52,20 @@ describe('device actions', () => {
     expect(resolveAction('empty_trash', {}, snap).ok).toBe(false);
   });
 
+  it('starts drafts: price only when said, folder and commission must exist', () => {
+    expect(resolveAction('commission_draft', { title: 'Mural', client_name: 'Ana', price: 1200.5, folder: 'harbour' }, snap)).toEqual({
+      ok: true, op: { type: 'commission-draft', title: 'Mural', clientName: 'Ana', clientEmail: null, description: '', priceCents: 120050, folderId: 'f1' },
+    });
+    const r = resolveAction('commission_draft', { title: 'Mural' }, snap);
+    expect(r.ok && r.op.type === 'commission-draft' && r.op.priceCents).toBeNull();
+    expect(resolveAction('commission_draft', { title: ' ' }, snap).ok).toBe(false);
+    expect(resolveAction('invoice_draft', { from_commission_id: 'd1' }, snap)).toEqual({
+      ok: true, op: { type: 'invoice-draft', fromCommissionId: 'd1', clientName: '', description: '', amountCents: null, folderId: null },
+    });
+    expect(resolveAction('invoice_draft', { from_commission_id: 'i1' }, snap).ok).toBe(false);
+    expect(resolveAction('invoice_draft', { amount: 50, folder: 'Nope' }, snap).ok).toBe(false);
+  });
+
   it('describes the device and its map', () => {
     const text = snapshotText(snap);
     expect(text).toContain('“Harbour” (id f1): commission “Harbour triptych” (id d1)');

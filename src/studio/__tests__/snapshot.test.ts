@@ -29,7 +29,7 @@ describe('the assistant snapshot', () => {
 });
 
 describe('running a confirmed operation', () => {
-  const handlers = () => ({ saveNote: vi.fn(async (_note: unknown) => {}), newFolder: vi.fn(async (_name: string) => {}), fileInto: vi.fn(async (_f: string, _i: string) => {}), trash: vi.fn((_id: string) => {}) });
+  const handlers = () => ({ saveNote: vi.fn(async (_note: unknown) => {}), newFolder: vi.fn(async (_name: string) => {}), fileInto: vi.fn(async (_f: string, _i: string) => {}), trash: vi.fn((_id: string) => {}), newCommission: vi.fn(async (_fill: unknown, _folder: string | null) => 'C-9'), newInvoice: vi.fn(async (_from: string | null, _fill: unknown, _folder: string | null) => 'INV-9') });
 
   it('creates a titled note with a checklist in a folder', async () => {
     const h = handlers();
@@ -50,5 +50,15 @@ describe('running a confirmed operation', () => {
     expect(h.newFolder).toHaveBeenCalledWith('Spring');
     expect(h.fileInto).toHaveBeenCalledWith('f1', 'i1');
     expect(h.trash).toHaveBeenCalledWith('d2');
+  });
+
+  it('starts commission and invoice drafts through the shell, saying nothing was sent', async () => {
+    const h = handlers();
+    const c = await runOp({ type: 'commission-draft', title: 'Harbour mural', clientName: 'Ana', clientEmail: null, description: 'Wall', priceCents: 120000, folderId: 'f1' }, records, h);
+    expect(h.newCommission).toHaveBeenCalledWith({ title: 'Harbour mural', clientName: 'Ana', clientEmail: null, description: 'Wall', priceCents: 120000 }, 'f1');
+    expect(c).toBe('Commission C-9 “Harbour mural” started as a draft in the folder “Harbour”. Nothing was sent.');
+    const i = await runOp({ type: 'invoice-draft', fromCommissionId: 'd1', clientName: '', description: '', amountCents: null, folderId: null }, records, h);
+    expect(h.newInvoice).toHaveBeenCalledWith('d1', { clientName: '', description: '', amountCents: null }, null);
+    expect(i).toBe('Invoice INV-9 started as a draft. Nothing was issued or sent.');
   });
 });

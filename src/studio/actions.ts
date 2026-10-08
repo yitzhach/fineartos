@@ -32,7 +32,9 @@ export type DeviceOp =
   | { type: 'note-edit'; id: string; title?: string; text?: string; addItems: string[]; keepOn?: KeepOn }
   | { type: 'folder-create'; name: string }
   | { type: 'file-into'; itemId: string; folderId: string }
-  | { type: 'trash'; itemId: string };
+  | { type: 'trash'; itemId: string }
+  | { type: 'commission-draft'; title: string; clientName: string; clientEmail: string | null; description: string; priceCents: number | null; folderId: string | null }
+  | { type: 'invoice-draft'; fromCommissionId: string | null; clientName: string; description: string; amountCents: number | null; folderId: string | null };
 
 const str = { type: 'string', maxLength: 2000 } as const;
 const keepOn = {
@@ -95,6 +97,38 @@ export const DEVICE_ACTIONS = [
     name: 'move_to_trash',
     description: 'Move a commission, invoice, picture, note or folder (by id) to the Trash. It is not deleted; the artist can put it back. The Trash can never be emptied from here.',
     inputSchema: { type: 'object', properties: { item_id: { type: 'string', maxLength: 60 } }, required: ['item_id'], additionalProperties: false },
+  },
+  {
+    name: 'commission_draft',
+    description: 'Start a new commission as a draft (nothing is issued or sent): title, client, what the artwork is, and a price in dollars only if the artist said one. Optionally filed into a folder.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', maxLength: 200 },
+        client_name: { type: 'string', maxLength: 200 },
+        client_email: { type: 'string', maxLength: 200 },
+        description: str,
+        price: { type: 'number', minimum: 0, maximum: 10000000, description: 'Dollars; leave out if not said' },
+        folder,
+      },
+      required: ['title'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'invoice_draft',
+    description: 'Start a new invoice as a draft (nothing is issued or sent). Either from a commission (by its id in app_data; its client and lines carry over) or blank with a client, a line and an amount in dollars only if the artist said one. Optionally filed into a folder.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        from_commission_id: { type: 'string', maxLength: 60 },
+        client_name: { type: 'string', maxLength: 200 },
+        description: { type: 'string', maxLength: 500 },
+        amount: { type: 'number', minimum: 0, maximum: 10000000, description: 'Dollars; leave out if not said' },
+        folder,
+      },
+      additionalProperties: false,
+    },
   },
 ] as const;
 
@@ -179,6 +213,26 @@ export function resolveAction(
       const item = allItems(snapshot).find((i) => i.id === clean(input.item_id, 60));
       if (!item) return fail('That item is no longer here.');
       return { ok: true, op: { type: 'trash', itemId: item.id } };
+    }
+    case 'commission_draft':
+    case 'invoice_draft': {
+      let folderId: string | null = null;
+      const folderName = clean(input.folder, 200);
+      if (folderName) {
+        const found = findFolder(snapshot, folderName);
+        if (!found) return fail(`There is no folder called “${folderName}”.`);
+        folderId = found.id;
+      }
+      const money = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v * 100) : null);
+      if (name === 'commission_draft') {
+        const title = clean(input.title, 200);
+        if (!title) return fail('A commission needs a title.');
+        const email = clean(input.client_email, 200);
+        return { ok: true, op: { type: 'commission-draft', title, clientName: clean(input.client_name, 200), clientEmail: email || null, description: clean(input.description, 2000), priceCents: money(input.price), folderId } };
+      }
+      const fromId = clean(input.from_commission_id, 60);
+      if (fromId && !allItems(snapshot).some((i) => i.id === fromId && i.kind === 'commission')) return fail('That commission is no longer here.');
+      return { ok: true, op: { type: 'invoice-draft', fromCommissionId: fromId || null, clientName: clean(input.client_name, 200), description: clean(input.description, 500), amountCents: money(input.amount), folderId } };
     }
     default:
       return fail(`Artist OS has no action called ${name}.`);
