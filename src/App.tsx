@@ -17,7 +17,7 @@ import { autoArrange, pruneLayout, trashPositionOf } from './os/desktopLayout';
 import { BuildStamp } from './os/BuildStamp';
 import { AppRail, type RailItem } from './os/AppRail';
 import { MOCK_TOOL_NAMES } from './os/mock/names';
-import { registerModule, registerPlannedModules } from './os/registry';
+import { listModules, registerModule, registerPlannedModules } from './os/registry';
 import { renderGroups, topZ, type WindowKind, type WindowState } from './os/windows';
 import { openingWindows } from './os/startup';
 import { isApplePlatform, keyNames, keyText, undoKeys } from './os/keys';
@@ -118,12 +118,14 @@ import {
   loadWindows,
   type WallpaperChoice,
 } from './lib/prefs';
+import type { StudioRecords as AssistantRecords } from './studio/snapshot';
 import { usePrefs } from './app/usePrefs';
 import {
   ArtworkWindow,
   QuickCapture,
   ClientsTool,
   NotesTool,
+  AssistantTool,
   Connect,
   ClientPreview,
   DocumentList,
@@ -186,6 +188,7 @@ registerModule({ id: 'shows', name: 'Shows', icon: 'shows', available: true, gro
 registerModule({ id: 'finance', name: 'Finance', icon: 'finance', available: true, group: 'tool' });
 registerModule({ id: 'clients', name: 'Clients', icon: 'clients', available: true, group: 'tool' });
 registerModule({ id: 'notes', name: 'Notes', icon: 'notes', available: true, group: 'tool' });
+registerModule({ id: 'assistant', name: 'Assistant', icon: 'assistant', available: true, group: 'tool' });
 // Last in the dock, the way the Trash is always last.
 registerModule({ id: 'trash', name: 'Trash', icon: 'trash', available: true, group: 'trash' });
 
@@ -782,6 +785,18 @@ export default function App() {
     ...notesOnDesktop(data.notes).map((note) => ({ kind: 'note' as const, id: note.id, note })),
   ];
 
+  /** The assistant reads the studio at the moment it asks or a card is confirmed. */
+  const assistantRecords = useRef<AssistantRecords>(null as unknown as AssistantRecords);
+  assistantRecords.current = {
+    projects,
+    documents: rows.map((row) => ({ id: row.id, title: row.document.title, documentNumber: row.document.documentNumber, archived: row.document.state === 'archived' })),
+    invoices,
+    photos,
+    notes: data.notes,
+    tools: listModules().filter((m) => m.available && m.group !== 'later').map((m) => m.name),
+    open: windows.map((w) => w.title),
+  };
+
   /** Which folder each filed item is in, for the Finder. */
   const folderOf: Record<string, string> = {};
   for (const project of projects) {
@@ -835,10 +850,10 @@ export default function App() {
     setMessage(`Desktop tidied up. ${undoKeys(apple)} puts it back.`);
   };
 
-  const handleNewFolder = async () => {
+  const handleNewFolder = async (wanted?: string) => {
     const taken = new Set(projects.map((p) => p.name));
-    let name = 'New folder';
-    for (let n = 2; taken.has(name); n += 1) name = `New folder ${n}`;
+    let name = wanted?.trim() || 'New folder';
+    for (let n = 2; taken.has(name); n += 1) name = `${wanted?.trim() || 'New folder'} ${n}`;
     const folder = createProject(name, null);
     await saveProjectRecord(folder);
     // Undoing a brand new folder removes it. It is empty by definition, so
@@ -1413,6 +1428,8 @@ export default function App() {
         return { kind: { type: 'tool', tool: 'clients' }, title: 'Clients', subtitle: 'Everyone, from every record' };
       case 'notes':
         return { kind: { type: 'tool', tool: 'notes' }, title: 'Notes', subtitle: 'Notes and checklists' };
+      case 'assistant':
+        return { kind: { type: 'tool', tool: 'assistant' }, title: 'Assistant', subtitle: 'Ask your studio' };
       default:
         return { kind: { type: 'tool', tool: id }, title: MOCK_TOOL_NAMES[id] ?? id, subtitle: 'Preview' };
     }
@@ -1835,14 +1852,6 @@ export default function App() {
       );
     }
 
-    if (kind.type === 'tool' && kind.tool === 'clients') {
-      return <ClientsTool records={peopleRecords} actions={peopleActions} focus={clientFocus} />;
-    }
-
-    if (kind.type === 'tool' && kind.tool === 'notes') {
-      return <NotesTool records={peopleRecords} actions={peopleActions} focus={noteFocus} />;
-    }
-
     if (kind.type === 'tool' && kind.tool === 'artwork') {
       return (
         <span className="faint" style={{ fontSize: 12 }}>
@@ -1874,6 +1883,9 @@ export default function App() {
         </>
       );
     }
+
+    // Built tools that draw their own bar have none here.
+    if (kind.type === 'tool' && ['clients', 'notes', 'assistant'].includes(kind.tool)) return null;
 
     // Only the mock tools carry this. A built tool saying it saves nothing
     // would be a lie about the Finder, which files things for real.
@@ -2244,6 +2256,42 @@ export default function App() {
           onRenameFolder={(folderId, name) => {
             const project = projects.find((p) => p.id === folderId);
             if (project) void saveProjectRecord(renameProject(project, name));
+          }}
+        />
+      );
+    }
+
+    if (kind.type === 'tool' && kind.tool === 'clients') {
+      return <ClientsTool records={peopleRecords} actions={peopleActions} focus={clientFocus} />;
+    }
+
+    if (kind.type === 'tool' && kind.tool === 'notes') {
+      return <NotesTool records={peopleRecords} actions={peopleActions} focus={noteFocus} />;
+    }
+
+    if (kind.type === 'tool' && kind.tool === 'assistant') {
+      return (
+        <AssistantTool
+          records={() => assistantRecords.current}
+          handlers={{
+            saveNote: data.saveNote,
+            newFolder: (name) => handleNewFolder(name),
+            fileInto: (folderId, itemId) => handleFileInto(folderId, itemId),
+            trash: (id) => handleTrash(id),
+          }}
+          openPlace={(place, control) => {
+            const p = place.trim().toLowerCase();
+            const c = control?.trim().toLowerCase() ?? '';
+            if (p === 'folders') {
+              const folder = projects.find((f) => f.name.toLowerCase() === c);
+              if (folder) open({ type: 'folder', projectId: folder.id }, folder.name, 'Project folder');
+            } else if (p === 'notes') {
+              const note = data.notes.find((n) => noteTitle(n).toLowerCase() === c);
+              openNotes(note ? { id: note.id } : undefined);
+            } else {
+              const id = listModules().find((m) => m.available && m.name.toLowerCase() === c)?.id;
+              if (id) openTool(id);
+            }
           }}
         />
       );

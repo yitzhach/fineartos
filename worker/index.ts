@@ -1,5 +1,11 @@
+interface Fetcher {
+  fetch(r: Request): Promise<Response>;
+}
 interface Env {
-  ASSETS: { fetch(r: Request): Promise<Response> };
+  ASSETS: Fetcher;
+  /** studio-api and studio-assistant, by service binding (Art-Talk-Back D-078). */
+  API?: Fetcher;
+  ASSISTANT?: Fetcher;
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
   IMAGES?: {
@@ -14,9 +20,31 @@ interface Env {
 }
 const json = (v: unknown, status = 200) =>
   Response.json(v, { status, headers: { "Cache-Control": "no-store" } });
+/**
+ * The studio platform on this origin, so its session cookie is first-party
+ * and nothing needs CORS: `/v1/*` goes to studio-api, `/assistant/*` to
+ * studio-assistant. Only these paths run this Worker first (wrangler.jsonc);
+ * everything else is the static app, exactly as before. A copy with no
+ * binding, or a platform that is down, answers 503 in the API's error shape
+ * and the app carries on offline.
+ */
+async function forward(request: Request, target: Fetcher | undefined, what: string): Promise<Response> {
+  const down = (message: string) =>
+    Response.json({ error: { code: 'unavailable', message } }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+  if (!target) return down(`The ${what} isn't connected to this copy of Artist OS.`);
+  try {
+    return await target.fetch(request);
+  } catch {
+    return down(`The ${what} can't be reached just now.`);
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith('/v1/')) return forward(request, env.API, 'studio');
+    if (url.pathname === '/assistant/status') return Response.json({ available: Boolean(env.ASSISTANT && env.API) }, { headers: { 'Cache-Control': 'no-store' } });
+    if (url.pathname.startsWith('/assistant/')) return forward(request, env.ASSISTANT, 'assistant');
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
     if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY)
       return json({ error: "Cloud sync unavailable" }, 503);

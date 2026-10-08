@@ -4326,3 +4326,23 @@ fieldset.section > legend {
 .booth-likes legend { margin-bottom: 6px; }
 .booth-likes .btn { flex-direction: column; gap: 4px; padding: 6px; max-width: 120px; white-space: normal; }
 .booth-likes img { width: 100px; height: 100px; object-fit: cover; border-radius: 6px; }
+
+/* The studio assistant (src/studio/ui). */
+.as-pad { padding: 16px; }
+.as-signin { display: flex; flex-direction: column; gap: 12px; max-width: 420px; }
+.as-window { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 12px 16px; gap: 10px; }
+.as-log { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.as-you, .as-reply { margin: 0; padding: 8px 12px; border-radius: 12px; max-width: 85%; white-space: pre-wrap; overflow-wrap: anywhere; }
+.as-you { align-self: flex-end; background: var(--accent); color: var(--accent-ink, inherit); }
+.as-reply { align-self: flex-start; background: var(--surface-2, rgba(0, 0, 0, 0.05)); }
+.as-card { border: 1px solid var(--line, rgba(0, 0, 0, 0.15)); border-radius: 12px; padding: 10px 12px; }
+.as-card h4 { margin: 0 0 4px; font-size: 13px; }
+.as-card p { margin: 0 0 8px; }
+.as-card dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0 0 8px; font-size: 13px; }
+.as-card dl div { display: contents; }
+.as-card dd { margin: 0; }
+.as-card[data-state='done'], .as-card[data-state='cancelled'] { opacity: 0.75; }
+.as-error { color: var(--danger, #a33); margin: 0; }
+.as-form { display: flex; gap: 8px; align-items: flex-end; }
+.as-form textarea { flex: 1; min-width: 0; font: inherit; resize: vertical; }
+.as-foot { margin: 0; font-size: 12px; }
