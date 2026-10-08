@@ -58,8 +58,9 @@
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 
 ## Next (numbered)
-0. Live since 2026-10-08 (fineartos#2; prod assistant redeployed). Ask owner how it
-   went; fix. Then commission/invoice draft device actions (`src/studio/`).
+0. Assistant live; owner tested note-in-folder 2026-10-08: all worked. Draft actions
+   `commission_draft` / `invoice_draft` added (7 device actions; drafts only,
+   price null unless said, optional folder) — check on the live site with owner.
 1. Phase 3 part 2: profile video for the loop (needs a stored file → DB v8
    or the images store; test v7→v8 with an old tab open); phone dock shows
    fewer items (audit 14). Check booth likes with a real show piece (script has none).
@@ -69,12 +70,12 @@
 - `src/app/*` — the hooks. `src/App.tsx` — wiring, `runAction`, render.
 - `scripts/check-clients-notes.mjs` — Phase 2; needs `OLD_DIST` (v6 build).
 - `src/studio/` — assistant: actions (device tools), snapshot, session hint, UI.
-- `scripts/check-assistant.mjs` — platform faked at network; 16/16.
+- `scripts/check-assistant.mjs` — platform faked at network; 19/19.
 - `scripts/check-notes-place.mjs` — notes save on close, home screen, folder; 8/8.
 - `scripts/check-booth.mjs` — Phase 3; 22 checks, tablet + phone, offline.
 
 ## Verify (tested / NOT tested)
-- Tested: unit 699; check-assistant 16/16 (real model/studio NOT tested); `check-booth` 22/22 (tablet+phone offline: no-PIN start
+- Tested: unit 701; check-assistant 19/19 (real model/studio NOT tested); `check-booth` 22/22 (tablet+phone offline: no-PIN start
   blocked, loop, sign-up stored, QR, Ctrl+K held, wrong PIN, reload stays in
   booth, PIN out). NOT: website iframe on a real site, loop with real photos,
   idle return timing by hand, full-screen on iPad.

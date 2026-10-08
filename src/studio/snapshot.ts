@@ -22,7 +22,14 @@ export interface StudioHandlers {
   newFolder: (name: string) => Promise<void>;
   fileInto: (folderId: string, itemId: string) => Promise<void>;
   trash: (itemId: string) => Promise<void> | void;
+  /** Makes a draft the way "New commission" does, with these fields filled; returns its number. */
+  newCommission: (fill: CommissionFill, folderId: string | null) => Promise<string>;
+  /** Makes a draft the way "New invoice" / "Create invoice" does; returns its number. */
+  newInvoice: (fromCommissionId: string | null, fill: InvoiceFill, folderId: string | null) => Promise<string>;
 }
+
+export interface CommissionFill { title: string; clientName: string; clientEmail: string | null; description: string; priceCents: number | null }
+export interface InvoiceFill { clientName: string; description: string; amountCents: number | null }
 
 export function buildSnapshot(r: StudioRecords): Snapshot {
   const docName = (d: StudioRecords['documents'][number]) => d.title.trim() || d.documentNumber;
@@ -83,5 +90,14 @@ export async function runOp(op: DeviceOp, r: StudioRecords, h: StudioHandlers, n
     case 'trash':
       await h.trash(op.itemId);
       return 'Moved to the Trash. Nothing was deleted; it can be put back from the Trash.';
+    case 'commission-draft': {
+      const { type: _t, folderId, ...fill } = op;
+      const number = await h.newCommission(fill, folderId);
+      return `Commission ${number} “${op.title}” started as a draft${folderId ? ` ${where({ type: 'folder', id: folderId })}` : ''}. Nothing was sent.`;
+    }
+    case 'invoice-draft': {
+      const number = await h.newInvoice(op.fromCommissionId, { clientName: op.clientName, description: op.description, amountCents: op.amountCents }, op.folderId);
+      return `Invoice ${number} started as a draft${op.folderId ? ` ${where({ type: 'folder', id: op.folderId })}` : ''}. Nothing was issued or sent.`;
+    }
   }
 }
