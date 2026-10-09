@@ -4,19 +4,16 @@
 - Build `BUILD_PLAN.md` phase by phase. Phases 0–6 done (2026-10-09).
 ## Now
 - `main` green + live at 63908ce: 763 unit, 41 site-qa (local + live).
+- Side branch `claude/great-archimedes-fcbzwz`: + `qa/tests/site/tabs.spec.ts`
+  (53 qa local; tabs 12/12 live). Not on main; test-only, no app code.
 - First-load JS 95.5 KB gzip of a 100 KB budget (was 99.3): launcher tables
   now load lazily. Keep new shell code out of the entry chunk.
 - Phase 7 (sync through studio-api, billing) needs owner calls; not started.
-- site-qa (`qa/`) live on `main`; every change follows CLAUDE.md "Site QA
-  workflow" (side branch → report → owner approves → main on owner's word).
+- Every change follows CLAUDE.md "Site QA workflow".
 ## Done
-- Entry diet: `os/goKeys.ts` (GO_KEYS, goStep) stays in the entry;
-  `os/launcher.ts` (tools, actions, records, ranking) is its own 4.6 KB chunk
-  loaded on idle (≤2 s) or when the box opens. `useLauncher` in
-  `app/useShellKeys.ts` → `LauncherState` loading / failed (Reload) / ready.
-- Phases 4–6 (selling, Visualizer, mailing list, calendar + tasks): see
-  `BUILD_PLAN.md` and the Files list; calendar maths runs in the lazy chunk.
-- Phases 0–3: see `BUILD_PLAN.md`. Studio sign-in + assistant: `src/studio/`.
+- Entry diet: `os/goKeys.ts` in entry; `os/launcher.ts` lazy 4.6 KB chunk
+  (idle ≤2 s or box opens); `useLauncher` loading / failed / ready.
+- Phases 0–6: see `BUILD_PLAN.md`. Studio sign-in + assistant: `src/studio/`.
 ## Decisions (keep)
 - Calendar maths runs in the lazy chunk: App only gathers `calendarInput`.
 - Board stage is derived, never stored; a draft is Quoting whatever it holds.
@@ -40,16 +37,20 @@
 - Booth on-flag persists across reload; guest book 5 s quiet → loop, no PIN.
 - Free = runs on device; paid = costs money. No plan shown before billing.
 ## Dead ends (do not retry)
+- tabs.spec: `waitForLoadState('networkidle')` after a Finance tab click hangs
+  60 s though the tab makes 0 requests. Use a fixed wait.
 - Two builds of one commit share `sw.js?v=` → SW never updates. Commit first.
 - `check-lazy-thumbs` stall check (<500 ms) is noisy: old and new builds both
   420–630 ms here. Compare interleaved runs, never one.
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 - Rendering the launcher lazily to "save" bytes is cheating: it draws at once.
 ## Next (numbered)
-1. Widen site-qa coverage, report only (no app code): windows.spec opens
-   each dock app's first view; add a spec for the tabs inside windows
-   (Connect, Finance, Commission Studio tabs, Settings) + phone sheets.
-   Run local, then live; report findings plainly; fix only what owner OKs.
+1. Await owner OK on 2 a11y findings from tabs.spec (both parked in
+   windows-known.json): hidden file input in `os/ImageDrop.tsx` unlabeled
+   (Commission Details/Files, Settings logo); hidden receipt camera input in
+   `FinanceWindow.tsx` (Money out) unlabeled. Fix = aria-label (or
+   tabIndex -1 + aria-hidden, button opens it). On OK: fix, drop the known
+   keys, qa green, land on main on owner's word.
 2. Phase 7 plan only: write `docs/phase-7.md` (records → studio-api sync,
    conflicts shown never overwritten, Trash sync per `FUTURE_BUILD.md`).
    Owner questions first: billing/plans (CLAUDE.md: nothing may imply it
@@ -62,27 +63,25 @@
    search box on a slow phone (brief "Loading search…" before idle load).
 ## Files (path — why)
 - `qa/` — site-qa kit; ours: `site.config.ts`, `audit-baseline.json`,
-  `tests/site/` windows.spec (every dock app), startup.spec, windows-known.json.
+  `tests/site/` windows.spec (dock apps), tabs.spec, startup.spec, windows-known.json.
 - `src/os/goKeys.ts`, `src/os/launcher.ts` — entry vs lazy launcher split.
 - `src/App.tsx` — wiring, `renderContent`, `openDated`, `calendarInput`.
 - `src/app/lazyTools.tsx` — every lazy window; add new tools here.
 - `src/calendar/`, `src/commission/tasks.ts` — Phase 6.
-- `src/connect/mailing.ts`, `src/connect/ui/MailingList.tsx` — Phase 5.
-- `src/shows/selling.ts`, `src/shows/prints.ts`, `src/visualizer/` — Phase 4.
+- `src/connect/`, `src/shows/selling.ts`, `src/visualizer/` — Phases 4–5.
 - `scripts/check-calendar.mjs` (34), `check-mailing.mjs` (24),
   `check-selling.mjs` (42), `check-visualizer.mjs` (30, `ROOM=` a photo),
   `check-booth.mjs` (22), `check-shows-trash.mjs`, `check-lazy-thumbs.mjs`.
 ## Verify (tested / NOT tested)
+- Tested 2026-10-09 (tabs.spec): every tab in Connect, Finance, Commission
+  Studio + Settings, desktop/phone/dark, local + live: only the 2 findings.
 - Tested 2026-10-09 (site-qa + 4 fixes, live 63908ce): unit 763; qa 41 local
   + live; startup.spec fails 3/3 on old build; check-calendar 34/34; CI green.
   Live run once hit a stale Connect chunk mid-deploy (passed 6/6 after).
-- Tested 2026-10-09 (launcher split): unit 762; check-launcher-tiling 20/20;
-  check-lazy-thumbs 15/15 (95.5 KB). Launcher "failed" state NOT exercised.
-- Tested 2026-10-09: unit 762; check-calendar 34/34, check-mailing 24/24,
-  check-selling 42/42, check-booth 22/22, check-shows-trash ok,
-  check-lazy-thumbs all pass (99.3 KB). All desktop + phone, 2nd tab open.
+- Earlier 2026-10-09: launcher split + Phases 4–6 browser checks all pass
+  (see `TESTING.md`); launcher "failed" state NOT exercised.
 - NOT tested: anything on a real device; .ics in a phone calendar; printed
-  paper; newsletter-tool imports; deployed URL (proxy 403 from sandbox).
+  paper; newsletter-tool imports.
 ## Resume
 - Read `CLAUDE.md`, then this file. Execute Next #1.
 - Browser checks: `npm run build`, then `node scripts/check-*.mjs` (see
