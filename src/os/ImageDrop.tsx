@@ -85,6 +85,8 @@ export function ImageDrop({ onFiles, label, hint, multiple = true, error, childr
         ref={inputRef}
         type="file"
         className="sr-only"
+        tabIndex={-1}
+        aria-label={label ?? 'Choose an image'}
         accept={ALLOWED_IMAGE_TYPES.join(',')}
         multiple={multiple}
         onChange={(e) => {

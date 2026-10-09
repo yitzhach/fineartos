@@ -5,7 +5,7 @@
 ## Now
 - `main` green + live at 63908ce: 763 unit, 41 site-qa (local + live).
 - Side branch `claude/great-archimedes-fcbzwz`: + `qa/tests/site/tabs.spec.ts`
-  (53 qa local; tabs 12/12 live). Not on main; test-only, no app code.
+  (53 qa local; tabs 12/12 live). Landed on main with the 2 label fixes.
 - First-load JS 95.5 KB gzip of a 100 KB budget (was 99.3): launcher tables
   now load lazily. Keep new shell code out of the entry chunk.
 - Phase 7 (sync through studio-api, billing) needs owner calls; not started.
@@ -45,12 +45,7 @@
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 - Rendering the launcher lazily to "save" bytes is cheating: it draws at once.
 ## Next (numbered)
-1. Await owner OK on 2 a11y findings from tabs.spec (both parked in
-   windows-known.json): hidden file input in `os/ImageDrop.tsx` unlabeled
-   (Commission Details/Files, Settings logo); hidden receipt camera input in
-   `FinanceWindow.tsx` (Money out) unlabeled. Fix = aria-label (or
-   tabIndex -1 + aria-hidden, button opens it). On OK: fix, drop the known
-   keys, qa green, land on main on owner's word.
+1. Owner tests live a11y-label fix (on main). Then Next #2.
 2. Phase 7 plan only: write `docs/phase-7.md` (records → studio-api sync,
    conflicts shown never overwritten, Trash sync per `FUTURE_BUILD.md`).
    Owner questions first: billing/plans (CLAUDE.md: nothing may imply it

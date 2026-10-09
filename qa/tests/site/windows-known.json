@@ -1,7 +1,3 @@
 {
-  "Assistant console: Failed to load resource: the server responded with a status of 401": "By design, live only: signed out, /assistant/status answers 401 and the window shows the signed-out state (AssistantWindow.tsx). Chrome logs every 4xx as a console error.",
-  "Commission Studio/Details a11y:label": "Reported 2026-10-09, awaiting owner OK: the hidden file input behind ImageDrop (src/os/ImageDrop.tsx) has no label; the visible button opens it. Fix = aria-label or tabIndex -1 + aria-hidden.",
-  "Commission Studio/Files a11y:label": "Same ImageDrop input as Commission Studio/Details.",
-  "Settings a11y:label": "Same ImageDrop input (Studio logo) as Commission Studio/Details.",
-  "Finance/Money out a11y:label": "Reported 2026-10-09, awaiting owner OK: hidden receipt camera input in FinanceWindow.tsx has no label; the visible button opens it."
+  "Assistant console: Failed to load resource: the server responded with a status of 401": "By design, live only: signed out, /assistant/status answers 401 and the window shows the signed-out state (AssistantWindow.tsx). Chrome logs every 4xx as a console error."
 }

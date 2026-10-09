@@ -589,6 +589,8 @@ export function FinanceWindow(props: Props) {
                 capture="environment"
                 multiple
                 className="sr-only"
+                tabIndex={-1}
+                aria-label="Receipt photo"
                 onChange={async (e) => {
                   const chosen = Array.from(e.target.files ?? []);
                   e.target.value = '';
