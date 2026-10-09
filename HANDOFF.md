@@ -3,12 +3,12 @@
 - Artist OS: desktop-OS business suite for one artist. Browser-only, local-first.
 - Build `BUILD_PLAN.md` phase by phase. Phases 0–6 done (2026-10-09).
 ## Now
-- `main` green at the commit that wrote this: 762 unit tests, IndexedDB v8.
+- `main` green + live at 63908ce: 763 unit, 41 site-qa (local + live).
 - First-load JS 95.5 KB gzip of a 100 KB budget (was 99.3): launcher tables
   now load lazily. Keep new shell code out of the entry chunk.
 - Phase 7 (sync through studio-api, billing) needs owner calls; not started.
-- site-qa (`qa/`) set up on side branch `claude/awesome-goodall-fcacde`, NOT
-  on `main` yet. Default workflow now: CLAUDE.md "Site QA workflow".
+- site-qa (`qa/`) live on `main`; every change follows CLAUDE.md "Site QA
+  workflow" (side branch → report → owner approves → main on owner's word).
 ## Done
 - Entry diet: `os/goKeys.ts` (GO_KEYS, goStep) stays in the entry;
   `os/launcher.ts` (tools, actions, records, ranking) is its own 4.6 KB chunk
@@ -46,11 +46,10 @@
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 - Rendering the launcher lazily to "save" bytes is cheating: it draws at once.
 ## Next (numbered)
-1. Land site-qa + fixes on `main` when owner says go (approved 2026-10-09:
-   hidden file inputs aria-hidden, Calendar grid → role=group). Then live
-   audit: `SITE_QA_URL=https://fineartos.bobdylan2000.workers.dev/`.
-   Awaiting sign-off: Clients import input unlabeled (windows-known.json);
-   demo window jumps in front if an app is opened right after load.
+1. Widen site-qa coverage, report only (no app code): windows.spec opens
+   each dock app's first view; add a spec for the tabs inside windows
+   (Connect, Finance, Commission Studio tabs, Settings) + phone sheets.
+   Run local, then live; report findings plainly; fix only what owner OKs.
 2. Phase 7 plan only: write `docs/phase-7.md` (records → studio-api sync,
    conflicts shown never overwritten, Trash sync per `FUTURE_BUILD.md`).
    Owner questions first: billing/plans (CLAUDE.md: nothing may imply it
@@ -63,7 +62,7 @@
    search box on a slow phone (brief "Loading search…" before idle load).
 ## Files (path — why)
 - `qa/` — site-qa kit; ours: `site.config.ts`, `audit-baseline.json`,
-  `tests/site/windows.spec.ts` (opens every dock app) + `windows-known.json`.
+  `tests/site/` windows.spec (every dock app), startup.spec, windows-known.json.
 - `src/os/goKeys.ts`, `src/os/launcher.ts` — entry vs lazy launcher split.
 - `src/App.tsx` — wiring, `renderContent`, `openDated`, `calendarInput`.
 - `src/app/lazyTools.tsx` — every lazy window; add new tools here.
@@ -74,8 +73,9 @@
   `check-selling.mjs` (42), `check-visualizer.mjs` (30, `ROOM=` a photo),
   `check-booth.mjs` (22), `check-shows-trash.mjs`, `check-lazy-thumbs.mjs`.
 ## Verify (tested / NOT tested)
-- Tested 2026-10-09 (site-qa + fixes): qa 39 pass, 0 known issues; unit 762;
-  check-calendar 34/34. Live audit works (host allowed); CI NOT yet seen.
+- Tested 2026-10-09 (site-qa + 4 fixes, live 63908ce): unit 763; qa 41 local
+  + live; startup.spec fails 3/3 on old build; check-calendar 34/34; CI green.
+  Live run once hit a stale Connect chunk mid-deploy (passed 6/6 after).
 - Tested 2026-10-09 (launcher split): unit 762; check-launcher-tiling 20/20;
   check-lazy-thumbs 15/15 (95.5 KB). Launcher "failed" state NOT exercised.
 - Tested 2026-10-09: unit 762; check-calendar 34/34, check-mailing 24/24,
