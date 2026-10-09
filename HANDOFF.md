@@ -49,9 +49,8 @@
 1. Land site-qa + fixes on `main` when owner says go (approved 2026-10-09:
    hidden file inputs aria-hidden, Calendar grid → role=group). Then live
    audit: `SITE_QA_URL=https://fineartos.bobdylan2000.workers.dev/`.
-   Awaiting sign-off: Clients contacts-import input unlabeled (known in
-   windows-known.json); demo project window jumps in front if another app
-   is opened in the first moment after load.
+   Awaiting sign-off: Clients import input unlabeled (windows-known.json);
+   demo window jumps in front if an app is opened right after load.
 2. Phase 7 plan only: write `docs/phase-7.md` (records → studio-api sync,
    conflicts shown never overwritten, Trash sync per `FUTURE_BUILD.md`).
    Owner questions first: billing/plans (CLAUDE.md: nothing may imply it
