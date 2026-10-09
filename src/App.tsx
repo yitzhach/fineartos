@@ -2087,7 +2087,7 @@ export default function App() {
               Artist OS cannot email this for you. Save the file and attach it — or copy it and
               paste it into your mail window.
             </span>
-            <a className="btn" href={mailtoForInvoice(invoice)}>Open in my mail app</a>
+            <a className="btn" href={mailtoForInvoice(invoice)} target="_blank" rel="noopener noreferrer">Open in my mail app</a>
           </div>
           <InvoiceView
             invoice={invoice}

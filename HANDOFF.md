@@ -8,6 +8,10 @@
   (53 qa local; tabs 12/12 live). Landed on main with the 2 label fixes.
 - First-load JS 95.5 KB gzip of a 100 KB budget (was 99.3): launcher tables
   now load lazily. Keep new shell code out of the entry chunk.
+- Viewing links (owner asked 2026-10-09): Connect › Send a picture › "Add a
+  viewing link" (signed in only) uploads to R2 `fineartos-shares` via
+  `worker/share.ts`; client opens `/p/<id>`. 90 days. All mailto buttons open
+  in a new tab (webmail used to replace the app tab).
 - Phase 7 (sync through studio-api, billing) needs owner calls; not started.
 - Every change follows CLAUDE.md "Site QA workflow".
 ## Done
@@ -36,6 +40,13 @@
 - Thumb mode never shows an original while its thumb is missing.
 - Booth on-flag persists across reload; guest book 5 s quiet → loop, no PIN.
 - Free = runs on device; paid = costs money. No plan shown before billing.
+- Viewing links: owner checked against studio-api `/v1/me` (cookie); link page
+  is server HTML with strict CSP, no app shell; sw.js skips `/share/`, `/p/`.
+  Expired / removed / made-up ids all answer the same 404 page.
+- Uploads are re-drawn as JPEG ≤2400px client-side: strips GPS metadata.
+- Links are not listed anywhere after the session; only removable while the
+  photo's link is on screen. Expiry tidies the page; R2 objects stay (add an
+  R2 lifecycle rule `shares/` 90 d if storage ever matters).
 ## Dead ends (do not retry)
 - tabs.spec: `waitForLoadState('networkidle')` after a Finance tab click hangs
   60 s though the tab makes 0 requests. Use a fixed wait.
@@ -45,7 +56,8 @@
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 - Rendering the launcher lazily to "save" bytes is cheating: it draws at once.
 ## Next (numbered)
-1. Owner tests live a11y-label fix (on main). Then Next #2.
+1. Owner tests viewing link live: sign in (Assistant), Connect › Send a
+   picture › Add a viewing link › Email; open link on a phone. Then Next #2.
 2. Phase 7 plan only: write `docs/phase-7.md` (records → studio-api sync,
    conflicts shown never overwritten, Trash sync per `FUTURE_BUILD.md`).
    Owner questions first: billing/plans (CLAUDE.md: nothing may imply it
@@ -62,12 +74,16 @@
 - `src/os/goKeys.ts`, `src/os/launcher.ts` — entry vs lazy launcher split.
 - `src/App.tsx` — wiring, `renderContent`, `openDated`, `calendarInput`.
 - `src/app/lazyTools.tsx` — every lazy window; add new tools here.
+- `src/share/viewLink.ts` (rules + client page), `src/share/upload.ts`,
+  `worker/share.ts`; `scripts/check-share.mjs` (14, wrangler dev + fake api).
 - `src/calendar/`, `src/commission/tasks.ts` — Phase 6.
 - `src/connect/`, `src/shows/selling.ts`, `src/visualizer/` — Phases 4–5.
 - `scripts/check-calendar.mjs` (34), `check-mailing.mjs` (24),
   `check-selling.mjs` (42), `check-visualizer.mjs` (30, `ROOM=` a photo),
   `check-booth.mjs` (22), `check-shows-trash.mjs`, `check-lazy-thumbs.mjs`.
 ## Verify (tested / NOT tested)
+- Tested 2026-10-09 viewing links: unit 777; qa 53 local; check-share 14/14.
+  NOT tested: live upload with real studio-api session; phone mail apps.
 - Tested 2026-10-09 (tabs.spec): every tab in Connect, Finance, Commission
   Studio + Settings, desktop/phone/dark, local + live: only the 2 findings.
 - Tested 2026-10-09 (site-qa + 4 fixes, live 63908ce): unit 763; qa 41 local

@@ -30,7 +30,7 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "run_worker_first": ["/v1/*", "/assistant/*"],
+    "run_worker_first": ["/v1/*", "/assistant/*", "/share/*", "/p/*"],
     // The app is one page; anything else should still land on it rather than
     // a Cloudflare 404. The service worker and manifest are real files in
     // dist/, so they are served as themselves.
@@ -41,5 +41,8 @@
   "services": [
     { "binding": "API", "service": "studio-api" },
     { "binding": "ASSISTANT", "service": "studio-assistant" }
-  ]
+  ],
+
+  // Viewing links (worker/share.ts). Private: the only way in is /p/<id>.
+  "r2_buckets": [{ "binding": "SHARES", "bucket_name": "fineartos-shares" }]
 }

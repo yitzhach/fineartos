@@ -272,6 +272,8 @@ export function UpdatesPane(props: Props) {
                     <a
                       className="btn"
                       data-variant="quiet"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       href={`mailto:${encodeURIComponent(doc.client.email)}?subject=${encodeURIComponent(
                         `${doc.title} — ${update.headline}`,
                       )}&body=${encodeURIComponent(

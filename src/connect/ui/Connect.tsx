@@ -18,6 +18,9 @@ import type { ClientProfile } from '../../clients/clients';
 import { showLink, slugify } from '../mailing';
 import { MailingList } from './MailingList';
 import { Icon } from '../../os/icons';
+import { readStudioSession } from '../../studio/session';
+import { linkEndDate, withViewingLink, type ShareCreated } from '../../share/viewLink';
+import { createViewLink, removeViewLink, viewLinksAvailable } from '../../share/upload';
 import { SignatureMark, SignaturePad } from './SignaturePad';
 import {
   csvOf,
@@ -652,6 +655,8 @@ function GuestBook({
                 {entry.email && (
                   <a
                     className="btn"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     href={mailtoLink(
                       entry.email,
                       'Lovely to meet you',
@@ -667,7 +672,7 @@ function GuestBook({
                   </a>
                 )}
                 {entry.email && likedOf(entry).length > 0 && (
-                  <a className="btn" data-variant="primary" href={likedMailto(entry)}>
+                  <a className="btn" data-variant="primary" href={likedMailto(entry)} target="_blank" rel="noopener noreferrer">
                     Email what they liked
                   </a>
                 )}
@@ -702,8 +707,24 @@ function SendPicture({
 }: Props) {
   const [to, setTo] = useState('');
   const [busy, setBusy] = useState(false);
+  // Viewing links, by photo: made only when signed in to the studio and the
+  // copy has link storage. Otherwise the button is absent, not dead (rule 8).
+  const [signedIn] = useState(() => readStudioSession() !== null);
+  const [linksOn, setLinksOn] = useState(false);
+  const [links, setLinks] = useState<Record<string, ShareCreated>>({});
+  const [linkBusy, setLinkBusy] = useState(false);
+  useEffect(() => {
+    if (!signedIn) return;
+    let live = true;
+    void viewLinksAvailable().then((on) => live && setLinksOn(on));
+    return () => {
+      live = false;
+    };
+  }, [signedIn]);
   const photo = photos.find((p) => p.id === selectedPhotoId) ?? photos[0] ?? null;
-  const message = photo ? shareMessage(photo, studio.name || null) : '';
+  const link = photo ? links[photo.id] ?? null : null;
+  const plain = photo ? shareMessage(photo, studio.name || null) : '';
+  const message = link ? withViewingLink(plain, link.url) : plain;
   const canShareFiles =
     typeof navigator !== 'undefined' && typeof navigator.canShare === 'function';
 
@@ -715,6 +736,36 @@ function SendPicture({
       </div>
     );
   }
+
+  const makeLink = async () => {
+    if (!photo || linkBusy) return;
+    setLinkBusy(true);
+    try {
+      const blob = await imageBlob(photo.imageId);
+      if (!blob) throw new Error('This picture’s image could not be read from this device.');
+      const made = await createViewLink(blob, photo.title || 'Artwork', plain);
+      setLinks((all) => ({ ...all, [photo.id]: made }));
+      onMessage(`Viewing link added to the message. It works until ${linkEndDate(made.expiresAt)}.`);
+    } catch (cause) {
+      onMessage(`No link was made. ${(cause as Error).message}`);
+    } finally {
+      setLinkBusy(false);
+    }
+  };
+
+  const dropLink = async () => {
+    if (!photo || !link || linkBusy) return;
+    setLinkBusy(true);
+    try {
+      await removeViewLink(link.id);
+      setLinks(({ [photo.id]: _gone, ...rest }) => rest);
+      onMessage('Link removed. Anyone who opens it now sees that it’s no longer available.');
+    } catch (cause) {
+      onMessage(`The link wasn’t removed. ${(cause as Error).message}`);
+    } finally {
+      setLinkBusy(false);
+    }
+  };
 
   const share = async () => {
     if (!photo) return;
@@ -804,6 +855,25 @@ function SendPicture({
 
             <pre className="send-message">{message}</pre>
 
+            {linksOn && (
+              <div className="chip-row">
+                {link ? (
+                  <>
+                    <span className="hint">
+                      Link added: anyone with it can see this picture until {linkEndDate(link.expiresAt)}.
+                    </span>
+                    <button className="btn" data-variant="quiet" disabled={linkBusy} onClick={() => void dropLink()}>
+                      {linkBusy ? 'Removing…' : 'Remove link'}
+                    </button>
+                  </>
+                ) : (
+                  <button className="btn" disabled={linkBusy} onClick={() => void makeLink()}>
+                    {linkBusy ? 'Uploading…' : 'Add a viewing link'}
+                  </button>
+                )}
+              </div>
+            )}
+
             <div className="chip-row">
               <button className="btn" data-variant="primary" disabled={busy} onClick={() => void share()}>
                 {busy ? 'Opening…' : canShareFiles ? 'Share with the picture' : 'Share'}
@@ -811,6 +881,8 @@ function SendPicture({
               <a
                 className="btn"
                 aria-disabled={!to.includes('@')}
+                target="_blank"
+                rel="noopener noreferrer"
                 href={to.includes('@') ? mailtoLink(to, photo.title, message) : undefined}
               >
                 Email
@@ -846,7 +918,11 @@ function SendPicture({
 
             <p className="hint">
               Email and Text hand off to your own mail and messages apps. An email link cannot carry
-              the picture itself — use Share on a phone, or Save picture and attach it.
+              the picture itself — {linksOn
+                ? 'add a viewing link and the client opens the picture from the message, or use Share on a phone.'
+                : signedIn
+                  ? 'use Share on a phone, or Save picture and attach it.'
+                  : 'use Share on a phone, or Save picture and attach it. Signed in to your studio (Assistant), you can add a viewing link instead.'}
             </p>
           </div>
         </div>

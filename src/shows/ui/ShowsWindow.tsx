@@ -478,7 +478,7 @@ function Selling({
                 {pay && paying === photo.id && <PayQr url={pay.url} from={pay.from} onProblem={setProblem} />}
                 {soldHere && receipt && (
                   <div className="chip-row">
-                    <a className="btn" href={mailtoLink('', receipt.subject, receipt.body)}>Email a receipt</a>
+                    <a className="btn" href={mailtoLink('', receipt.subject, receipt.body)} target="_blank" rel="noopener noreferrer">Email a receipt</a>
                     <a className="btn" href={smsLink('', receipt.body)}>Text a receipt</a>
                     <button
                       className="btn"

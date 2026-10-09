@@ -122,7 +122,7 @@ export function MailingList({ guests, profiles, photos, onMessage }: Props) {
           </label>
           <div className="chip-row">
             {mailto ? (
-              <a className="btn" data-variant="primary" href={mailto}>
+              <a className="btn" data-variant="primary" href={mailto} target="_blank" rel="noopener noreferrer">
                 Open in my mail app
               </a>
             ) : (

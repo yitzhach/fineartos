@@ -1,0 +1,2 @@
+// Local only: `wrangler dev -c wrangler.jsonc -c scripts/fake-studio-api/wrangler.jsonc`.
+{ "name": "studio-api", "main": "index.js", "compatibility_date": "2026-09-01" }

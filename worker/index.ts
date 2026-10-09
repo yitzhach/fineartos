@@ -1,3 +1,5 @@
+import { handleShare, isSharePath, type ShareBucket } from './share';
+
 interface Fetcher {
   fetch(r: Request): Promise<Response>;
 }
@@ -6,6 +8,8 @@ interface Env {
   /** studio-api and studio-assistant, by service binding (Art-Talk-Back D-078). */
   API?: Fetcher;
   ASSISTANT?: Fetcher;
+  /** Private bucket for viewing links (worker/share.ts). */
+  SHARES?: ShareBucket;
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
   IMAGES?: {
@@ -45,6 +49,7 @@ export default {
     if (url.pathname.startsWith('/v1/')) return forward(request, env.API, 'studio');
     if (url.pathname === '/assistant/status') return Response.json({ available: Boolean(env.ASSISTANT && env.API) }, { headers: { 'Cache-Control': 'no-store' } });
     if (url.pathname.startsWith('/assistant/')) return forward(request, env.ASSISTANT, 'assistant');
+    if (isSharePath(url.pathname)) return handleShare(request, env);
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
     if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY)
       return json({ error: "Cloud sync unavailable" }, 503);

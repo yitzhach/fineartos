@@ -58,7 +58,8 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
   // The studio platform (sign-in, the assistant) is live data: never cached.
-  if (url.pathname.startsWith('/v1/') || url.pathname.startsWith('/assistant/')) return;
+  // Viewing links are server pages, never the app shell.
+  if (['/v1/', '/assistant/', '/share/', '/p/'].some((prefix) => url.pathname.startsWith(prefix))) return;
 
   // Navigations fall back to the cached shell so a reload offline still opens.
   if (request.mode === 'navigate') {

@@ -557,6 +557,8 @@ export function ArtworkWindow(props: Props) {
               className="btn"
               data-variant="primary"
               aria-disabled={!sendTo.includes('@')}
+              target="_blank"
+              rel="noopener noreferrer"
               href={sendTo.includes('@') ? mailtoPicks() : undefined}
             >
               Email these to me
