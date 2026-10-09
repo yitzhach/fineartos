@@ -25,12 +25,22 @@ for (const app of APPS) {
     await page.goto('./');
     const dock = page.locator('nav.dock');
     await expect(dock).toBeVisible();
+    // The demo project opens itself a moment after load and takes the front;
+    // let it, or it lands on top of the app this test opened.
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.frame[data-focused="true"]')).toBeVisible();
     const button = dock.getByRole('button', { name: app, exact: true });
     test.skip(await button.count() === 0, `${app} is not in this dock`);
     await button.click();
-    await page.waitForTimeout(800);
+    // Most windows are lazy chunks: let the chunk and its first render land,
+    // or the audit can catch some windows before they are drawn.
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(500);
 
     const focused = page.locator('.frame[data-focused="true"]');
+    // Home shows the desktop; every other app must come up in front, or the
+    // audit below would pass by having nothing to look at.
+    if (app !== 'Home') await expect(focused).toBeVisible();
     const axe = new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']);
     // No window in front (Home shows the desktop): tests/audit.spec.ts has that.
     const violations = await focused.count() > 0
@@ -44,9 +54,9 @@ for (const app of APPS) {
       if (wide > 1) problems.push(`overflow: page scrolls sideways by ${wide}px`);
     }
 
-    // "Calendar a11y:aria-required-children": the same in every project.
-    const key = (p: string) => `${app} ${p.split(' ')[0]}`;
-    const fresh = problems.filter(p => !(key(p) in known));
+    // A known entry is "<App> <start of the finding>", the same in every
+    // project: "Calendar a11y:aria-required-children" covers that rule.
+    const fresh = problems.filter(p => !Object.keys(known).some(k => `${app} ${p}`.startsWith(k)));
     info.annotations.push(...problems.map(p => ({ type: 'finding', description: p })));
     expect(fresh, `${app} (${info.project.name})`).toEqual([]);
   });
