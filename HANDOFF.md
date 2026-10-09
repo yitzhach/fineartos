@@ -77,11 +77,10 @@
   `check-selling.mjs` (42), `check-visualizer.mjs` (30, `ROOM=` a photo),
   `check-booth.mjs` (22), `check-shows-trash.mjs`, `check-lazy-thumbs.mjs`.
 ## Verify (tested / NOT tested)
-- Tested 2026-10-09 viewing links: unit 777; qa 53 local; check-share 14/14.
+- Tested 2026-10-09 viewing links: unit 777; qa 53 local+live; check-share 14.
   NOT tested: live upload with real studio-api session; phone mail apps.
 - Tested 2026-10-09 (site-qa + 4 fixes, live 63908ce): unit 763; qa 41 local
   + live; startup.spec fails 3/3 on old build; check-calendar 34/34; CI green.
-  Live run once hit a stale Connect chunk mid-deploy (passed 6/6 after).
 - NOT tested: anything on a real device; .ics in a phone calendar; printed
   paper; newsletter-tool imports.
 ## Resume
