@@ -1,0 +1,3 @@
+{
+  "Calendar a11y:aria-required-children": "Known bug, not yet fixed (2026-10-09 first audit): the month grid has role=grid but no row/gridcell children."
+}

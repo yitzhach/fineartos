@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process';
 import { defineConfig } from 'vite';
+import { configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
 /**
@@ -45,5 +46,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // qa/ is Playwright (site-qa), run with `npm --prefix qa test`, not Vitest.
+    exclude: [...configDefaults.exclude, 'qa/**'],
   },
 });

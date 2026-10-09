@@ -3,7 +3,8 @@
 A desktop-OS-styled business suite for one working artist. Browser-only, no
 server, honest about that everywhere it matters.
 
-- Repo `yitzhach/fineartos`, branch `main`. Work on `main`, push to `main`.
+- Repo `yitzhach/fineartos`, branch `main`. Work goes live by landing on
+  `main`, and only on the owner's word: see **Site QA workflow**.
 - Live: https://fineartos.bobdylan2000.workers.dev — Cloudflare Workers static
   assets, rebuilt on every push to `main` (about a minute).
 - Stack: React 18 + TypeScript (strict, `noUncheckedIndexedAccess`), Vite,
@@ -89,6 +90,28 @@ module beside its tests instead. State lives in hooks by concern in `src/app/`
 (studio data, windows, trash, keys and the search box, prefs, undo);
 `src/App.tsx` is the shell that wires them and draws each window.
 
+## Site QA workflow (the default for every change)
+
+`qa/` is site-qa (yitzhach/site-qa): browser audit + our specs, desktop,
+phone and dark. Known issues sit in `qa/audit-baseline.json` and
+`qa/tests/site/windows-known.json`; only new ones fail.
+
+1. Work on the session's side branch, never straight on `main`.
+2. Test a local build of `main` (`npm --prefix qa test` builds and serves it).
+3. Report findings in plain words first; change no app code until the owner
+   approves which fixes.
+4. Fix in small batches; after each, `npm test` and `npm --prefix qa test`
+   must both pass.
+5. Anything near saved records: also check an existing database with a
+   second tab open.
+6. Land on `main` (deploys) only on the owner's word; then audit the live
+   site: `SITE_QA_URL=https://fineartos.bobdylan2000.workers.dev/ npm --prefix qa test`.
+   (Cloud sessions need that host under Allowed domains in the environment's
+   network settings; until then the live check is blocked, say so.)
+
+Tedious sweeps (triage, reading results) may go to a Haiku subagent; the
+decisions and the code stay in the main session.
+
 ## Rules that are not negotiable
 
 These came from real mistakes. Breaking them has broken the app before.
@@ -130,7 +153,10 @@ These came from real mistakes. Breaking them has broken the app before.
   with `--no-sandbox`. Scripts must sit in the repo to resolve `playwright`,
   and piping their output through `grep` hides everything if they hang —
   write to a file.
-- Deploy: push to `main`.
+- `npm ci --prefix qa && npm --prefix qa test` — browser tests → `qa/results/audit.json`.
+- `qa/browse open <url>` — read and drive a page as text.
+- `npm --prefix qa run audit:baseline` — re-record known issues (should only shrink).
+- Deploy: land on `main`, after sign-off.
 
 ## Gotchas
 
