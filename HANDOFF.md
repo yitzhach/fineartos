@@ -12,7 +12,7 @@
 
 ## Done
 - Phase 3 part 2 (2026-10-09): DB v8 `boothMedia` (additive). Loop video ≤350 MB,
-  muted, fades through dark at loop point. Phone dock: 6 apps + Trash
+  muted, straight loop (fade-through-dark removed 2026-10-09: read as a jump). Phone dock: 6 apps + Trash
   (`Dock.tsx`). Guest book: 5 s quiet → loop "(timed out)", no PIN; "Back to
   the loop" in tab bar. Slides crossfade 1.5 s (`booth-slide-over`). Constants
   in `booth.ts`. `check-booth-media.mjs` 12/12.
@@ -66,8 +66,9 @@
    Draft actions need a live check. Owner: is 5 s right on a real tablet?
 1. Phase 3 part 2 (done 2026-10-09, see Done): owner to try the video and the
    phone dock on the tablet and phone.
-2. Then Phase 4 — Visualizer scope settled: true size + perspective + lighting
-   (see `BUILD_PLAN.md` Phase 4).
+2. Phase 4 Visualizer: maths done + tested (`src/visualizer/`: scale from a
+   marked line, 4-corner wall homography, lighting filter + shadow). Next:
+   the window — replace mock in `src/os/mock/tools.tsx`, register available.
 ## Files (path — why)
 - `src/app/*` — the hooks. `src/App.tsx` — wiring, `runAction`, render.
 - `scripts/check-clients-notes.mjs` — Phase 2; needs `OLD_DIST` (v6 build).
