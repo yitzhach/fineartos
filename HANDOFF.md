@@ -3,28 +3,25 @@
 - Artist OS: desktop-OS business suite for one artist. Browser-only, no server.
 - Build `BUILD_PLAN.md` phase by phase.
 ## Now
-- Tree green, 701 tests, IndexedDB v8. Booth loop: guest-book timeout, back button,
-  1.5 s crossfade, 350 MB video (2026-10-09).
+- Tree green, 715 tests, IndexedDB v8. Booth loop video: straight loop, no fade
+  (2026-10-09); Choose/Replace video is a primary .btn.
 - First-load JS 97.7 KiB gzip (check-lazy-thumbs measures KiB; budget 100).
-- Notes fix (2026-10-07): typing autosaves (0.8 s + on close; blur alone lost
-  notes), Title field, Save button, "Keep it on" Notes only / Home screen / folder.
+- Notes autosave 0.8 s + on close (blur alone lost notes, 2026-10-07).
 
 ## Done
 - Phase 3 part 2 (2026-10-09): DB v8 `boothMedia` (additive). Loop video ≤350 MB,
-  muted, straight loop (fade-through-dark removed 2026-10-09: read as a jump). Phone dock: 6 apps + Trash
-  (`Dock.tsx`). Guest book: 5 s quiet → loop "(timed out)", no PIN; "Back to
+  muted, straight loop (fade through dark removed: read as a jump). Phone
+  dock: 6 apps + Trash (`Dock.tsx`). Guest book: 5 s quiet → loop "(timed out)", no PIN; "Back to
   the loop" in tab bar. Slides crossfade 1.5 s (`booth-slide-over`). Constants
   in `booth.ts`. `check-booth-media.mjs` 12/12.
-- Phases 0–1: search box, tiling, hooks in `src/app/`, lazy tools
-  (`app/lazyTools.tsx`), thumbnails backfilled by `useObjectUrls`.
+- Phases 0–1: hooks in `src/app/`, lazy tools (`app/lazyTools.tsx`).
 - Phase 2: v7 stores guests/notes/clients/contacts (`persistence/db.ts`).
   Guest book copied from localStorage on load, old key moved to
   `artistOS.guestBook.movedToDatabase`; write failures shown. Clients
   (`clients/clients.ts`) built from commissions, invoices, guests, imported
   contacts; auto-joined only by email/phone, same name → offered. Profile
   keeps tags, follow-up (Coming up), note, merges, `label`. Notes
-  (`notes/notes.ts`) pin to anything, go to the Trash. vCard/CSV import.
-  Quick capture (phone + button, search box action). G L clients, G N notes.
+  (`notes/notes.ts`) pin to anything. vCard/CSV import. Quick capture.
 - Phase 3 part 1: `booth/booth.ts` (PIN hash+salt, lockout, panels, pieces,
   price line, idle/slide timing), `booth/storage.ts` (settings + on-flag in
   localStorage), `booth/ui/BoothSetup` (Connect → "Booth mode" tab),
@@ -60,14 +57,18 @@
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 
 ## Next (numbered)
-0. Booth likes with a real show piece: set "Hanging right now" on a piece,
-   open booth mode, check the "Pieces you like" boxes show and save. NOT tested yet.
-   Draft actions need a live check. Owner: is 5 s right on a real tablet?
-1. Phase 3 part 2 (done 2026-10-09, see Done): owner to try the video and the
-   phone dock on the tablet and phone.
-2. Phase 4 Visualizer: maths done + tested (`src/visualizer/`: scale from a
-   marked line, 4-corner wall homography, lighting filter + shadow). Next:
-   the window — replace mock in `src/os/mock/tools.tsx`, register available.
+1. Visualizer window (Phase 4). Maths done + tested in `src/visualizer/`
+   (`pixelsPerInch`, `wallToPhoto`/`photoToWall`, `pieceQuad`, `cssMatrix3d`,
+   `matchLighting`/`cssFilter`/`averageRgb`). Build: pick room photo → mark
+   4 wall corners + wall width/height (or a 2-point line + real length) →
+   pick a piece (its `widthIn`/`heightIn`; null size = say so, no guess) →
+   drag it on the wall, lighting slider, shadow. Replace mock `Visualizer`
+   in `src/os/mock/tools.tsx`; register available in `src/os/registry.ts`.
+   Room photo: on device or session only — decide, log it. Phone touch drag
+   must work. Browser-check before shipping.
+2. Owner checks, NOT tested: booth likes w/ real "Hanging right now" piece;
+   5 s guest-book timeout on tablet; loop video + phone dock on devices.
+3. Rest of Phase 4: selling at the booth (see `BUILD_PLAN.md`).
 ## Files (path — why)
 - `src/app/*` — the hooks. `src/App.tsx` — wiring, `runAction`, render.
 - `scripts/check-clients-notes.mjs` — Phase 2; needs `OLD_DIST` (v6 build).
@@ -86,5 +87,5 @@
   sheets, iPad keys, deployed URL (proxy 403), 861–1000px, iOS print.
 
 ## Resume
-- Read `CLAUDE.md`, then only the Phase 3 section of `BUILD_PLAN.md`.
+- Read `CLAUDE.md`, then only the Phase 4 section of `BUILD_PLAN.md`.
 - Push to `main` (deploys). Browser checks: see `TESTING.md`.
