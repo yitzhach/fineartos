@@ -47,7 +47,7 @@ for (const [label, viewport] of [['desktop', { width: 1440, height: 900 }], ['ph
     const r = indexedDB.open('artist-os');
     r.onsuccess = () => {
       const tx = r.result.transaction('photos', 'readwrite'); const s = tx.objectStore('photos');
-      s.getAll().onsuccess = (e) => { const row = e.target.result[0]; s.put({ ...row, photo: { ...row.photo, title: 'River piece', price: 800, status: 'available' } }); };
+      s.getAll().onsuccess = (e) => { const row = e.target.result[0]; s.put({ ...row, photo: { ...row.photo, title: 'River piece', price: 800, status: 'available', widthIn: 24, heightIn: 36, paymentLink: 'square.link/u/river' } }); };
       tx.oncomplete = () => { r.result.close(); res(); };
     };
   }));
@@ -57,8 +57,24 @@ for (const [label, viewport] of [['desktop', { width: 1440, height: 900 }], ['ph
   await focused().getByLabel('New show name').fill('Spring Market');
   await focused().getByRole('button', { name: 'Add show' }).click(); await wait(800);
   await focused().locator('.sh-piece', { hasText: 'River piece' }).click(); await wait(800);
+  await focused().locator('#sh-take').fill('30');
+  await focused().locator('#sh-venue').click(); await wait(500);
   const sel = focused().locator('.sh-selling');
   ok(`${label}: tally before`, (await sel.innerText()).includes('0 sold · 1 still out'));
+
+  // Pay QR from the piece's own link.
+  await sel.getByRole('button', { name: 'Pay QR' }).click(); await wait(500);
+  ok(`${label}: pay QR drawn for the piece link`, (await sel.locator('.sh-payqr canvas').count()) === 1 && (await sel.locator('.sh-payqr').innerText()).includes('https://square.link/u/river'));
+  await page.screenshot({ path: `${OUT}/sell-${label}-payqr.png` });
+
+  // Prints go to a hidden frame holding the whole sheet.
+  const lastSheet = () => page.evaluate(() => { const f = [...document.querySelectorAll('iframe[srcdoc]')].pop(); return f ? f.srcdoc : ''; });
+  await sel.getByRole('button', { name: 'Print price list' }).click(); await wait(800);
+  let sheet = await lastSheet();
+  ok(`${label}: price list sheet`, sheet.includes('Spring Market') && sheet.includes('$800') && sheet.includes('24 × 36 in'));
+  await sel.getByRole('button', { name: 'Print wall labels' }).click(); await wait(800);
+  sheet = await lastSheet();
+  ok(`${label}: wall labels sheet`, (sheet.match(/class="label"/g) ?? []).length === 1 && sheet.includes('River piece'));
 
   // Two taps.
   await sel.getByRole('button', { name: 'Sold', exact: true }).click(); await wait(300);
@@ -66,9 +82,13 @@ for (const [label, viewport] of [['desktop', { width: 1440, height: 900 }], ['ph
   await sel.getByLabel('Buyer (optional)').fill('Ana');
   await sel.getByRole('button', { name: 'Record sale' }).click(); await wait(800);
   await page.screenshot({ path: `${OUT}/sell-${label}-sold.png` });
-  ok(`${label}: tally after`, (await sel.innerText()).includes('1 sold · $800.00 · 0 still out'));
+  ok(`${label}: tally after, kept after the 30% take`, (await sel.innerText()).includes('1 sold · $800.00 · kept $560.00 · 0 still out'));
   let rec = await piece(page);
-  ok(`${label}: piece sold, with the buyer, location client`, rec.status === 'sold' && rec.location === 'client' && rec.sale.buyer === 'Ana' && rec.sale.amount === 80000);
+  ok(`${label}: piece sold, with the buyer, location client, fee 30%`, rec.status === 'sold' && rec.location === 'client' && rec.sale.buyer === 'Ana' && rec.sale.amount === 80000 && rec.sale.fee === 24000);
+  ok(`${label}: no pay QR once sold`, (await sel.getByRole('button', { name: 'Pay QR' }).count()) === 0);
+  await sel.getByRole('button', { name: 'Certificate' }).click(); await wait(800);
+  sheet = await lastSheet();
+  ok(`${label}: certificate sheet`, sheet.includes('Certificate of Authenticity') && sheet.includes('River piece') && sheet.includes('<img src="blob:'));
   const mail = await sel.getByRole('link', { name: 'Email a receipt' }).getAttribute('href');
   ok(`${label}: receipt hands off to mail`, mail.startsWith('mailto:?subject=') && decodeURIComponent(mail).includes('$800.00'));
 
@@ -79,7 +99,7 @@ for (const [label, viewport] of [['desktop', { width: 1440, height: 900 }], ['ph
   ok(`${label}: Artwork's sales list has it`, /River piece\s+2026-\d\d-\d\d\s+Spring Market · Ana\s+\$800\.00/.test(sales));
   await open('Finance');
   const fin = await focused().innerText();
-  ok(`${label}: Finance has the income`, fin.includes('River piece') && fin.includes('800'));
+  ok(`${label}: Finance money in = $560 after the 30% take`, /MONEY IN\s+\$560\.00/i.test(fin));
 
   // Take it back → Trash.
   await open('Shows');
@@ -91,7 +111,7 @@ for (const [label, viewport] of [['desktop', { width: 1440, height: 900 }], ['ph
 
   await page.reload(); await wait(3000);
   await open('Finance');
-  ok(`${label}: Finance dropped it (after reload)`, !(await focused().innerText()).includes('River piece'));
+  ok(`${label}: Finance dropped it (after reload)`, !/\$560\.00/.test(await focused().innerText()));
   await open('Trash');
   ok(`${label}: Trash lists the sale`, (await focused().innerText()).includes('Sale of “River piece”'));
   await focused().getByRole('button', { name: /Put back/ }).first().click(); await wait(800);

@@ -79,6 +79,12 @@ export const QuickCapture = lazyTool('Quick capture', () => import('./QuickCaptu
 export const VisualizerWindow = lazyTool('The Visualizer', () =>
   import('../visualizer/ui/VisualizerWindow').then((m) => m.VisualizerWindow),
 );
+// The inspector beside a commission: only drawn once one is open.
+export const ArtworkInspector = lazyTool(
+  'The inspector',
+  () => import('../commission/ui/ArtworkInspector').then((m) => m.ArtworkInspector),
+  true,
+);
 export const BoothMode = lazyTool('Booth mode', () => import('../booth/ui/BoothMode').then((m) => m.BoothMode));
 export const MockToolWindow = lazyTool('The preview', () => import('../os/mock/tools').then((m) => m.MockToolWindow));
 

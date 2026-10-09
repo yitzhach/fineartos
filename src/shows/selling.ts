@@ -15,7 +15,7 @@
 import { newId } from '../commission/document';
 import { formatMoney } from '../commission/calc';
 import type { Minor } from '../commission/types';
-import { askingInMinor, type Sale } from '../artwork/catalogue';
+import { askingInMinor, netOf, type Sale } from '../artwork/catalogue';
 import { editPhoto, statusOf, type Photo } from '../photo/photo';
 import type { Show } from './shows';
 
@@ -46,11 +46,46 @@ export function sellAtShow(photo: Photo, show: Show, input: SaleInput, today: st
     amount: input.amount,
     where: show.name,
     buyer: input.buyer?.trim() || null,
-    fee: null,
+    fee: consignmentFee(input.amount, show.takePercent ?? null),
     note: null,
     before: { status: statusOf(photo), location: photo.location ?? null },
   };
   return editPhoto(photo, { status: 'sold', location: 'client', sale }, now);
+}
+
+/**
+ * What the show takes of a sale: its percentage of the amount, to the cent.
+ * Unknown when either is unknown — never a guessed zero.
+ */
+export function consignmentFee(amount: Minor | null, takePercent: number | null): Minor | null {
+  if (amount === null || takePercent === null || !(takePercent >= 0 && takePercent <= 100)) return null;
+  return Math.round((amount * takePercent) / 100);
+}
+
+/**
+ * The link a buyer scans to pay for this piece: its own, else the studio's
+ * Square link. Only a web address counts — anything else would be a QR that
+ * leads nowhere (rule 8).
+ */
+export function paymentLinkFor(
+  photo: Photo,
+  studioLink: string | null,
+): { url: string; from: 'piece' | 'studio' } | null {
+  const own = webAddress(photo.paymentLink ?? null);
+  if (own) return { url: own, from: 'piece' };
+  const studio = webAddress(studioLink);
+  return studio ? { url: studio, from: 'studio' } : null;
+}
+
+export function webAddress(text: string | null): string | null {
+  const t = text?.trim();
+  if (!t) return null;
+  try {
+    const url = new URL(/^[a-z]+:/i.test(t) ? t : `https://${t}`);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
+  } catch {
+    return null;
+  }
 }
 
 /** A show sale can go to the Trash on its own; an older, hand-written sale cannot. */
@@ -106,6 +141,13 @@ export interface ShowTally {
   sold: Photo[];
   /** The sum of the sales with a figure, per currency. */
   totals: { currency: string; amount: Minor }[];
+  /**
+   * What the studio kept after what the show took, per currency, for the
+   * sales whose take is known. Sales with a figure but no recorded take are
+   * counted in `takeUnknown`, not quietly kept in full.
+   */
+  kept: { currency: string; amount: Minor }[];
+  takeUnknown: number;
   /** Sales with no figure recorded — left out of the totals, and said. */
   missing: number;
   /** Pieces the show took that have not sold. */
@@ -117,11 +159,18 @@ export function showTally(show: Show, photos: Photo[]): ShowTally {
     .filter((photo) => photo.sale?.showId === show.id)
     .sort((a, b) => (a.sale!.date + a.updatedAt).localeCompare(b.sale!.date + b.updatedAt));
   const byCurrency = new Map<string, Minor>();
+  const keptBy = new Map<string, Minor>();
   let missing = 0;
+  let takeUnknown = 0;
   for (const photo of sold) {
     const amount = photo.sale!.amount;
-    if (amount === null) missing += 1;
-    else byCurrency.set(photo.currency, (byCurrency.get(photo.currency) ?? 0) + amount);
+    if (amount === null) {
+      missing += 1;
+      continue;
+    }
+    byCurrency.set(photo.currency, (byCurrency.get(photo.currency) ?? 0) + amount);
+    if (photo.sale!.fee === null) takeUnknown += 1;
+    else keptBy.set(photo.currency, (keptBy.get(photo.currency) ?? 0) + netOf(photo.sale!)!);
   }
   const stillOut = show.pieceIds
     .map((id) => photos.find((photo) => photo.id === id))
@@ -129,6 +178,8 @@ export function showTally(show: Show, photos: Photo[]): ShowTally {
   return {
     sold,
     totals: [...byCurrency].map(([currency, amount]) => ({ currency, amount })),
+    kept: [...keptBy].map(([currency, amount]) => ({ currency, amount })),
+    takeUnknown,
     missing,
     stillOut,
   };
@@ -138,6 +189,12 @@ export function showTally(show: Show, photos: Photo[]): ShowTally {
 export function describeTally(tally: ShowTally): string {
   const parts = [`${tally.sold.length} sold`];
   for (const total of tally.totals) parts.push(formatMoney(total.amount, total.currency));
+  // What was kept is only said when some take was recorded; then the sales
+  // without one are named rather than counted as kept in full.
+  if (tally.kept.length) {
+    for (const kept of tally.kept) parts.push(`kept ${formatMoney(kept.amount, kept.currency)}`);
+    if (tally.takeUnknown) parts.push(`${tally.takeUnknown} with no take recorded, not in kept`);
+  }
   if (tally.missing) parts.push(`${tally.missing} with no price recorded, left out`);
   parts.push(`${tally.stillOut.length} still out`);
   return parts.join(' · ');

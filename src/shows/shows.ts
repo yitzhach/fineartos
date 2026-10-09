@@ -43,6 +43,11 @@ export interface Show {
    */
   priorLocations: Record<string, PieceLocation | null>;
   note: string | null;
+  /**
+   * What the show or gallery takes of each sale, in percent. Null or absent
+   * = nothing recorded, and a sale's fee stays unknown rather than zero.
+   */
+  takePercent?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -77,6 +82,9 @@ export function showProblem(show: Show): string | null {
     return 'The show ends before it starts.';
   }
   if (show.boothFee !== null && show.boothFee < 0) return 'A booth fee cannot be negative.';
+  if (show.takePercent != null && !(show.takePercent >= 0 && show.takePercent <= 100)) {
+    return 'What the show takes has to be between 0 and 100%.';
+  }
   return null;
 }
 

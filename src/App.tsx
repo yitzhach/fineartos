@@ -33,7 +33,6 @@ import {
 } from './commission/document';
 import type { CommissionDocument } from './commission/types';
 import type { ProjectTab } from './commission/ui/ProjectWindow';
-import { ArtworkInspector } from './commission/ui/ArtworkInspector';
 import {
   applyInvoiceEdit,
   createBlankInvoice,
@@ -144,6 +143,7 @@ import {
   WallpaperSlides,
   BoothMode,
   VisualizerWindow,
+  ArtworkInspector,
   FinanceWindow,
   ImageEditor,
   InvoiceEditor,
@@ -2247,7 +2247,8 @@ export default function App() {
           onTogglePiece={(show, photo) => void toggleShowPiece(show, photo)}
           onSell={(show, photo, input) => void sellPiece(show, photo, input)}
           onTrashSale={(saleId) => void handleTrash(saleId)}
-          studioName={studio.name || null}
+          studio={{ name: studio.name || null, email: studio.email, phone: studio.phone }}
+          studioPayLink={payment.squareLink}
           focus={showFocus}
         />
       );

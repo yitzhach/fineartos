@@ -137,6 +137,19 @@ export function PhotoWindow({ photo, url, onChange, onSend, onPreview, onEdit }:
           <span className="hint">Blank is not zero — it reads “Price on request”.</span>
         </div>
 
+        <div className="field">
+          <label htmlFor={`pay-${photo.id}`}>Payment link</label>
+          <input
+            id={`pay-${photo.id}`}
+            type="url"
+            inputMode="url"
+            value={photo.paymentLink ?? ''}
+            placeholder="A checkout link for this piece (optional)"
+            onChange={(e) => onChange({ paymentLink: e.target.value.trim() || null })}
+          />
+          <span className="hint">Shown as a pay QR at a show. Nothing here takes the payment.</span>
+        </div>
+
         <div className="field-row">
           <div className="field">
             <label htmlFor={`s-${photo.id}`}>Status</label>

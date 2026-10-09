@@ -125,3 +125,37 @@ describe('the receipt', () => {
     expect(receiptText(unknown, null).body).not.toMatch(/sent/i);
   });
 });
+
+describe('consignment and paying', () => {
+  it("the show's take fills the fee; unknown stays unknown", async () => {
+    const { consignmentFee } = await import('../selling');
+    expect(consignmentFee(80000, 30)).toBe(24000);
+    expect(consignmentFee(999, 33.3)).toBe(333);
+    expect(consignmentFee(null, 30)).toBeNull();
+    expect(consignmentFee(80000, null)).toBeNull();
+    const show = editShow(fair(), { takePercent: 25 }, now);
+    const sold = sellAtShow(piece('A'), show, { amount: 40000, buyer: null }, '2026-10-09', now);
+    expect(sold.sale!.fee).toBe(10000);
+    expect(incomeFromPieces([sold])[0]!.fee).toBe(10000);
+  });
+
+  it('the tally says what was kept, and names sales with no take', () => {
+    const base = fair();
+    const a = piece('A'), b = piece('B');
+    const show = editShow(base, { pieceIds: [a.id, b.id], takePercent: 20 }, now);
+    const soldA = sellAtShow(a, show, { amount: 10000, buyer: null }, '2026-10-09', now);
+    const soldB = sellAtShow(b, editShow(show, { takePercent: null }, now), { amount: 5000, buyer: null }, '2026-10-09', now);
+    const tally = showTally(show, [soldA, soldB]);
+    expect(tally.kept).toEqual([{ currency: 'USD', amount: 8000 }]);
+    expect(describeTally(tally)).toBe('2 sold · $150.00 · kept $80.00 · 1 with no take recorded, not in kept · 0 still out');
+    expect(describeTally(showTally(fair(), []))).toBe('0 sold · 0 still out');
+  });
+
+  it('a pay link: the piece’s own, else the studio’s, only a web address', async () => {
+    const { paymentLinkFor } = await import('../selling');
+    expect(paymentLinkFor(piece('A', { paymentLink: 'square.link/u/abc' }), 'https://studio.example')).toEqual({ url: 'https://square.link/u/abc', from: 'piece' });
+    expect(paymentLinkFor(piece('A'), 'https://checkout.square.site/x')).toEqual({ url: 'https://checkout.square.site/x', from: 'studio' });
+    expect(paymentLinkFor(piece('A', { paymentLink: 'javascript:alert(1)' }), null)).toBeNull();
+    expect(paymentLinkFor(piece('A', { paymentLink: '   ' }), '  ')).toBeNull();
+  });
+});

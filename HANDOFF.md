@@ -3,19 +3,21 @@
 - Artist OS: desktop-OS business suite for one artist. Browser-only, no server.
 - Build `BUILD_PLAN.md` phase by phase.
 ## Now
-- Tree green, 734 tests, IndexedDB v8 (no bump). Phase 4: Visualizer + selling
-  part 1 shipped 2026-10-09.
-- First-load JS 99.1 KB gzip (budget 100): next shell code MUST split something out.
-- Notes autosave 0.8 s + on close (blur alone lost notes, 2026-10-07).
+- Tree green, 743 tests, IndexedDB v8 (no bump). Phase 4 built (2026-10-09):
+  Visualizer, selling, pay QR, consignment, prints.
+- First-load JS ~98.8 KB gzip (budget 100). ArtworkInspector now lazy. Next
+  win if needed: defer `os/launcher.ts` tables (12 KB raw) until search opens.
 ## Done
 - Phase 4 selling pt 1: `shows/selling.ts` (sell, tally, receipt, trash/put
   back/drop sale; tested). Shows window → Selling: Sold → Record sale (price
   prefilled from asking), tally line, receipt via mailto/sms, Take the sale
   back → Trash kind `sale`. Books read the sale off the piece (no extra row).
-- Phase 4 Visualizer: `visualizer/placement.ts` (marks → wall, start, drag,
-  clamp, draw transform; tested) + lazy `visualizer/ui/VisualizerWindow`.
-  Corners+wall size or known length; unsized pieces listed as left out.
-  Launcher entry, G V, dock tool. Mock Visualizer removed.
+- Phase 4 selling pt 2: `photo.paymentLink` (PhotoWindow field) else Settings
+  Square link → Pay QR (http/https only). `show.takePercent` → sale `fee`;
+  tally adds "kept". `shows/prints.ts`: price list, 3.5×2in wall labels, COA
+  (blank line if no studio name) printed via hidden iframe (`ui/printSheet`).
+- Phase 4 Visualizer: `visualizer/placement.ts` (tested) + lazy window;
+  corners+wall size or known length; unsized pieces left out. G V.
 - Phase 3 pt 2: DB v8 `boothMedia`; loop video ≤350 MB straight loop; phone
   dock 6 + Trash; guest book 5 s quiet → loop; slides crossfade 1.5 s.
 - Phase 2: v7 guests/notes/clients/contacts; Clients joined by email/phone
@@ -55,29 +57,27 @@
   no new store). Piece drawn from the thumbnail, element 12 px/in.
 ## Dead ends (do not retry)
 - Two builds of one commit share `sw.js?v=` → SW never updates. Commit first.
+- `check-lazy-thumbs` stall check (<500 ms) is noisy here: old+new builds
+  interleaved both 420–590 ms (2026-10-09). Compare interleaved, not once.
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 
 ## Next (numbered)
-1. Phase 4 selling pt 2: payment link/QR per piece (Settings has payment
-   instructions; per-piece link optional field), consignment splits (sale
-   `fee` from a show/gallery %), then prints: price list, wall labels, COA.
-   Free entry-chunk bytes first (99.1/100).
-2. Owner checks, NOT tested: selling on a real tablet at a show; receipt
+1. Phase 5 — Mailing list (`BUILD_PLAN.md`). Read only that section first.
+2. Owner checks, NOT tested: real print output (labels cut size, COA on
+   Letter/A4, iOS print); pay QR scanned by a phone; selling on a tablet; receipt
    opening Mail/Messages on iOS/Android; Visualizer w/ a real room photo on iPad/phone; booth likes w/ real "Hanging right now" piece;
    5 s guest-book timeout on tablet; loop video + phone dock on devices.
 ## Files (path — why)
 - `src/app/*` — the hooks. `src/App.tsx` — wiring, `runAction`, render.
 - `scripts/check-clients-notes.mjs` — Phase 2; needs `OLD_DIST` (v6 build).
 - `src/studio/` — assistant: actions (device tools), snapshot, session hint, UI.
-- `scripts/check-assistant.mjs` — platform faked at network; 19/19.
-- `scripts/check-notes-place.mjs` — notes save on close, home screen, folder; 8/8.
+- `scripts/check-assistant.mjs` (19), `check-notes-place.mjs` (8) — Phase 2/3.
 - `scripts/check-booth.mjs` — Phase 3; 22 checks, tablet + phone, offline.
 - `scripts/check-visualizer.mjs` — 30 checks, desktop + phone touch; `ROOM=` a photo.
-- `scripts/check-selling.mjs` — Phase 4 gate; 32 checks, desktop + phone.
-
+- `scripts/check-selling.mjs` — Phase 4 gate; 42 checks, desktop + phone.
 ## Verify (tested / NOT tested)
-- Tested: unit 734; `check-selling` 32/32 (sell → Artwork, Finance, tally;
-  take back, reload, put back, empty; 2nd tab); `check-visualizer` 30/30;
+- Tested: unit 743; `check-selling` 42/42 (take %, pay QR, 3 print sheets'
+  HTML, sell → Artwork, Finance $ net, tally; Trash round-trip; 2nd tab); `check-visualizer` 30/30;
   `check-shows-trash`, `check-lazy-thumbs` pass. NOT: real devices, iOS
   mail/sms hand-off, real room photo, lighting by eye.
 - Phase 3: `check-booth` 22/22, `check-booth-media` 9/9. NOT: likes, iPad,
@@ -86,5 +86,5 @@
   iPad keys, deployed URL (proxy 403), 861–1000px, iOS print.
 
 ## Resume
-- Read `CLAUDE.md`, then only the Phase 4 section of `BUILD_PLAN.md`.
+- Read `CLAUDE.md`, then only the Phase 5 section of `BUILD_PLAN.md`.
 - Push to `main` (deploys). Browser checks: see `TESTING.md`.

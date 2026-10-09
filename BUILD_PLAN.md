@@ -184,15 +184,15 @@ mentions a plan until billing exists.
 - Done when: a full show day runs offline on a tablet — loop, a sign-up, a
   QR scan, the PIN out — checked at tablet and phone widths.
 
-### Phase 4 — Selling at the booth, and the Visualizer · Visualizer and selling part 1 done · Free
+### Phase 4 — Selling at the booth, and the Visualizer · **Done** · Free
 
 - Sold in two taps: status and location on the piece, an income row in the
   books, a receipt handed to the device's mail or messages app, and a
   payment link or QR per piece where the artist has one.
 - The day's tally per show, pieces still out, consignment splits.
   Part 1 (9 Oct 2026): sold in two taps from the show, the tally, receipt
-  hand-off, and Take the sale back through the Trash. Still to build:
-  payment link/QR per piece, consignment splits, prints.
+  hand-off, and Take the sale back through the Trash. Part 2 (same day):
+  pay QR per piece, the show's take % as the sale's fee, the three prints.
 - Print: price list, wall labels, certificate of authenticity.
 - Visualizer (scope settled 28 Sep 2026): a room photo, a known length
   marked on it, the piece placed at true size; plus perspective (four wall

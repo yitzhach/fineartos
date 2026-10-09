@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import QRCode from 'qrcode';
+import { certificateHtml, priceListHtml, wallLabelsHtml, type PrintStudio } from '../prints';
+import { printSheet } from './printSheet';
 import { formatMoney, parseMoney } from '../../commission/calc';
 import { mailtoLink, smsLink, type GuestEntry } from '../../connect/guestbook';
 import { describePrice, type Photo } from '../../photo/photo';
-import { cannotSell, describeTally, receiptText, saleDefaults, showTally, trashableSale, type SaleInput } from '../selling';
+import { cannotSell, describeTally, paymentLinkFor, receiptText, saleDefaults, showTally, trashableSale, type SaleInput } from '../selling';
 import {
   SHOW_STATUSES,
   boothFees,
@@ -32,8 +35,10 @@ interface Props {
   onSell: (show: Show, photo: Photo, input: SaleInput) => void;
   /** A show sale to the Trash, by the sale's id. */
   onTrashSale: (saleId: string) => void;
-  /** For the receipt's "from" line. */
-  studioName: string | null;
+  /** For the receipt, the labels and the certificate. */
+  studio: PrintStudio;
+  /** The studio's Square link from Settings: the pay QR when a piece has no link of its own. */
+  studioPayLink: string | null;
   onExport: () => void;
   onImport: (file: File) => void;
   /**
@@ -50,7 +55,7 @@ const WHEN_LABEL = { upcoming: 'Upcoming', on: 'On now', past: 'Past', undated: 
  * lives on the piece, in Artwork. A booth fee lands in the books once the
  * artist is accepted — the books row is written by the app, not here.
  */
-export function ShowsWindow({ shows, photos, imageUrls, guests, currency, onSave, onTrash, onTogglePiece, onSell, onTrashSale, studioName, onExport, onImport, focus }: Props) {
+export function ShowsWindow({ shows, photos, imageUrls, guests, currency, onSave, onTrash, onTogglePiece, onSell, onTrashSale, studio, studioPayLink, onExport, onImport, focus }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const today = localToday();
   const [selectedId, setSelectedId] = useState<string | null>(shows[0]?.id ?? null);
@@ -149,7 +154,8 @@ export function ShowsWindow({ shows, photos, imageUrls, guests, currency, onSave
             onTogglePiece={onTogglePiece}
             onSell={onSell}
             onTrashSale={onTrashSale}
-            studioName={studioName}
+            studio={studio}
+            studioPayLink={studioPayLink}
           />
         ) : (
           <p className="hint sh-empty">Pick a show to see it.</p>
@@ -170,7 +176,8 @@ function ShowDetail({
   onTogglePiece,
   onSell,
   onTrashSale,
-  studioName,
+  studio,
+  studioPayLink,
 }: {
   show: Show;
   photos: Photo[];
@@ -182,12 +189,14 @@ function ShowDetail({
   onTogglePiece: (show: Show, photo: Photo) => void;
   onSell: (show: Show, photo: Photo, input: SaleInput) => void;
   onTrashSale: (saleId: string) => void;
-  studioName: string | null;
+  studio: PrintStudio;
+  studioPayLink: string | null;
 }) {
   // A local copy, so a half-typed date or a backwards range is shown with
   // its problem instead of being saved.
   const [draft, setDraft] = useState(show);
   const [fee, setFee] = useState(show.boothFee === null ? '' : String(show.boothFee / 100));
+  const [take, setTake] = useState(show.takePercent == null ? '' : String(show.takePercent));
   useEffect(() => setDraft(show), [show]);
   const problem = showProblem(draft);
 
@@ -269,6 +278,18 @@ function ShowDetail({
             onBlur={() => change({ boothFee: parseMoney(fee) })}
           />
         </div>
+        <div className="field">
+          <label htmlFor="sh-take">Show takes (%)</label>
+          <input
+            id="sh-take"
+            type="text"
+            inputMode="decimal"
+            placeholder="Not recorded"
+            value={take}
+            onChange={(e) => setTake(e.target.value)}
+            onBlur={() => change({ takePercent: take.trim() === '' || !Number.isFinite(Number(take)) ? null : Number(take) })}
+          />
+        </div>
       </div>
       <p className="hint">
         {draft.status === 'accepted' || draft.status === 'done'
@@ -287,7 +308,7 @@ function ShowDetail({
       </div>
 
       {draft.pieceIds.length > 0 && (
-        <Selling show={show} photos={photos} imageUrls={imageUrls} onSell={onSell} onTrashSale={onTrashSale} studioName={studioName} />
+        <Selling show={show} photos={photos} imageUrls={imageUrls} onSell={onSell} onTrashSale={onTrashSale} studio={studio} studioPayLink={studioPayLink} />
       )}
 
       <h4>Pieces taken ({draft.pieceIds.length})</h4>
@@ -344,15 +365,24 @@ function Selling({
   imageUrls,
   onSell,
   onTrashSale,
-  studioName,
+  studio,
+  studioPayLink,
 }: {
   show: Show;
   photos: Photo[];
   imageUrls: Record<string, string>;
   onSell: (show: Show, photo: Photo, input: SaleInput) => void;
   onTrashSale: (saleId: string) => void;
-  studioName: string | null;
+  studio: PrintStudio;
+  studioPayLink: string | null;
 }) {
+  const [problem, setProblem] = useState<string | null>(null);
+  const [paying, setPaying] = useState<string | null>(null);
+  const print = (html: string) =>
+    printSheet(html).then(
+      () => setProblem(null),
+      (cause: Error) => setProblem(`Could not print: ${cause.message}`),
+    );
   const tally = showTally(show, photos);
   const [selling, setSelling] = useState<{ id: string; amount: string; buyer: string } | null>(null);
   const pieces = show.pieceIds
@@ -373,7 +403,8 @@ function Selling({
           const soldHere = photo.sale?.showId === show.id;
           const blocked = soldHere ? null : cannotSell(photo);
           const open = selling?.id === photo.id;
-          const receipt = soldHere ? receiptText(photo, studioName) : null;
+          const receipt = soldHere ? receiptText(photo, studio.name) : null;
+          const pay = !soldHere && !blocked ? paymentLinkFor(photo, studioPayLink) : null;
           return (
             <li key={photo.id} className="sh-sale" data-sold={soldHere || undefined}>
               {imageUrls[photo.imageId] ? <img src={imageUrls[photo.imageId]} alt="" /> : <span className="missing" />}
@@ -413,10 +444,18 @@ function Selling({
                     </div>
                   </form>
                 )}
+                {pay && paying === photo.id && <PayQr url={pay.url} from={pay.from} onProblem={setProblem} />}
                 {soldHere && receipt && (
                   <div className="chip-row">
                     <a className="btn" href={mailtoLink('', receipt.subject, receipt.body)}>Email a receipt</a>
                     <a className="btn" href={smsLink('', receipt.body)}>Text a receipt</a>
+                    <button
+                      className="btn"
+                      type="button"
+                      onClick={() => void print(certificateHtml(photo, studio, imageUrls[photo.imageId] ?? null, photo.sale!.date))}
+                    >
+                      Certificate
+                    </button>
                     {trashableSale(photo) && (
                       <button className="btn" data-variant="quiet" type="button" onClick={() => onTrashSale(photo.sale!.id!)}>
                         Take the sale back
@@ -426,15 +465,52 @@ function Selling({
                 )}
               </div>
               {!soldHere && !blocked && !open && (
-                <button className="btn" data-variant="primary" type="button" onClick={() => start(photo)}>
-                  Sold
-                </button>
+                <div className="sh-sale-actions">
+                  <button className="btn" data-variant="primary" type="button" onClick={() => start(photo)}>
+                    Sold
+                  </button>
+                  {pay && (
+                    <button className="btn" type="button" aria-pressed={paying === photo.id} onClick={() => setPaying(paying === photo.id ? null : photo.id)}>
+                      Pay QR
+                    </button>
+                  )}
+                </div>
               )}
             </li>
           );
         })}
       </ul>
-      <p className="hint">A receipt opens in your own mail or messages app; nothing is sent from here. A sale taken back goes to the Trash.</p>
+      <div className="chip-row">
+        <button className="btn" type="button" onClick={() => void print(priceListHtml(show, pieces, studio))}>Print price list</button>
+        <button className="btn" type="button" onClick={() => void print(wallLabelsHtml(pieces, studio))}>Print wall labels</button>
+      </div>
+      {problem && <p className="sh-problem" role="alert">{problem}</p>}
+      <p className="hint">
+        A receipt opens in your own mail or messages app; nothing is sent from here. A sale taken back goes to the Trash.
+        {studioPayLink || pieces.some((p) => p.paymentLink) ? '' : ' For a pay QR, add a payment link to a piece, or a Square link in Settings.'}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The pay QR: the link the buyer scans with their own phone. It hands them a
+ * checkout page; nothing here learns whether they paid, so the sale is still
+ * recorded by the artist with Sold.
+ */
+function PayQr({ url, from, onProblem }: { url: string; from: 'piece' | 'studio'; onProblem: (text: string) => void }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (ref.current) QRCode.toCanvas(ref.current, url, { width: 160, margin: 1 }).catch((cause: Error) => onProblem(`The pay QR could not be drawn: ${cause.message}`));
+  }, [url, onProblem]);
+  return (
+    <div className="sh-payqr">
+      <canvas ref={ref} aria-label={`QR code for ${url}`} />
+      <span className="faint">
+        Scan to pay · {from === 'piece' ? "this piece's link" : "the studio's Square link"}
+        <br />
+        {url}
+      </span>
     </div>
   );
 }

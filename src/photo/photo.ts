@@ -66,6 +66,11 @@ export interface Photo {
    */
   trashedSales?: Sale[];
   /**
+   * A checkout link for this one piece (Square, Stripe, PayPal…), pasted by
+   * the artist. Shown as a pay QR at a show. Nothing here takes a payment.
+   */
+  paymentLink?: string | null;
+  /**
    * Kept out of the picker a visitor is handed at a show. Not a property of
    * the work — a picture is hidden because it is sold, promised, or simply
    * not what this booth is about, and the artist can put it back in one tap.
