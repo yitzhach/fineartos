@@ -60,6 +60,12 @@ export interface Photo {
    */
   sale?: Sale | null;
   /**
+   * Sales moved to the Trash. Kept on the piece itself, not in the Trash
+   * list, so an edit to the piece in the meantime cannot lose one. Put back
+   * moves one to `sale` again; emptying the Trash drops it from here.
+   */
+  trashedSales?: Sale[];
+  /**
    * Kept out of the picker a visitor is handed at a show. Not a property of
    * the work — a picture is hidden because it is sold, promised, or simply
    * not what this booth is about, and the artist can put it back in one tap.

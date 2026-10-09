@@ -3,32 +3,25 @@
 - Artist OS: desktop-OS business suite for one artist. Browser-only, no server.
 - Build `BUILD_PLAN.md` phase by phase.
 ## Now
-- Tree green, 723 tests, IndexedDB v8. Visualizer window built (2026-10-09).
-- Booth loop video: straight loop, no fade; Choose/Replace is a primary .btn.
-- First-load JS 98.5 KB gzip (check-lazy-thumbs; budget 100) — tight.
+- Tree green, 734 tests, IndexedDB v8 (no bump). Phase 4: Visualizer + selling
+  part 1 shipped 2026-10-09.
+- First-load JS 99.1 KB gzip (budget 100): next shell code MUST split something out.
 - Notes autosave 0.8 s + on close (blur alone lost notes, 2026-10-07).
 ## Done
+- Phase 4 selling pt 1: `shows/selling.ts` (sell, tally, receipt, trash/put
+  back/drop sale; tested). Shows window → Selling: Sold → Record sale (price
+  prefilled from asking), tally line, receipt via mailto/sms, Take the sale
+  back → Trash kind `sale`. Books read the sale off the piece (no extra row).
 - Phase 4 Visualizer: `visualizer/placement.ts` (marks → wall, start, drag,
   clamp, draw transform; tested) + lazy `visualizer/ui/VisualizerWindow`.
   Corners+wall size or known length; unsized pieces listed as left out.
   Launcher entry, G V, dock tool. Mock Visualizer removed.
-- Phase 3 part 2 (2026-10-09): DB v8 `boothMedia` (additive). Loop video ≤350 MB,
-  muted, straight loop (fade through dark removed: read as a jump). Phone
-  dock: 6 apps + Trash (`Dock.tsx`). Guest book: 5 s quiet → loop "(timed out)", no PIN; "Back to
-  the loop" in tab bar. Slides crossfade 1.5 s (`booth-slide-over`). Constants
-  in `booth.ts`. `check-booth-media.mjs` 12/12.
-- Phase 2: v7 stores guests/notes/clients/contacts (`persistence/db.ts`).
-  Guest book copied from localStorage on load, old key moved to
-  `artistOS.guestBook.movedToDatabase`; write failures shown. Clients
-  (`clients/clients.ts`) built from commissions, invoices, guests, imported
-  contacts; auto-joined only by email/phone, same name → offered. Profile
-  keeps tags, follow-up (Coming up), note, merges, `label`. Notes
-  (`notes/notes.ts`) pin to anything. vCard/CSV import. Quick capture.
-- Phase 3 part 1: `booth/booth.ts` (PIN hash+salt, lockout, panels, pieces,
-  price line, idle/slide timing), `booth/storage.ts` (settings + on-flag in
-  localStorage), `booth/ui/BoothSetup` (Connect → "Booth mode" tab),
-  lazy `booth/ui/BoothMode` (loop, panels, likes on sign-up, PIN pad).
-  App returns only BoothMode while on; capture keydown holds shell keys/undo.
+- Phase 3 pt 2: DB v8 `boothMedia`; loop video ≤350 MB straight loop; phone
+  dock 6 + Trash; guest book 5 s quiet → loop; slides crossfade 1.5 s.
+- Phase 2: v7 guests/notes/clients/contacts; Clients joined by email/phone
+  only; Notes pin to anything; vCard/CSV import; Quick capture.
+- Phase 3 pt 1: `booth/` (PIN, panels, idle); BoothMode replaces the shell
+  while on and captures shell keys/undo.
 
 ## Decisions (keep)
 - `/v1/*`, `/assistant/*` never cached by `sw.js` (live sign-in data).
@@ -54,6 +47,10 @@
 - Website panel only after the artist ticks "I can see my site" (no detection
   possible); otherwise the QR panel covers it.
 - Booth pieces = today's show pieceIds ∪ inCurrentShow, minus hidden.
+- Trashed sale lives on the piece (`photo.trashedSales`), not in the Trash
+  list: an edit meanwhile can't lose it. Put back refuses if resold since.
+  Only show sales (have `id`+`before`) are trashable; old hand sales aren't.
+- `shows/selling` is dynamic-imported from App + useTrash (entry budget).
 - Visualizer room photo = window state only (client's room, minutes of use;
   no new store). Piece drawn from the thumbnail, element 12 px/in.
 ## Dead ends (do not retry)
@@ -61,9 +58,12 @@
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 
 ## Next (numbered)
-1. Rest of Phase 4: selling at the booth (sold in two taps, day's tally,
-   prints) — see `BUILD_PLAN.md`. Sale must be undoable via Trash.
-2. Owner checks, NOT tested: Visualizer w/ a real room photo on iPad/phone; booth likes w/ real "Hanging right now" piece;
+1. Phase 4 selling pt 2: payment link/QR per piece (Settings has payment
+   instructions; per-piece link optional field), consignment splits (sale
+   `fee` from a show/gallery %), then prints: price list, wall labels, COA.
+   Free entry-chunk bytes first (99.1/100).
+2. Owner checks, NOT tested: selling on a real tablet at a show; receipt
+   opening Mail/Messages on iOS/Android; Visualizer w/ a real room photo on iPad/phone; booth likes w/ real "Hanging right now" piece;
    5 s guest-book timeout on tablet; loop video + phone dock on devices.
 ## Files (path — why)
 - `src/app/*` — the hooks. `src/App.tsx` — wiring, `runAction`, render.
@@ -73,15 +73,15 @@
 - `scripts/check-notes-place.mjs` — notes save on close, home screen, folder; 8/8.
 - `scripts/check-booth.mjs` — Phase 3; 22 checks, tablet + phone, offline.
 - `scripts/check-visualizer.mjs` — 30 checks, desktop + phone touch; `ROOM=` a photo.
+- `scripts/check-selling.mjs` — Phase 4 gate; 32 checks, desktop + phone.
 
 ## Verify (tested / NOT tested)
-- Tested: unit 723; `check-visualizer` 30/30 (synthetic room, 2nd tab);
-  `check-lazy-thumbs` pass. NOT: real room photo, iPad, lighting by eye.
-- Earlier: unit 701; `check-booth` 22/22; `check-booth-media` 9/9 (v7→v8 with
-  old tab open, video in loop + reload, phone dock 7 vs tablet 14).
-  NOT: likes, blocked-tab path, crossfade with 2+ pieces, video fade by eye,
-  350 MB on a real tablet, iPad. One reload timeout in the media check once,
-  passed on re-run (watch it).
+- Tested: unit 734; `check-selling` 32/32 (sell → Artwork, Finance, tally;
+  take back, reload, put back, empty; 2nd tab); `check-visualizer` 30/30;
+  `check-shows-trash`, `check-lazy-thumbs` pass. NOT: real devices, iOS
+  mail/sms hand-off, real room photo, lighting by eye.
+- Phase 3: `check-booth` 22/22, `check-booth-media` 9/9. NOT: likes, iPad,
+  350 MB on a tablet. Media check timed out once on reload (watch it).
 - Earlier phases: `scripts/check-*` pass. NOT: mic, vCard, camera, dark sheets,
   iPad keys, deployed URL (proxy 403), 861–1000px, iOS print.
 

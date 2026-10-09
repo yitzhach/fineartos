@@ -153,6 +153,7 @@ import {
   warmTools,
 } from './app/lazyTools';
 import { boothIsOn, setBoothOn } from './booth/storage';
+import type { SaleInput } from './shows/selling';
 import { useUndo } from './app/useUndo';
 import { useObjectUrls } from './app/useObjectUrls';
 import { useStudioData } from './app/useStudioData';
@@ -1064,6 +1065,7 @@ export default function App() {
       allShows,
       expenses,
       reload: data.reload,
+      savePhoto: savePhotoRecord,
       wallpaperLibrary,
       closeWindowsFor: wm.closeWindowsFor,
       pushUndoEntry,
@@ -1232,6 +1234,25 @@ export default function App() {
       setMessage(`The piece could not be moved: ${String(cause)}`);
       await data.reload();
     }
+  };
+
+  /**
+   * Sold at a show. The books and the show's tally read the sale off the
+   * piece, so this one write changes all three. Undo sends the sale to the
+   * Trash, where it can be put back.
+   */
+  const sellPiece = async (show: Show, photo: Photo, input: SaleInput) => {
+    // Loaded on demand, like the Shows window that asks for it: the first load stays small.
+    const { sellAtShow } = await import('./shows/selling');
+    const sold = sellAtShow(photo, show, input, localToday());
+    try {
+      await savePhotoRecord(sold);
+    } catch (cause) {
+      setMessage(`The sale could not be saved: ${String(cause)}`);
+      return;
+    }
+    pushUndoEntry(`Sell “${photo.title}”`, () => handleTrash(sold.sale!.id!));
+    setMessage(`“${photo.title}” sold. It reads Sold in Artwork and is in the books.`);
   };
 
   const deleteExpenseRecord = async (id: string) => {
@@ -2224,6 +2245,9 @@ export default function App() {
           onExport={handleExportShows}
           onImport={(file) => void handleImportShows(file)}
           onTogglePiece={(show, photo) => void toggleShowPiece(show, photo)}
+          onSell={(show, photo, input) => void sellPiece(show, photo, input)}
+          onTrashSale={(saleId) => void handleTrash(saleId)}
+          studioName={studio.name || null}
           focus={showFocus}
         />
       );

@@ -4376,3 +4376,16 @@ fieldset.section > legend {
   .viz { grid-template-columns: 1fr; }
   .viz-view { order: -1; }
 }
+
+/* --- Selling at a show ---------------------------------------------------- */
+
+.sh-selling { display: flex; flex-direction: column; gap: 6px; }
+.sh-sales { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.sh-sale { display: flex; gap: 10px; align-items: flex-start; padding: 8px; border: 1px solid var(--line); border-radius: 8px; }
+.sh-sale > img, .sh-sale > .missing { width: 48px; height: 48px; object-fit: cover; border-radius: 5px; background: var(--line); flex: none; }
+.sh-sale-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.sh-sale-main .faint { font-size: 12.5px; }
+.sh-sale[data-sold] { border-color: var(--accent); }
+.sh-sale-form { display: flex; flex-direction: column; gap: 8px; }
+.sh-sale-form label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-faint); }
+.sh-sale-form input { max-width: 220px; }

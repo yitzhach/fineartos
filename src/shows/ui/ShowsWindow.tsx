@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatMoney, parseMoney } from '../../commission/calc';
-import type { GuestEntry } from '../../connect/guestbook';
-import type { Photo } from '../../photo/photo';
+import { mailtoLink, smsLink, type GuestEntry } from '../../connect/guestbook';
+import { describePrice, type Photo } from '../../photo/photo';
+import { cannotSell, describeTally, receiptText, saleDefaults, showTally, trashableSale, type SaleInput } from '../selling';
 import {
   SHOW_STATUSES,
   boothFees,
@@ -27,6 +28,12 @@ interface Props {
   onSave: (show: Show) => void;
   onTrash: (show: Show) => void;
   onTogglePiece: (show: Show, photo: Photo) => void;
+  /** Sold, in two taps: the piece, the books and the tally change together. */
+  onSell: (show: Show, photo: Photo, input: SaleInput) => void;
+  /** A show sale to the Trash, by the sale's id. */
+  onTrashSale: (saleId: string) => void;
+  /** For the receipt's "from" line. */
+  studioName: string | null;
   onExport: () => void;
   onImport: (file: File) => void;
   /**
@@ -43,7 +50,7 @@ const WHEN_LABEL = { upcoming: 'Upcoming', on: 'On now', past: 'Past', undated: 
  * lives on the piece, in Artwork. A booth fee lands in the books once the
  * artist is accepted — the books row is written by the app, not here.
  */
-export function ShowsWindow({ shows, photos, imageUrls, guests, currency, onSave, onTrash, onTogglePiece, onExport, onImport, focus }: Props) {
+export function ShowsWindow({ shows, photos, imageUrls, guests, currency, onSave, onTrash, onTogglePiece, onSell, onTrashSale, studioName, onExport, onImport, focus }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const today = localToday();
   const [selectedId, setSelectedId] = useState<string | null>(shows[0]?.id ?? null);
@@ -140,6 +147,9 @@ export function ShowsWindow({ shows, photos, imageUrls, guests, currency, onSave
               setSelectedId(null);
             }}
             onTogglePiece={onTogglePiece}
+            onSell={onSell}
+            onTrashSale={onTrashSale}
+            studioName={studioName}
           />
         ) : (
           <p className="hint sh-empty">Pick a show to see it.</p>
@@ -158,6 +168,9 @@ function ShowDetail({
   onSave,
   onTrash,
   onTogglePiece,
+  onSell,
+  onTrashSale,
+  studioName,
 }: {
   show: Show;
   photos: Photo[];
@@ -167,6 +180,9 @@ function ShowDetail({
   onSave: (show: Show) => void;
   onTrash: (show: Show) => void;
   onTogglePiece: (show: Show, photo: Photo) => void;
+  onSell: (show: Show, photo: Photo, input: SaleInput) => void;
+  onTrashSale: (saleId: string) => void;
+  studioName: string | null;
 }) {
   // A local copy, so a half-typed date or a backwards range is shown with
   // its problem instead of being saved.
@@ -270,6 +286,10 @@ function ShowDetail({
         <textarea id="sh-note" rows={2} value={draft.note ?? ''} onChange={(e) => change({ note: e.target.value || null })} />
       </div>
 
+      {draft.pieceIds.length > 0 && (
+        <Selling show={show} photos={photos} imageUrls={imageUrls} onSell={onSell} onTrashSale={onTrashSale} studioName={studioName} />
+      )}
+
       <h4>Pieces taken ({draft.pieceIds.length})</h4>
       {photos.length === 0 ? (
         <p className="hint">No pieces in the studio yet.</p>
@@ -310,5 +330,111 @@ function ShowDetail({
         </button>
       </div>
     </section>
+  );
+}
+
+/**
+ * Selling at the show: the tally, and each piece taken with its one button.
+ * Tap Sold, check the price, tap Record sale — two taps when the asking price
+ * is the price. A sale made here can be taken back; it goes to the Trash.
+ */
+function Selling({
+  show,
+  photos,
+  imageUrls,
+  onSell,
+  onTrashSale,
+  studioName,
+}: {
+  show: Show;
+  photos: Photo[];
+  imageUrls: Record<string, string>;
+  onSell: (show: Show, photo: Photo, input: SaleInput) => void;
+  onTrashSale: (saleId: string) => void;
+  studioName: string | null;
+}) {
+  const tally = showTally(show, photos);
+  const [selling, setSelling] = useState<{ id: string; amount: string; buyer: string } | null>(null);
+  const pieces = show.pieceIds
+    .map((id) => photos.find((photo) => photo.id === id))
+    .filter((photo): photo is Photo => Boolean(photo));
+
+  const start = (photo: Photo) => {
+    const d = saleDefaults(photo);
+    setSelling({ id: photo.id, amount: d.amount === null ? '' : String(d.amount / 100), buyer: '' });
+  };
+
+  return (
+    <div className="sh-selling">
+      <h4>Selling</h4>
+      <p className="hint" aria-live="polite">{describeTally(tally)}</p>
+      <ul className="sh-sales">
+        {pieces.map((photo) => {
+          const soldHere = photo.sale?.showId === show.id;
+          const blocked = soldHere ? null : cannotSell(photo);
+          const open = selling?.id === photo.id;
+          const receipt = soldHere ? receiptText(photo, studioName) : null;
+          return (
+            <li key={photo.id} className="sh-sale" data-sold={soldHere || undefined}>
+              {imageUrls[photo.imageId] ? <img src={imageUrls[photo.imageId]} alt="" /> : <span className="missing" />}
+              <div className="sh-sale-main">
+                <strong>{photo.title || 'Untitled'}</strong>
+                <span className="faint">
+                  {soldHere
+                    ? `Sold${photo.sale!.amount === null ? ', no price recorded' : ` · ${formatMoney(photo.sale!.amount, photo.currency)}`}${photo.sale!.buyer ? ` · ${photo.sale!.buyer}` : ''}`
+                    : blocked ?? describePrice(photo)}
+                </span>
+                {open && selling && (
+                  <form
+                    className="sh-sale-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      onSell(show, photo, { amount: parseMoney(selling.amount), buyer: selling.buyer.trim() || null });
+                      setSelling(null);
+                    }}
+                  >
+                    <label>
+                      Sold for ({photo.currency})
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="Not recorded"
+                        value={selling.amount}
+                        onChange={(e) => setSelling({ ...selling, amount: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Buyer (optional)
+                      <input type="text" value={selling.buyer} onChange={(e) => setSelling({ ...selling, buyer: e.target.value })} />
+                    </label>
+                    <div className="chip-row">
+                      <button className="btn" data-variant="primary" type="submit">Record sale</button>
+                      <button className="btn" data-variant="quiet" type="button" onClick={() => setSelling(null)}>Cancel</button>
+                    </div>
+                  </form>
+                )}
+                {soldHere && receipt && (
+                  <div className="chip-row">
+                    <a className="btn" href={mailtoLink('', receipt.subject, receipt.body)}>Email a receipt</a>
+                    <a className="btn" href={smsLink('', receipt.body)}>Text a receipt</a>
+                    {trashableSale(photo) && (
+                      <button className="btn" data-variant="quiet" type="button" onClick={() => onTrashSale(photo.sale!.id!)}>
+                        Take the sale back
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+              {!soldHere && !blocked && !open && (
+                <button className="btn" data-variant="primary" type="button" onClick={() => start(photo)}>
+                  Sold
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <p className="hint">A receipt opens in your own mail or messages app; nothing is sent from here. A sale taken back goes to the Trash.</p>
+    </div>
   );
 }

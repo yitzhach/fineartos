@@ -29,7 +29,7 @@
 
 /** Integer minor units, as the money in the rest of the app is kept. */
 type Minor = number;
-import { describePrice, statusOf, type Photo } from '../photo/photo';
+import { describePrice, statusOf, type Photo, type PhotoStatus } from '../photo/photo';
 
 /** Where a piece physically is. Null until the artist says. */
 export type PieceLocation = 'studio' | 'show' | 'gallery' | 'loan' | 'client' | 'storage';
@@ -70,6 +70,15 @@ export interface Sale {
    * nothing in the app can work that out on its own.
    */
   invoiced?: boolean;
+  /**
+   * Set on a sale made at a show (`shows/selling.ts`), so it can be counted in
+   * that show's tally and moved to the Trash on its own. Older sales have
+   * none and stay as they were.
+   */
+  id?: string;
+  showId?: string;
+  /** What the piece read before this sale, so taking the sale back is exact. */
+  before?: { status: PhotoStatus; location: PieceLocation | null };
 }
 
 export function emptySale(date = new Date().toISOString().slice(0, 10)): Sale {

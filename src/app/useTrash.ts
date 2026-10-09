@@ -64,6 +64,7 @@ export function useTrashActions(deps: {
   allShows: Show[];
   expenses: Expense[];
   reload: () => Promise<unknown>;
+  savePhoto: (photo: Photo) => Promise<void>;
   wallpaperLibrary: CustomWallpaper[];
   closeWindowsFor: (ids: string[]) => void;
   pushUndoEntry: (label: string, undo: () => void | Promise<void>) => void;
@@ -96,6 +97,8 @@ export function useTrashActions(deps: {
     const invoice = invoices.find((i) => i.id === itemId);
     const photo = photos.find((p) => p.id === itemId);
     const show = shows.find((one) => one.id === itemId);
+    const soldPiece = photos.find((one) => one.sale?.id === itemId);
+    if (soldPiece) return trashSaleOf(soldPiece, itemId);
     if (!project && !doc && !invoice && !photo && !show && !note) return;
 
     const entry: TrashEntry = project
@@ -139,9 +142,44 @@ export function useTrashActions(deps: {
     );
   };
 
+  /**
+   * A sale to the Trash: the piece reads what it read before the sale, the
+   * books and the show's tally drop it, and the sale waits on the piece.
+   */
+  const trashSaleOf = async (piece: Photo, saleId: string) => {
+    // The selling rules load with the Shows window; only a sale needs them here.
+    const { trashSale } = await import('../shows/selling');
+    const next = trashSale(piece, saleId);
+    if (!next) return;
+    await deps.savePhoto(next);
+    const entry: TrashEntry = {
+      id: saleId,
+      kind: 'sale',
+      name: `Sale of “${piece.title}”`,
+      deletedAt: new Date().toISOString(),
+      contains: [],
+      fromFolderId: null,
+      pieceId: piece.id,
+    };
+    applyTrash(trashItem(trashRef.current, entry));
+    pushUndoEntry(`Move the sale of “${piece.title}” to the Trash`, () => handlePutBack(saleId, true));
+    say(`The sale of “${piece.title}” went to the Trash. The piece is back as it was; nothing has been deleted.`);
+  };
+
   const handlePutBack = async (itemId: string, quiet = false) => {
     const entry = findEntry(trashRef.current, itemId);
     if (!entry) return;
+    if (entry.kind === 'sale') {
+      const { putSaleBack } = await import('../shows/selling');
+      const piece = entry.pieceId ? await repo.loadPhoto(entry.pieceId) : null;
+      const back = piece ? putSaleBack(piece, itemId) : 'The piece this sale was on is no longer here.';
+      if (typeof back === 'string') return say(back);
+      await deps.savePhoto(back);
+      applyTrash(removeEntry(trashRef.current, itemId));
+      if (quiet) return;
+      pushUndoEntry(`Put “${entry.name}” back`, () => handleTrash(itemId));
+      return say(`“${entry.name}” is back: the piece reads Sold again, and the books and the show count it.`);
+    }
     applyTrash(removeEntry(trashRef.current, itemId));
     if (quiet) return;
     pushUndoEntry(`Put “${entry.name}” back`, () => handleTrash(itemId));
@@ -159,6 +197,16 @@ export function useTrashActions(deps: {
   const destroy = async (entries: TrashEntry[]) => {
     const ids = entries.flatMap(deletionTargets);
     const removedImages: string[] = [];
+
+    // A sale waits on its piece; emptying drops it from there. The piece
+    // itself stays exactly as it reads now.
+    const saleEntries = entries.filter((one) => one.kind === 'sale' && one.pieceId);
+    const { dropTrashedSale } = saleEntries.length ? await import('../shows/selling') : { dropTrashedSale: null };
+    for (const entry of saleEntries) {
+      const piece = await repo.loadPhoto(entry.pieceId!);
+      const next = piece && dropTrashedSale ? dropTrashedSale(piece, entry.id) : null;
+      if (next) await repo.savePhoto(next);
+    }
 
     // A commission's updates are its own records and have no life without it.
     // Left behind they are orphans: invisible everywhere, and still stored.

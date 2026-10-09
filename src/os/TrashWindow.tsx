@@ -149,6 +149,7 @@ function kindLabel(kind: TrashEntry['kind']): string {
   if (kind === 'photo') return 'Picture';
   if (kind === 'show') return 'Show';
   if (kind === 'note') return 'Note';
+  if (kind === 'sale') return 'Sale';
   return 'Commission';
 }
 
@@ -164,6 +165,7 @@ function describeContents({
   pictures,
   shows,
   notes,
+  sales,
   fees,
   records,
   entries,
@@ -176,6 +178,7 @@ function describeContents({
   if (pictures) parts.push(countPhrase(pictures, 'picture'));
   if (shows) parts.push(countPhrase(shows, 'show'));
   if (notes) parts.push(countPhrase(notes, 'note'));
+  if (sales) parts.push(countPhrase(sales, 'sale'));
   const inside = records - entries - updates - fees;
   if (inside > 0) parts.push(`${countPhrase(inside)} filed inside`);
   // Named, because nobody put these in the Trash themselves: they follow the
@@ -201,6 +204,9 @@ function describeEntry(entry: TrashEntry, updates: AttachedRecord[]): string {
     );
   }
   if (going > 0) parts.push(`${countPhrase(going, 'client update')} belonging to it`);
+  if (entry.kind === 'sale') {
+    return 'The sale — gone for good. The piece stays as it is now, unsold. This cannot be undone.';
+  }
   if (entry.kind === 'show') {
     const what = fees > 0 ? 'The show and its booth-fee row in the books' : 'The show';
     return `${what} — gone for good. Its pieces go back where they were. This cannot be undone.`;
