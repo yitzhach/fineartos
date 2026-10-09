@@ -143,6 +143,7 @@ import {
   WallpaperSlides,
   BoothMode,
   VisualizerWindow,
+  CalendarWindow,
   ArtworkInspector,
   FinanceWindow,
   ImageEditor,
@@ -154,6 +155,8 @@ import {
 } from './app/lazyTools';
 import { boothIsOn, setBoothOn } from './booth/storage';
 import type { SaleInput } from './shows/selling';
+import type { CalendarEvent, CalendarInput } from './calendar/calendar';
+type CalendarOpen = CalendarEvent['open'];
 import { useUndo } from './app/useUndo';
 import { useObjectUrls } from './app/useObjectUrls';
 import { useStudioData } from './app/useStudioData';
@@ -190,6 +193,7 @@ registerModule({ id: 'shows', name: 'Shows', icon: 'shows', available: true, gro
 registerModule({ id: 'finance', name: 'Finance', icon: 'finance', available: true, group: 'tool' });
 registerModule({ id: 'clients', name: 'Clients', icon: 'clients', available: true, group: 'tool' });
 registerModule({ id: 'notes', name: 'Notes', icon: 'notes', available: true, group: 'tool' });
+registerModule({ id: 'calendar', name: 'Calendar', icon: 'calendar', available: true, group: 'tool' });
 registerModule({ id: 'visualizer', name: 'Visualizer', icon: 'visualizer', available: true, group: 'tool' });
 registerModule({ id: 'assistant', name: 'Assistant', icon: 'assistant', available: true, group: 'tool' });
 // Last in the dock, the way the Trash is always last.
@@ -1500,6 +1504,8 @@ export default function App() {
         return { kind: { type: 'tool', tool: 'clients' }, title: 'Clients', subtitle: 'Everyone, from every record' };
       case 'notes':
         return { kind: { type: 'tool', tool: 'notes' }, title: 'Notes', subtitle: 'Notes and checklists' };
+      case 'calendar':
+        return { kind: { type: 'tool', tool: 'calendar' }, title: 'Calendar', subtitle: 'Every dated thing, in one place' };
       case 'visualizer':
         return { kind: { type: 'tool', tool: 'visualizer' }, title: 'Visualizer', subtitle: 'A piece on a wall, at true size' };
       case 'assistant':
@@ -1536,6 +1542,30 @@ export default function App() {
   // The tools themselves build every person from the records (app/PeopleTools,
   // loaded on open). The shell keeps only what the search box and Coming up
   // need, read off the stored notes and profiles.
+
+  /**
+   * The calendar's records, raw. Its dates are worked out in the lazy chunk;
+   * only the inputs are gathered here, and remade only when one changes.
+   */
+  const calendarInput = useMemo<CalendarInput>(
+    () => ({
+      shows,
+      documents: rows.map((row) => row.document),
+      owed: allOwed({ invoices, documents: rows.map((row) => row.document) }),
+      followUps: followUpsDue(data.profiles, '0000-00-00', '9999-12-31'),
+      today: localToday(),
+    }),
+    [shows, rows, invoices, data.profiles],
+  );
+
+  /** A dated thing from the calendar, opened at the record it came from. */
+  const openDated = (target: CalendarOpen) => {
+    if (target.kind === 'client') return openClients(target.id);
+    if (target.kind === 'invoice') return openInvoiceWindow(target.id);
+    if (target.kind === 'commission') return openDocumentWindow(target.id);
+    setShowFocus({ id: target.id });
+    open({ type: 'tool', tool: 'shows' }, 'Shows', 'Fairs, openings and markets');
+  };
 
   const openClients = (id?: string) => {
     if (id) setClientFocus({ id });
@@ -1959,7 +1989,7 @@ export default function App() {
     }
 
     // Built tools that draw their own bar have none here.
-    if (kind.type === 'tool' && ['clients', 'notes', 'assistant', 'visualizer'].includes(kind.tool)) return null;
+    if (kind.type === 'tool' && ['clients', 'notes', 'assistant', 'visualizer', 'calendar'].includes(kind.tool)) return null;
 
     // Only the mock tools carry this. A built tool saying it saves nothing
     // would be a lie about the Finder, which files things for real.
@@ -2389,6 +2419,16 @@ export default function App() {
               if (id) openTool(id);
             }
           }}
+        />
+      );
+    }
+
+    if (kind.type === 'tool' && kind.tool === 'calendar') {
+      return (
+        <CalendarWindow
+          input={calendarInput}
+          onOpen={openDated}
+          onMessage={setMessage}
         />
       );
     }

@@ -61,6 +61,7 @@ export const GO_KEYS: Record<string, string> = {
   l: 'clients',
   n: 'notes',
   v: 'visualizer',
+  k: 'calendar',
   t: 'trash',
   h: 'home',
 };
@@ -141,6 +142,12 @@ const TOOL_SPECS: ToolSpec[] = [
     title: 'Notes',
     hint: 'Quick notes and checklists, pinned to anything',
     keywords: ['note', 'notes', 'checklist', 'todo', 'to do', 'list', 'memo', 'jot', 'reminder', 'dictate'],
+  },
+  {
+    id: 'calendar',
+    title: 'Calendar',
+    hint: 'Every dated thing: shows, deadlines, deliveries, payments, follow-ups, tasks',
+    keywords: ['calendar', 'schedule', 'agenda', 'dates', 'due', 'tasks', 'todo', 'to do', 'board', 'stages', 'pipeline', 'ics', 'ical', 'month'],
   },
   {
     id: 'visualizer',

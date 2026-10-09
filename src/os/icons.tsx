@@ -23,6 +23,7 @@ export type IconName =
   | 'shows'
   | 'artwork'
   | 'visualizer'
+  | 'calendar'
   | 'finance'
   | 'clients'
   | 'notes'
@@ -131,6 +132,14 @@ const paths: Record<IconName, JSX.Element> = {
   ),
 
   // A piece hung on a wall, with the floor line under it.
+  calendar: (
+    <>
+      <rect x="3.6" y="5.2" width="16.8" height="15" rx="1.4" />
+      <path d="M3.6 9.6h16.8" />
+      <path d="M8 3.4v3.6M16 3.4v3.6" />
+      <path d="M7.6 13.4h2M11 13.4h2M14.4 13.4h2M7.6 16.8h2M11 16.8h2" />
+    </>
+  ),
   shows: (
     <>
       <rect x="6.4" y="4.2" width="11.2" height="9.4" rx="0.9" />

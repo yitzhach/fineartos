@@ -19,44 +19,6 @@ export interface ToolDefinition {
   render?: () => JSX.Element;
 }
 
-function Calendar() {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth();
-  const first = new Date(year, month, 1).getDay();
-  const days = new Date(year, month + 1, 0).getDate();
-  const cells: (number | null)[] = [
-    ...Array.from({ length: first }, () => null),
-    ...Array.from({ length: days }, (_, i) => i + 1),
-  ];
-
-  return (
-    <MockTool
-      name="Calendar"
-      purpose="It will hold show dates, delivery dates and studio time in one view."
-      needs="The dates below are real; there are no events because nothing records them yet."
-    >
-      <div className="mock-cal">
-        <h3>{today.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</h3>
-        <div className="cal-grid">
-          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-            <span key={i} className="cal-head">{d}</span>
-          ))}
-          {cells.map((day, i) => (
-            <span
-              key={i}
-              className="cal-day"
-              data-today={day === today.getDate() ? 'true' : 'false'}
-            >
-              {day ?? ''}
-            </span>
-          ))}
-        </div>
-      </div>
-    </MockTool>
-  );
-}
-
 function Clients() {
   return (
     <MockTool
@@ -148,7 +110,6 @@ function Connect() {
 
 /** Mock tools by id, matching the dock. */
 export const MOCK_TOOLS: Record<string, () => JSX.Element> = {
-  calendar: Calendar,
   clients: Clients,
   files: Files,
   templates: Templates,

@@ -10,6 +10,7 @@ import {
   milestonesOf,
   SUGGESTED_STAGES,
 } from '../milestones';
+import { addTask, createTask, removeTask, sortedTasks, tasksOf, updateTask } from '../tasks';
 
 export type ProjectTab =
   | 'overview'
@@ -17,6 +18,7 @@ export type ProjectTab =
   | 'document'
   | 'files'
   | 'milestones'
+  | 'tasks'
   | 'invoices'
   | 'updates'
   | 'notes';
@@ -100,6 +102,7 @@ export function ProjectWindow(props: Props) {
     { id: 'document', label: 'Document' },
     { id: 'files', label: 'Files', count: images.length },
     { id: 'milestones', label: 'Milestones', count: progress.total },
+    { id: 'tasks', label: 'Tasks', count: tasksOf(doc).filter((t) => !t.done).length },
     { id: 'invoices', label: 'Invoices', count: invoices.length },
     { id: 'updates', label: 'Client', count: props.updatesWaiting || undefined },
     { id: 'notes', label: 'Notes' },
@@ -344,6 +347,12 @@ export function ProjectWindow(props: Props) {
         </div>
       )}
 
+      {tab === 'tasks' && (
+        <div className="pj-pane">
+          <TaskEditor doc={doc} onDocChange={props.onDocChange} />
+        </div>
+      )}
+
       {tab === 'milestones' && (
         <div className="pj-pane">
           <MilestoneEditor doc={doc} onDocChange={props.onDocChange} />
@@ -554,6 +563,66 @@ function MilestoneEditor({
           Add
         </button>
       </div>
+    </>
+  );
+}
+
+/**
+ * The artist's own to-dos for this commission. Private: never on the client
+ * document. A dated one shows in the Calendar.
+ */
+function TaskEditor({ doc, onDocChange }: { doc: CommissionDocument; onDocChange: (doc: CommissionDocument) => void }) {
+  const [label, setLabel] = useState('');
+  const [due, setDue] = useState('');
+  const tasks = sortedTasks(tasksOf(doc));
+  return (
+    <>
+      <p className="hint">Private to-dos — never on the client's document. A task with a date shows in the Calendar.</p>
+      {tasks.length === 0 && <p className="hint">No tasks yet.</p>}
+      <ul className="milestones editable">
+        {tasks.map((task) => (
+          <li key={task.id}>
+            <button
+              className="ms-check"
+              data-done={task.done}
+              onClick={() => onDocChange(updateTask(doc, task.id, { done: !task.done }))}
+              aria-pressed={task.done}
+              aria-label={`Mark ${task.label} ${task.done ? 'not done' : 'done'}`}
+            >
+              <span aria-hidden="true">{task.done ? '✓' : ''}</span>
+            </button>
+            <input
+              type="text"
+              aria-label="Task"
+              value={task.label}
+              onChange={(e) => onDocChange(updateTask(doc, task.id, { label: e.target.value }))}
+            />
+            <input
+              type="date"
+              aria-label={`Due date for ${task.label}`}
+              value={task.due ?? ''}
+              onChange={(e) => onDocChange(updateTask(doc, task.id, { due: e.target.value || null }))}
+            />
+            <button className="btn" data-variant="quiet" aria-label={`Remove ${task.label}`} onClick={() => onDocChange(removeTask(doc, task.id))}>
+              ✕
+            </button>
+          </li>
+        ))}
+      </ul>
+      <form
+        className="ms-add"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!label.trim()) return;
+          onDocChange(addTask(doc, createTask(label, due || null)));
+          setLabel('');
+          setDue('');
+        }}
+      >
+        <input type="text" placeholder="Add a task" aria-label="New task" value={label} onChange={(e) => setLabel(e.target.value)} />
+        <input type="date" aria-label="New task due date" value={due} onChange={(e) => setDue(e.target.value)} />
+        <button className="btn" type="submit" disabled={label.trim() === ''}>Add</button>
+      </form>
     </>
   );
 }

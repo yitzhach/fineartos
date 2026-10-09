@@ -85,6 +85,7 @@ export const ArtworkInspector = lazyTool(
   () => import('../commission/ui/ArtworkInspector').then((m) => m.ArtworkInspector),
   true,
 );
+export const CalendarWindow = lazyTool('The calendar', () => import('../calendar/ui/CalendarWindow').then((m) => m.CalendarWindow));
 export const BoothMode = lazyTool('Booth mode', () => import('../booth/ui/BoothMode').then((m) => m.BoothMode));
 export const MockToolWindow = lazyTool('The preview', () => import('../os/mock/tools').then((m) => m.MockToolWindow));
 

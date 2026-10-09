@@ -56,6 +56,15 @@ export interface Milestone {
   done: boolean;
 }
 
+/** A private to-do on a commission, with an optional due date. */
+export interface CommissionTask {
+  id: string;
+  label: string;
+  /** yyyy-mm-dd, or null: no date agreed. */
+  due: string | null;
+  done: boolean;
+}
+
 export interface Schedule {
   targetCompletionDate: string | null;
   deliveryNotes: string | null;
@@ -134,6 +143,12 @@ export interface CommissionDocument extends ClientFacing {
   version: number;
   /** Never leaves the app. Excluded from every snapshot and export. */
   privateNotes: string | null;
+  /**
+   * The artist's own to-dos for this commission. Like the private notes, never
+   * client-facing: `toClientFacing` names its fields, and this is not one.
+   * Optional so a document from an older build reads as an empty list.
+   */
+  tasks?: CommissionTask[];
   issuedSnapshots: IssuedSnapshot[];
   createdAt: string;
   updatedAt: string;

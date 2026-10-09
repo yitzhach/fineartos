@@ -215,12 +215,14 @@ mentions a plan until billing exists.
 - Built 9 Oct 2026: the list is derived, never stored (`connect/mailing.ts`);
   clients join only when marked "may email" in Clients.
 
-### Phase 6 — Calendar and tasks · Planned · Free
+### Phase 6 — Calendar and tasks · **Done** · Free
 
 - Calendar tool (replaces the preview): shows, deadlines, deliveries,
   payments due, follow-ups; ICS export for the phone's own calendar.
 - Tasks per commission; a board of commissions by stage.
 - Done when: every dated thing in the studio appears once, in one place.
+- Built 9 Oct 2026: `src/calendar/` (month, list, board by stage, .ics) and
+  private commission tasks (`commission/tasks.ts`, never client-facing).
 
 ### Phase 7 — Sign-in and the cloud · Planned · Studio — the server line
 
