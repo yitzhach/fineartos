@@ -14,7 +14,6 @@
   dock: 6 apps + Trash (`Dock.tsx`). Guest book: 5 s quiet → loop "(timed out)", no PIN; "Back to
   the loop" in tab bar. Slides crossfade 1.5 s (`booth-slide-over`). Constants
   in `booth.ts`. `check-booth-media.mjs` 12/12.
-- Phases 0–1: hooks in `src/app/`, lazy tools (`app/lazyTools.tsx`).
 - Phase 2: v7 stores guests/notes/clients/contacts (`persistence/db.ts`).
   Guest book copied from localStorage on load, old key moved to
   `artistOS.guestBook.movedToDatabase`; write failures shown. Clients
