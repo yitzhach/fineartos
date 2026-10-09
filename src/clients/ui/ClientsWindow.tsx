@@ -64,6 +64,8 @@ export function ClientsWindow(props: Props) {
             type="file"
             accept=".vcf,.csv,text/vcard,text/csv"
             className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) props.onImport(file);

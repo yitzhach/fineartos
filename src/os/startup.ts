@@ -26,8 +26,15 @@ export function openingWindows(input: {
   records: StudioRecords;
   /** What is in the Trash. */
   hidden: ReadonlySet<string>;
+  /**
+   * Windows the artist opened before the studio finished reading. They got
+   * there first: what they opened stays in front, and nothing is put back
+   * over it or in place of it.
+   */
+  alreadyOpen?: number;
 }): Opening {
   const { records, hidden } = input;
+  if ((input.alreadyOpen ?? 0) > 0) return { kind: 'nothing' };
   if (input.restoreOn) {
     const live = {
       documents: new Set(records.documents.map((row) => row.id)),

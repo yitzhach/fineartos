@@ -277,6 +277,7 @@ export default function App() {
       saved: loadWindows(),
       records,
       hidden: trashedIds(trashRef.current),
+      alreadyOpen: wm.windowsRef.current.length,
     });
     if (opening.kind === 'restore') wm.setWindows(opening.windows);
     else if (opening.kind === 'newest') {

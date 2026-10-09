@@ -31,6 +31,12 @@ describe('what the desktop opens with', () => {
     expect(opening.windows.map((w) => w.kind.type)).toEqual(['settings', 'commission']);
   });
 
+  it('opens nothing over a window the artist opened before the studio was read', () => {
+    const saved = openAll([{ type: 'settings' }]);
+    expect(openingWindows({ restoreOn: true, saved, records: studio, hidden: new Set(), alreadyOpen: 1 })).toEqual({ kind: 'nothing' });
+    expect(openingWindows({ restoreOn: false, saved: [], records: studio, hidden: new Set(), alreadyOpen: 1 })).toEqual({ kind: 'nothing' });
+  });
+
   it('opens the newest commission when nothing was open', () => {
     expect(openingWindows({ restoreOn: true, saved: [], records: studio, hidden: new Set() })).toEqual({
       kind: 'newest',
