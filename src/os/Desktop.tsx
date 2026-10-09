@@ -515,6 +515,8 @@ function AddImages({
         accept="image/png,image/jpeg,image/webp"
         multiple
         className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
         onChange={(e) => {
           if (e.target.files && e.target.files.length > 0) onFiles(e.target.files);
           e.target.value = '';

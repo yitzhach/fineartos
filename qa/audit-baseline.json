@@ -1,12 +1,3 @@
 {
-  "_about": "Known issues the audit reports without failing. Only new ones fail. Rewrite from a run with `npm run audit:baseline` and review the diff: it should only shrink, unless an issue is being accepted on purpose.",
-  "dark ./": {
-    "a11y:label": 2
-  },
-  "desktop ./": {
-    "a11y:label": 2
-  },
-  "phone ./": {
-    "a11y:label": 2
-  }
+  "_about": "Known issues the audit reports without failing. Only new ones fail. Rewrite from a run with `npm run audit:baseline` and review the diff: it should only shrink, unless an issue is being accepted on purpose."
 }

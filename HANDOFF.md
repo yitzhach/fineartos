@@ -46,11 +46,9 @@
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 - Rendering the launcher lazily to "save" bytes is cheating: it draws at once.
 ## Next (numbered)
-1. Owner picks fixes from the first site-qa report: (a) two unlabeled hidden
-   file inputs (Import JSON in App.tsx, Add images in Desktop.tsx); (b)
-   Calendar `.ca-grid` role=grid with no rows/cells. Fix approved ones, drop
-   them from `qa/audit-baseline.json` / `windows-known.json`, both suites
-   green, land on `main` only on owner's word.
+1. Land site-qa + fixes on `main` when owner says go (approved 2026-10-09:
+   hidden file inputs aria-hidden, Calendar grid → role=group). Then live
+   audit: `SITE_QA_URL=https://fineartos.bobdylan2000.workers.dev/`.
 2. Phase 7 plan only: write `docs/phase-7.md` (records → studio-api sync,
    conflicts shown never overwritten, Trash sync per `FUTURE_BUILD.md`).
    Owner questions first: billing/plans (CLAUDE.md: nothing may imply it
@@ -74,8 +72,8 @@
   `check-selling.mjs` (42), `check-visualizer.mjs` (30, `ROOM=` a photo),
   `check-booth.mjs` (22), `check-shows-trash.mjs`, `check-lazy-thumbs.mjs`.
 ## Verify (tested / NOT tested)
-- Tested 2026-10-09 (site-qa): `npm --prefix qa test` 39 pass on local build;
-  unit 762. Live-site audit blocked (proxy 403); CI workflow NOT yet run.
+- Tested 2026-10-09 (site-qa + fixes): qa 39 pass, 0 known issues; unit 762;
+  check-calendar 34/34. Live host now allowed; CI workflow NOT yet seen.
 - Tested 2026-10-09 (launcher split): unit 762; check-launcher-tiling 20/20;
   check-lazy-thumbs 15/15 (95.5 KB). Launcher "failed" state NOT exercised.
 - Tested 2026-10-09: unit 762; check-calendar 34/34, check-mailing 24/24,

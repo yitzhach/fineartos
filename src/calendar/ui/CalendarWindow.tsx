@@ -111,7 +111,7 @@ export function CalendarWindow({ input, onOpen, onMessage }: Props) {
             <button className="btn" data-variant="quiet" aria-label="Next month" onClick={() => setMonth(shiftMonth(month, 1))}>›</button>
             <button className="btn" data-variant="quiet" onClick={() => { setMonth(today.slice(0, 7)); setDay(today); }}>Today</button>
           </div>
-          <div className="ca-grid" role="grid" aria-label={monthTitle(month)}>
+          <div className="ca-grid" role="group" aria-label={monthTitle(month)}>
             {WEEKDAYS.map((w) => <div key={w} className="ca-head">{w}</div>)}
             {monthGrid(month).map((d) => {
               const on = eventsOn(shown, d);

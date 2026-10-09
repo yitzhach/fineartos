@@ -2561,6 +2561,8 @@ export default function App() {
         type="file"
         accept="application/json"
         className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) void handleImport(file);

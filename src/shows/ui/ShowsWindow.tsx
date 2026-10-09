@@ -114,6 +114,8 @@ export function ShowsWindow({ shows, photos, imageUrls, guests, profiles, curren
             type="file"
             accept="application/json"
             className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) onImport(file);
