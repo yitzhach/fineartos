@@ -1,7 +1,6 @@
 import QRCode from 'qrcode';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CROSSFADE_MS,
   GUEST_QUIET_MS,
   PANEL_LABELS,
   boothPanels,
@@ -192,30 +191,9 @@ export function BoothMode(props: Props) {
   );
 }
 
-/**
- * The artist's clip, muted and looping. It fades through dark at the loop point
- * over CROSSFADE_MS, since one video cannot be cross-faded with itself.
- */
+/** The artist's clip, muted, looping straight back to its start. */
 function LoopVideo({ src }: { src: string }) {
-  const ref = useRef<HTMLVideoElement>(null);
-  const fade = CROSSFADE_MS / 1000;
-  return (
-    <video
-      ref={ref}
-      className="booth-slide"
-      src={src}
-      autoPlay
-      muted
-      loop
-      playsInline
-      onTimeUpdate={() => {
-        const v = ref.current;
-        if (!v || !Number.isFinite(v.duration)) return;
-        const edge = Math.min(v.currentTime, v.duration - v.currentTime);
-        v.style.opacity = String(Math.max(0, Math.min(1, edge / fade)));
-      }}
-    />
-  );
+  return <video className="booth-slide" src={src} autoPlay muted loop playsInline />;
 }
 
 function BoothGuestBook({

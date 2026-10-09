@@ -130,7 +130,7 @@ export function BoothSetup({ siteUrl, photos, showPieceIds, onStart, onMessage, 
         </p>
         {profileVideoUrl && <video className="booth-setup-video" src={profileVideoUrl} muted loop playsInline controls />}
         <div className="booth-setup-row">
-          <label className="button">
+          <label className="btn" data-variant="primary">
             {profileVideoUrl ? 'Replace video' : 'Choose a video'}
             <input
               type="file"
