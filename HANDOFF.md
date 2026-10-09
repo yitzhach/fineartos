@@ -78,10 +78,10 @@
 - `scripts/check-selling.mjs` — Phase 4 gate; 42 checks, desktop + phone.
 - `scripts/check-mailing.mjs` — Phase 5 gate; 24 checks, desktop + phone.
 ## Verify (tested / NOT tested)
-- Tested: `check-mailing` 24/24, `check-booth` 22/22. unit 752; `check-selling` 42/42 (take %, pay QR, 3 print sheets'
-  HTML, sell → Artwork, Finance $ net, tally; Trash round-trip; 2nd tab); `check-visualizer` 30/30;
-  `check-shows-trash`, `check-lazy-thumbs` pass. NOT: real devices, iOS
-  mail/sms hand-off, real room photo, lighting by eye.
+- Tested: unit 752; `check-mailing` 24/24; `check-selling` 42/42; `check-booth`
+  22/22; `check-visualizer` 30/30; `check-shows-trash` ok. `check-lazy-thumbs`:
+  budget ok (98.9), stall check 548 ms FAIL = known noise (see Dead ends).
+  NOT: real devices, iOS mail/sms, real room photo, lighting by eye.
 - Phase 3: `check-booth` 22/22, `check-booth-media` 9/9. NOT: likes, iPad,
   350 MB on a tablet. Media check timed out once on reload (watch it).
 - Earlier phases: `scripts/check-*` pass. NOT: mic, vCard, camera, dark sheets,
