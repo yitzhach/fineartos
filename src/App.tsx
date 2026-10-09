@@ -162,7 +162,7 @@ import { useObjectUrls } from './app/useObjectUrls';
 import { useStudioData } from './app/useStudioData';
 import { useWindows } from './app/useWindows';
 import { useTrashActions, useTrashState } from './app/useTrash';
-import { useLauncherEntries, useShellKeys } from './app/useShellKeys';
+import { useLauncher, useShellKeys } from './app/useShellKeys';
 
 /**
  * Workspace id. With no auth in this phase there is one local workspace, but
@@ -1667,7 +1667,7 @@ export default function App() {
     [data.profiles],
   );
 
-  const launcherEntries = useLauncherEntries(
+  const { launcher, wantLauncher } = useLauncher(
     {
       frames: frames.length,
       hasFocused,
@@ -2520,7 +2520,8 @@ export default function App() {
         studioName={studio.name}
         launcher={
           <Launcher
-            entries={launcherEntries}
+            state={launcher}
+            onWant={wantLauncher}
             onChoose={onLaunch}
             summon={shell.launcherSummon}
             compact={compact}

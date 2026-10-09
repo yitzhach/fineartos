@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { isApplePlatform, keyNames, keyText, undoKeys } from '../keys';
 import { shortcutGroups, typingNote } from '../shortcuts';
-import { GO_KEYS, actionEntries, type LauncherContext } from '../launcher';
+import { GO_KEYS } from '../goKeys';
+import { actionEntries, type LauncherContext } from '../launcher';
 
 describe('key names', () => {
   it('knows an Apple device by its user agent', () => {

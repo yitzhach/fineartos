@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { GO_KEYS, GO_WINDOW_MS, goStep } from '../goKeys';
 import {
-  GO_KEYS,
-  GO_WINDOW_MS,
   TRY_THESE,
   actionEntries,
-  goStep,
   normalise,
   recordEntries,
   searchLauncher,

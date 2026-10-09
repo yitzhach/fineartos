@@ -14,6 +14,11 @@
  *  - Nothing is offered that cannot be done. Tiling needs two windows, so
  *    with one open it is not in the list — not shown and then refused.
  *  - Every tool shows its shortcut, which is how the shortcuts are learned.
+ *
+ * This module is loaded when the box is first wanted (or the app is idle),
+ * not with the shell: the keyword tables are too heavy for the first load.
+ * The G-then-a-letter keys work from the first frame, so they live in
+ * goKeys.ts, which the shell imports directly.
  */
 
 import type { StoredDocument } from '../persistence/repository';
@@ -25,6 +30,7 @@ import { describePhoto } from '../photo/photo';
 import type { Show } from '../shows/shows';
 import type { GuestEntry } from '../connect/guestbook';
 import { keyNames } from './keys';
+import { GO_KEYS } from './goKeys';
 
 export type LauncherSection = 'tool' | 'action' | 'record';
 
@@ -44,27 +50,6 @@ export interface LauncherEntry {
   /** Offered in the empty box, before anything is typed. */
   suggested?: boolean;
 }
-
-/**
- * Two-key shortcuts for the tools: G, then the letter. The letter is the
- * tool's initial wherever that is free; Finance is B for the books, because
- * F was already the Finder.
- */
-export const GO_KEYS: Record<string, string> = {
-  p: 'commissions',
-  i: 'invoices',
-  f: 'finder',
-  c: 'connect',
-  a: 'artwork',
-  s: 'shows',
-  b: 'finance',
-  l: 'clients',
-  n: 'notes',
-  v: 'visualizer',
-  k: 'calendar',
-  t: 'trash',
-  h: 'home',
-};
 
 /** Each G sequence and the tool it opens, for the shortcut sheet. */
 export function goSequences(): { letter: string; tool: string; title: string }[] {
@@ -650,35 +635,3 @@ export function suggestions(entries: LauncherEntry[]): LauncherEntry[] {
  * would teach the opposite lesson.
  */
 export const TRY_THESE = ['qr', 'mileage', 'booth fee', 'email list', 'receipts'];
-
-// --- G, then a letter ---------------------------------------------------
-
-/** How long after G the second key still counts. */
-export const GO_WINDOW_MS = 1500;
-
-export interface GoState {
-  /** When G was pressed, or null when not waiting for a second key. */
-  armedAt: number | null;
-}
-
-/**
- * One key press through the G-sequence. The caller passes only plain keys —
- * none with Ctrl, ⌘ or Alt held — and only when nobody is typing in a field.
- * `consumed` says the key was part of a sequence and should do nothing else.
- */
-export function goStep(
-  state: GoState,
-  key: string,
-  now: number,
-): { state: GoState; tool: string | null; consumed: boolean } {
-  const k = key.toLowerCase();
-  const armed = state.armedAt !== null && now - state.armedAt <= GO_WINDOW_MS;
-  if (armed) {
-    const tool = GO_KEYS[k] ?? null;
-    if (tool) return { state: { armedAt: null }, tool, consumed: true };
-    if (k === 'g') return { state: { armedAt: now }, tool: null, consumed: true };
-    return { state: { armedAt: null }, tool: null, consumed: false };
-  }
-  if (k === 'g') return { state: { armedAt: now }, tool: null, consumed: true };
-  return { state: { armedAt: null }, tool: null, consumed: false };
-}

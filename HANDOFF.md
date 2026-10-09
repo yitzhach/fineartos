@@ -4,10 +4,14 @@
 - Build `BUILD_PLAN.md` phase by phase. Phases 0–6 done (2026-10-09).
 ## Now
 - `main` green at the commit that wrote this: 762 unit tests, IndexedDB v8.
-- First-load JS 99.3 KB gzip of a 100 KB budget — the next shell byte breaks
-  it. Free room before adding anything to the entry chunk (Next #1).
+- First-load JS 95.5 KB gzip of a 100 KB budget (was 99.3): launcher tables
+  now load lazily. Keep new shell code out of the entry chunk.
 - Phase 7 (sync through studio-api, billing) needs owner calls; not started.
 ## Done
+- Entry diet: `os/goKeys.ts` (GO_KEYS, goStep) stays in the entry;
+  `os/launcher.ts` (tools, actions, records, ranking) is its own 4.6 KB chunk
+  loaded on idle (≤2 s) or when the box opens. `useLauncher` in
+  `app/useShellKeys.ts` → `LauncherState` loading / failed (Reload) / ready.
 - Phase 6 calendar + tasks: `calendar/calendar.ts` (every dated thing once:
   shows, deadlines, deliveries, milestones, tasks, payments due, follow-ups;
   month grid, ICS with folding + exclusive DTEND; tested). Lazy
@@ -34,6 +38,8 @@
 - `/v1/*`, `/assistant/*` never cached by `sw.js` (live sign-in data).
 - Note in a folder = `pin {kind:'project'}`. No DB bump.
 - System bar search is the launcher; actions only when runnable (rule 8).
+- Launcher box draws at once; only its tables are lazy. G keys never wait.
+  Don't re-export goKeys from launcher.ts (would pull tables into entry).
 - Emptying the Trash reloads BEFORE entries leave it (else a flash-back).
 - Shared modules: split cheap helpers out of the entry chunk; don't re-export.
 - Clients/Notes wiring in lazy `app/PeopleTools.tsx`; keep `buildPeople` out
@@ -48,20 +54,18 @@
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 - Rendering the launcher lazily to "save" bytes is cheating: it draws at once.
 ## Next (numbered)
-1. Free entry-chunk room: `os/launcher.ts` is ~12 KB raw (keyword tables,
-   `actionEntries`). Load the tables on first search open (or idle) while
-   `GO_KEYS`/`goStep` stay in the entry. Target ≤ 97 KB. Re-run
-   `check-lazy-thumbs`, `check-launcher-tiling`, unit tests.
-2. Phase 7 plan only: write `docs/phase-7.md` (records → studio-api sync,
+1. Phase 7 plan only: write `docs/phase-7.md` (records → studio-api sync,
    conflicts shown never overwritten, Trash sync per `FUTURE_BUILD.md`).
    Owner questions first: billing/plans (CLAUDE.md: nothing may imply it
    yet), which records sync, new Worker routes need Art-Talk-Back to ship
    first. Build nothing server-side without Isaac's yes.
-3. Owner checks, NOT tested: calendar .ics import on iPhone/Android; real
+2. Owner checks, NOT tested: calendar .ics import on iPhone/Android; real
    print output (labels, COA, iOS print); CSV import to Mailchimp/Kit/
    Buttondown; BCC draft in iOS Mail; pay/show QR scanned by a phone;
-   selling + Visualizer on a tablet; booth likes; loop video on devices.
+   selling + Visualizer on a tablet; booth likes; loop video on devices;
+   search box on a slow phone (brief "Loading search…" before idle load).
 ## Files (path — why)
+- `src/os/goKeys.ts`, `src/os/launcher.ts` — entry vs lazy launcher split.
 - `src/App.tsx` — wiring, `renderContent`, `openDated`, `calendarInput`.
 - `src/app/lazyTools.tsx` — every lazy window; add new tools here.
 - `src/calendar/`, `src/commission/tasks.ts` — Phase 6.
@@ -72,6 +76,8 @@
   `check-selling.mjs` (42), `check-visualizer.mjs` (30, `ROOM=` a photo),
   `check-booth.mjs` (22), `check-shows-trash.mjs`, `check-lazy-thumbs.mjs`.
 ## Verify (tested / NOT tested)
+- Tested 2026-10-09 (launcher split): unit 762; check-launcher-tiling 20/20;
+  check-lazy-thumbs 15/15 (95.5 KB). Launcher "failed" state NOT exercised.
 - Tested 2026-10-09: unit 762; check-calendar 34/34, check-mailing 24/24,
   check-selling 42/42, check-booth 22/22, check-shows-trash ok,
   check-lazy-thumbs all pass (99.3 KB). All desktop + phone, 2nd tab open.

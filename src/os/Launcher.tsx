@@ -1,10 +1,13 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Icon, type IconName } from './icons';
-import { searchLauncher, suggestions, TRY_THESE, type LauncherEntry } from './launcher';
+import type { LauncherEntry } from './launcher';
+import type { LauncherState } from '../app/useShellKeys';
 
 interface Props {
-  /** Everything that can be found right now: tools, actions, records. */
-  entries: LauncherEntry[];
+  /** Everything that can be found right now — tools, actions, records — once its tables have loaded. */
+  state: LauncherState;
+  /** Asks for the tables now: the box has been opened. */
+  onWant: () => void;
   onChoose: (entry: LauncherEntry) => void;
   /** Goes up by one each time ⌘K, Ctrl+K or / asks for the box. */
   summon: number;
@@ -51,7 +54,7 @@ function Glass() {
  * click or a tap on any row. It is a combobox in the ARIA sense, so a screen
  * reader hears the active row as the arrows move.
  */
-export function Launcher({ entries, onChoose, summon, compact, summonKeys }: Props) {
+export function Launcher({ state, onWant, onChoose, summon, compact, summonKeys }: Props) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -61,10 +64,16 @@ export function Launcher({ entries, onChoose, summon, compact, summonKeys }: Pro
   const optionId = (index: number) => `${listId}-option-${index}`;
 
   const typed = query.trim() !== '';
-  const results = useMemo(
-    () => (typed ? searchLauncher(entries, query) : suggestions(entries)),
-    [entries, query, typed],
-  );
+  const results = useMemo(() => {
+    if (state.status !== 'ready') return [];
+    const { index, entries } = state;
+    return typed ? index.searchLauncher(entries, query) : index.suggestions(entries);
+  }, [state, query, typed]);
+
+  // Opened before the idle load got there: fetch the tables now.
+  useEffect(() => {
+    if (open && state.status !== 'ready') onWant();
+  }, [open, state.status, onWant]);
 
   // Asked for by a shortcut: open, and put the cursor in the box.
   useEffect(() => {
@@ -228,15 +237,24 @@ export function Launcher({ entries, onChoose, summon, compact, summonKeys }: Pro
               );
             })}
           </ul>
-          {typed && results.length === 0 && (
+          {state.status === 'loading' && <p className="launcher-empty">Loading search…</p>}
+          {state.status === 'failed' && (
+            <div className="launcher-empty" role="alert">
+              <p>Search could not load. The connection may have dropped, or a newer version is out.</p>
+              <button type="button" className="primary" onClick={() => window.location.reload()}>
+                Reload
+              </button>
+            </div>
+          )}
+          {state.status === 'ready' && typed && results.length === 0 && (
             <p className="launcher-empty">
               Nothing matches “{query.trim()}”. Try a tool, a client’s name or an invoice number.
             </p>
           )}
-          {!typed && (
+          {!typed && state.status === 'ready' && (
             <p className="launcher-try">
               Try{' '}
-              {TRY_THESE.map((word) => (
+              {state.index.TRY_THESE.map((word) => (
                 <button
                   key={word}
                   className="launcher-chip"

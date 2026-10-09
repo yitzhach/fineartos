@@ -16,16 +16,8 @@
  * key, so a preventDefault inside one never prevented anything.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
-import {
-  actionEntries,
-  goStep,
-  recordEntries,
-  toolEntries,
-  type GoState,
-  type LauncherContext,
-  type LauncherEntry,
-  type LauncherRecords,
-} from '../os/launcher';
+import { goStep, type GoState } from '../os/goKeys';
+import type { LauncherContext, LauncherEntry, LauncherRecords } from '../os/launcher';
 import type { Arrow } from '../os/tiling';
 import { focused as focusedWindow, stepTab, tabsOf, type WindowState } from '../os/windows';
 
@@ -121,40 +113,83 @@ export function useShellKeys(options: {
   return { launcherSummon, shortcutsOpen, openShortcuts, closeShortcuts };
 }
 
+/** The search box's tables and ranking, loaded apart from the shell. */
+export type LauncherIndex = typeof import('../os/launcher');
+
+/** Where the search box stands: still loading its tables, unable to, or ready. */
+export type LauncherState =
+  | { status: 'loading' }
+  | { status: 'failed' }
+  | { status: 'ready'; index: LauncherIndex; entries: LauncherEntry[] };
+
+let launcherLoad: Promise<LauncherIndex> | null = null;
+function loadLauncher(): Promise<LauncherIndex> {
+  launcherLoad ??= import('../os/launcher').catch((reason: unknown) => {
+    launcherLoad = null; // the next ask tries again
+    throw reason;
+  });
+  return launcherLoad;
+}
+
 /**
- * Everything the search box can offer right now. Remade only when something
- * it shows has changed, not on every render of the shell.
+ * Everything the search box can offer right now. Its keyword tables load
+ * when the box is first wanted, or once the app is idle, so they stay out of
+ * the first load. Remade only when something it shows has changed, not on
+ * every render of the shell.
  */
-export function useLauncherEntries(context: LauncherContext, records: LauncherRecords): LauncherEntry[] {
+export function useLauncher(
+  context: LauncherContext,
+  records: LauncherRecords,
+): { launcher: LauncherState; wantLauncher: () => void } {
+  const [index, setIndex] = useState<LauncherIndex | 'failed' | null>(null);
+  const wantLauncher = useCallback(() => {
+    loadLauncher().then(setIndex, () => setIndex('failed'));
+  }, []);
+
+  useEffect(() => {
+    const idle = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void })
+      .requestIdleCallback;
+    if (idle) idle(wantLauncher, { timeout: 2000 });
+    else window.setTimeout(wantLauncher, 500);
+  }, [wantLauncher]);
+
   const { frames, hasFocused, compact, undoLabel, theme, fullscreen, autoTile, snapped, mac } = context;
   const { documents, invoices, projects, photos, shows, guests, notes, people } = records;
-  return useMemo(
-    () => [
-      ...toolEntries(),
-      ...actionEntries({ frames, hasFocused, compact, undoLabel, theme, fullscreen, autoTile, snapped, mac }),
-      ...recordEntries({ documents, invoices, projects, photos, shows, guests, notes, people }),
-    ],
-    [
-      frames,
-      hasFocused,
-      compact,
-      undoLabel,
-      theme,
-      fullscreen,
-      autoTile,
-      snapped,
-      mac,
-      documents,
-      invoices,
-      projects,
-      photos,
-      shows,
-      guests,
-      notes,
-      people,
-    ],
-  );
+  const launcher = useMemo<LauncherState>(() => {
+    if (index === null) return { status: 'loading' };
+    if (index === 'failed') return { status: 'failed' };
+    return {
+      status: 'ready',
+      index,
+      entries: [
+        ...index.toolEntries(),
+        ...index.actionEntries({ frames, hasFocused, compact, undoLabel, theme, fullscreen, autoTile, snapped, mac }),
+        ...index.recordEntries({ documents, invoices, projects, photos, shows, guests, notes, people }),
+      ],
+    };
+  }, [
+    index,
+    frames,
+    hasFocused,
+    compact,
+    undoLabel,
+    theme,
+    fullscreen,
+    autoTile,
+    snapped,
+    mac,
+    documents,
+    invoices,
+    projects,
+    photos,
+    shows,
+    guests,
+    notes,
+    people,
+  ]);
+  return { launcher, wantLauncher };
 }
+
 
 const ARROWS: Record<string, Arrow | undefined> = {
   ArrowLeft: 'left',
