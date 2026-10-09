@@ -23,6 +23,8 @@ interface Props {
   siteUrl: string;
   photos: Photo[];
   imageUrls: Record<string, string>;
+  /** The artist's attract-loop video, if one is kept. It plays in place of the slideshow. */
+  profileVideoUrl: string | null;
   guests: GuestEntry[];
   onGuests: (guests: GuestEntry[]) => void;
   showName: string | null;
@@ -100,7 +102,11 @@ export function BoothMode(props: Props) {
           setAwake(true);
         }}
       >
-        {url && <img key={piece?.id} className="booth-slide" src={url} alt="" />}
+        {props.profileVideoUrl ? (
+          <video className="booth-slide" src={props.profileVideoUrl} autoPlay muted loop playsInline />
+        ) : (
+          url && <img key={piece?.id} className="booth-slide" src={url} alt="" />
+        )}
         <div className="booth-loop-caption">
           <h1>{props.studio.name || 'Welcome'}</h1>
           {piece && <p>{piece.title} · {boothPriceLine(piece)}</p>}

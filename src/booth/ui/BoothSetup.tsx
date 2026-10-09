@@ -23,10 +23,15 @@ interface Props {
   showPieceIds: string[];
   onStart: () => void;
   onMessage: (text: string) => void;
+  profileVideoUrl: string | null;
+  onProfileVideo: (file: Blob | null) => Promise<void>;
 }
 
+/** The largest attract-loop video kept on the device, in megabytes. */
+export const MAX_VIDEO_MB = 60;
+
 /** Where the artist gets the booth ready: PIN, statement, website, timings. */
-export function BoothSetup({ siteUrl, photos, showPieceIds, onStart, onMessage }: Props) {
+export function BoothSetup({ siteUrl, photos, showPieceIds, onStart, onMessage, profileVideoUrl, onProfileVideo }: Props) {
   const [settings, setSettings] = useState<BoothSettings>(() => parseBooth(readBoothRaw()));
   const [pin, setPin] = useState('');
   const [again, setAgain] = useState('');
@@ -114,6 +119,50 @@ export function BoothSetup({ siteUrl, photos, showPieceIds, onStart, onMessage }
             </label>
           </>
         )}
+      </section>
+
+      <section>
+        <h3>Attract loop video</h3>
+        <p className="hint">
+          Optional. A short clip of your work plays muted, looping, in place of the slideshow. MP4 or WebM, up to{' '}
+          {MAX_VIDEO_MB} MB. It stays on this device.
+        </p>
+        {profileVideoUrl && <video className="booth-setup-video" src={profileVideoUrl} muted loop playsInline controls />}
+        <div className="booth-setup-row">
+          <label className="button">
+            {profileVideoUrl ? 'Replace video' : 'Choose a video'}
+            <input
+              type="file"
+              accept="video/mp4,video/webm"
+              hidden
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (!file) return;
+                if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+                  onMessage(`That video is ${Math.round(file.size / 1048576)} MB. Keep it under ${MAX_VIDEO_MB} MB.`);
+                  return;
+                }
+                try {
+                  await onProfileVideo(file);
+                  onMessage('Attract loop video saved.');
+                } catch {
+                  onMessage('The video could not be saved. Nothing else was changed.');
+                }
+              }}
+            />
+          </label>
+          {profileVideoUrl && (
+            <button
+              onClick={async () => {
+                await onProfileVideo(null);
+                onMessage('Video removed. The loop goes back to the slideshow.');
+              }}
+            >
+              Remove video
+            </button>
+          )}
+        </div>
       </section>
 
       <section>

@@ -70,6 +70,8 @@ interface Props {
   /** Pieces the Shows tool took to today's show, for the booth. */
   showPieceIds: string[];
   onStartBooth: () => void;
+  profileVideoUrl: string | null;
+  onProfileVideo: (file: Blob | null) => Promise<void>;
 }
 
 /**
@@ -100,6 +102,8 @@ export function Connect(props: Props) {
           photos={props.photos}
           showPieceIds={props.showPieceIds}
           onStart={props.onStartBooth}
+          profileVideoUrl={props.profileVideoUrl}
+          onProfileVideo={props.onProfileVideo}
           onMessage={props.onMessage}
         />
       )}

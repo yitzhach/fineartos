@@ -26,6 +26,25 @@ interface Props {
  * a still one), and it is off under prefers-reduced-motion.
  */
 const MAX_SCALE = 1.42;
+
+/**
+ * On a phone the dock keeps the few tools the artist reaches for; the rest
+ * stay one search away in the launcher (audit 14: the full row scrolled
+ * sideways with half-cut icons at each end). Trash always stays.
+ */
+const PHONE_DOCK = ['home', 'commissions', 'connect', 'artwork', 'invoices', 'finance'];
+const PHONE_QUERY = '(max-width: 860px)';
+
+function usePhoneDock(): boolean {
+  const [phone, setPhone] = useState(() => window.matchMedia(PHONE_QUERY).matches);
+  useEffect(() => {
+    const query = window.matchMedia(PHONE_QUERY);
+    const sync = () => setPhone(query.matches);
+    query.addEventListener('change', sync);
+    return () => query.removeEventListener('change', sync);
+  }, []);
+  return phone;
+}
 /**
  * How far from an item's centre the pointer still lifts it, in px. The swell
  * is the same height as it always was; the reach is what sets how fast it
@@ -36,6 +55,7 @@ const MAX_SCALE = 1.42;
 const REACH = 189;
 
 export function Dock({ activeId, onOpen, onHeight }: Props) {
+  const phone = usePhoneDock();
   const [pointerX, setPointerX] = useState<number | null>(null);
   const frame = useRef<number | null>(null);
   const dockRef = useRef<HTMLElement>(null);
@@ -105,7 +125,9 @@ export function Dock({ activeId, onOpen, onHeight }: Props) {
         setNear(false);
       }}
     >
-      {listModules().map((module, index, all) => {
+      {listModules()
+        .filter((module) => !phone || module.group === 'trash' || PHONE_DOCK.includes(module.id))
+        .map((module, index, all) => {
         // A rule between groups: what works, what is coming later, and the
         // Trash. Without it the dimmed previews read as a gap in the row.
         const previous = index > 0 ? all[index - 1] : undefined;

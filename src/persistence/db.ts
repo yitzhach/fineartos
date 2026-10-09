@@ -8,7 +8,7 @@
  */
 
 const DB_NAME = 'artist-os';
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 
 export const STORE_DOCUMENTS = 'documents';
 export const STORE_IMAGES = 'images';
@@ -25,6 +25,8 @@ export const STORE_EXPENSES = 'expenses';
 /** Added in DB_VERSION 6: shows — the event, not the pieces. */
 export const STORE_SHOWS = 'shows';
 /** Added in DB_VERSION 7: the guest book (was localStorage), notes, client profiles, imported contacts. */
+/** Added in DB_VERSION 8: the booth's attract-loop video (one record, id 'profile'). */
+export const STORE_BOOTH_MEDIA = 'boothMedia';
 export const STORE_GUESTS = 'guests';
 export const STORE_NOTES = 'notes';
 export const STORE_CLIENTS = 'clients';
@@ -174,6 +176,11 @@ export function openDb(): Promise<IDBDatabase> {
           const store = db.createObjectStore(name, { keyPath: 'id' });
           store.createIndex('workspaceId', 'workspaceId');
         }
+      }
+      // Version 8 adds the booth's media shelf: one record for the profile
+      // video. Nothing already stored is touched.
+      if (!db.objectStoreNames.contains(STORE_BOOTH_MEDIA)) {
+        db.createObjectStore(STORE_BOOTH_MEDIA, { keyPath: 'id' });
       }
     };
     request.onsuccess = () => {

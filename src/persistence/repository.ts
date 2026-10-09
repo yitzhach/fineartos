@@ -30,6 +30,7 @@ import {
   STORE_NOTES,
   STORE_CLIENTS,
   STORE_CONTACTS,
+  STORE_BOOTH_MEDIA,
   STORE_IMAGES,
   STORE_INVOICES,
   STORE_PHOTOS,
@@ -409,6 +410,32 @@ export class Repository {
     const image = await this.getImage(id);
     if (!image) return;
     await put(STORE_IMAGES, { ...image, thumb });
+  }
+
+  /**
+   * The booth's attract-loop video (muted, looping). One per workspace; passing
+   * null takes it away. The file is kept as it was chosen.
+   */
+  async setProfileVideo(blob: Blob | null): Promise<void> {
+    const id = `${this.workspaceId}:profile`;
+    if (!blob) {
+      await remove(STORE_BOOTH_MEDIA, id);
+      return;
+    }
+    await put(STORE_BOOTH_MEDIA, {
+      id,
+      workspaceId: this.workspaceId,
+      blob,
+      mimeType: blob.type,
+      byteSize: blob.size,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  async getProfileVideo(): Promise<Blob | null> {
+    const record = await get<{ workspaceId: string; blob: Blob }>(STORE_BOOTH_MEDIA, `${this.workspaceId}:profile`);
+    if (!record || record.workspaceId !== this.workspaceId) return null;
+    return record.blob;
   }
 
   async getImage(id: string): Promise<StoredImage | null> {

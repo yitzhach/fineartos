@@ -283,6 +283,29 @@ export default function App() {
   const [dockHeight, setDockHeight] = useState(84);
   /** Booth mode survives a reload, so a visitor cannot refresh into the studio. */
   const [boothOn, setBoothOnState] = useState(boothIsOn);
+  // The attract-loop video, as an object URL while it is on screen. Loaded
+  // from the device's own store; revoked when replaced or the app leaves.
+  const [profileVideoUrl, setProfileVideoUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let url: string | null = null;
+    let live = true;
+    void repo.getProfileVideo().then((blob) => {
+      if (!live) return;
+      url = blob ? URL.createObjectURL(blob) : null;
+      setProfileVideoUrl(url);
+    }).catch(() => undefined);
+    return () => {
+      live = false;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [repo]);
+  const saveProfileVideo = async (blob: Blob | null) => {
+    await repo.setProfileVideo(blob);
+    setProfileVideoUrl((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return blob ? URL.createObjectURL(blob) : null;
+    });
+  };
   /**
    * True once a newer build is being served. A tab left open at a show goes
    * on running the JavaScript it loaded, which looks exactly like a deploy
@@ -2178,6 +2201,8 @@ export default function App() {
           onMessage={setMessage}
           showPieceIds={todayShow?.pieceIds ?? []}
           onStartBooth={startBooth}
+          profileVideoUrl={profileVideoUrl}
+          onProfileVideo={saveProfileVideo}
         />
       );
     }
@@ -2381,6 +2406,7 @@ export default function App() {
         siteUrl={siteUrl}
         photos={photos}
         imageUrls={imageUrls}
+        profileVideoUrl={profileVideoUrl}
         guests={guests}
         onGuests={(next) => void setGuests(next)}
         showName={todayShow?.name ?? null}

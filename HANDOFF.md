@@ -4,12 +4,15 @@
 - Build `BUILD_PLAN.md` phase by phase.
 
 ## Now
-- Tree green, 681 tests, IndexedDB v7 (unchanged). Phase 3 part 1 done.
+- Tree green, 701 tests, IndexedDB v8. Phase 3 part 2 partly done (2026-10-09).
 - First-load JS 97.7 KiB gzip (check-lazy-thumbs measures KiB; budget 100).
 - Notes fix (2026-10-07): typing autosaves (0.8 s + on close; blur alone lost
   notes), Title field, Save button, "Keep it on" Notes only / Home screen / folder.
 
 ## Done
+- Phase 3 part 2 (2026-10-09): DB v8 `boothMedia` (additive). Loop video
+  (≤60 MB, on device) plays muted in place of slides. Phone dock: 6 apps + Trash
+  (`Dock.tsx` PHONE_DOCK); rest via launcher. `check-booth-media.mjs` 9/9.
 - Phases 0–1: search box, tiling, hooks in `src/app/`, lazy tools
   (`app/lazyTools.tsx`), thumbnails backfilled by `useObjectUrls`.
 - Phase 2: v7 stores guests/notes/clients/contacts (`persistence/db.ts`).
@@ -58,12 +61,11 @@
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 
 ## Next (numbered)
-0. Assistant live; owner tested note-in-folder 2026-10-08: all worked. Draft actions
-   `commission_draft` / `invoice_draft` added (7 device actions; drafts only,
-   price null unless said, optional folder) — check on the live site with owner.
-1. Phase 3 part 2: profile video for the loop (needs a stored file → DB v8
-   or the images store; test v7→v8 with an old tab open); phone dock shows
-   fewer items (audit 14). Check booth likes with a real show piece (script has none).
+0. Booth likes with a real show piece: set "Hanging right now" on a piece,
+   open booth mode, check the "Pieces you like" boxes show and save. NOT tested yet.
+   Draft actions `commission_draft` / `invoice_draft` still need a live check with owner.
+1. Phase 3 part 2 (done 2026-10-09, see Done): owner to try the video and the
+   phone dock on the tablet and phone.
 2. Then Phase 4 — Visualizer scope settled: true size + perspective + lighting
    (see `BUILD_PLAN.md` Phase 4).
 ## Files (path — why)
@@ -75,16 +77,15 @@
 - `scripts/check-booth.mjs` — Phase 3; 22 checks, tablet + phone, offline.
 
 ## Verify (tested / NOT tested)
-- Tested: unit 701; check-assistant 19/19 (real model/studio NOT tested); `check-booth` 22/22 (tablet+phone offline: no-PIN start
-  blocked, loop, sign-up stored, QR, Ctrl+K held, wrong PIN, reload stays in
-  booth, PIN out). NOT: website iframe on a real site, loop with real photos,
-  idle return timing by hand, full-screen on iPad.
+- Tested: unit 701; `check-booth` 22/22; `check-booth-media` 9/9 (v7→v8 with
+  old tab open, video in loop + reload, phone dock 7 vs tablet 14).
+  NOT: likes with a real piece, the blocked-tab path (v7 build cooperates),
+  video playback with a real clip, real photos in loop, idle timing, iPad.
 - Earlier phases: all `scripts/check-*` pass. NOT tested: real mic, real
   vCard, device camera, merge UI by hand, dark sheets, real Mac/iPad keys,
   deployed URL (proxy 403), 861–1000px, iOS print.
 
 ## Resume
 - Read `CLAUDE.md`, then only the Phase 3 section of `BUILD_PLAN.md`.
-- Booth code is all in `src/booth/`; setup is Connect's "Booth mode" tab.
-- Push to `main` (deploys) and to the session's `claude/*` branch if named.
-- Browser checks: see `TESTING.md`.
+- Booth code in `src/booth/`; setup is Connect's "Booth mode" tab.
+- Push to `main` (deploys). Browser checks: see `TESTING.md`.
