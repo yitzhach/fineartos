@@ -13,7 +13,7 @@
 ## Done
 - Phase 3 part 2 (2026-10-09): DB v8 `boothMedia` (additive). Loop video ≤350 MB,
   muted, fades through dark at loop point. Phone dock: 6 apps + Trash
-  (`Dock.tsx`). Guest book: 3.5 s quiet → loop "(timed out)", no PIN; "Back to
+  (`Dock.tsx`). Guest book: 5 s quiet → loop "(timed out)", no PIN; "Back to
   the loop" in tab bar. Slides crossfade 1.5 s (`booth-slide-over`). Constants
   in `booth.ts`. `check-booth-media.mjs` 12/12.
 - Phases 0–1: search box, tiling, hooks in `src/app/`, lazy tools
@@ -52,7 +52,7 @@
 - Thumb mode never shows an original while its thumb is missing (200 full
   decodes = the stall). Blank tile until the backfill reaches it.
 - Booth on-flag persists: a reload must land back in the booth, not the studio.
-- Guest book quiet timeout (3.5 s) returns to the loop with no PIN.
+- Guest book quiet timeout (5 s) returns to the loop with no PIN.
 - Website panel only after the artist ticks "I can see my site" (no detection
   possible); otherwise the QR panel covers it.
 - Booth pieces = today's show pieceIds ∪ inCurrentShow, minus hidden.
@@ -63,7 +63,7 @@
 ## Next (numbered)
 0. Booth likes with a real show piece: set "Hanging right now" on a piece,
    open booth mode, check the "Pieces you like" boxes show and save. NOT tested yet.
-   Draft actions need a live check. Owner: is 3.5 s too short on a real tablet?
+   Draft actions need a live check. Owner: is 5 s right on a real tablet?
 1. Phase 3 part 2 (done 2026-10-09, see Done): owner to try the video and the
    phone dock on the tablet and phone.
 2. Then Phase 4 — Visualizer scope settled: true size + perspective + lighting
@@ -80,7 +80,8 @@
 - Tested: unit 701; `check-booth` 22/22; `check-booth-media` 9/9 (v7→v8 with
   old tab open, video in loop + reload, phone dock 7 vs tablet 14).
   NOT: likes, blocked-tab path, crossfade with 2+ pieces, video fade by eye,
-  350 MB on a real tablet, iPad.
+  350 MB on a real tablet, iPad. One reload timeout in the media check once,
+  passed on re-run (watch it).
 - Earlier phases: `scripts/check-*` pass. NOT: real mic, vCard, camera, dark
   sheets, iPad keys, deployed URL (proxy 403), 861–1000px, iOS print.
 

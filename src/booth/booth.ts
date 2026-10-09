@@ -31,8 +31,8 @@ export interface BoothSettings {
   slideSeconds: number;
 }
 
-/** On the guest book, a visitor who neither signs nor touches for this long goes back to the loop. */
-export const GUEST_QUIET_MS = 3500;
+/** On the guest book, a visitor who neither signs nor touches for this long (5 s, owner 2026-10-09) goes back to the loop. */
+export const GUEST_QUIET_MS = 5000;
 /** The loop's slides fade into each other over this long. */
 export const CROSSFADE_MS = 1500;
 export const MIN_IDLE_SECONDS = 20;
