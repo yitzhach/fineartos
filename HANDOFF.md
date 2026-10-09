@@ -2,7 +2,6 @@
 ## Goal
 - Artist OS: desktop-OS business suite for one artist. Browser-only, no server.
 - Build `BUILD_PLAN.md` phase by phase.
-
 ## Now
 - Tree green, 701 tests, IndexedDB v8. Booth loop: guest-book timeout, back button,
   1.5 s crossfade, 350 MB video (2026-10-09).
