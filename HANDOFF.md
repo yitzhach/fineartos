@@ -87,5 +87,4 @@
 
 ## Resume
 - Read `CLAUDE.md`, then only the Phase 3 section of `BUILD_PLAN.md`.
-- Booth code in `src/booth/`; setup is Connect's "Booth mode" tab.
 - Push to `main` (deploys). Browser checks: see `TESTING.md`.
