@@ -4,15 +4,18 @@
 - Build `BUILD_PLAN.md` phase by phase.
 
 ## Now
-- Tree green, 701 tests, IndexedDB v8. Phase 3 part 2 partly done (2026-10-09).
+- Tree green, 701 tests, IndexedDB v8. Booth loop: guest-book timeout, back button,
+  1.5 s crossfade, 350 MB video (2026-10-09).
 - First-load JS 97.7 KiB gzip (check-lazy-thumbs measures KiB; budget 100).
 - Notes fix (2026-10-07): typing autosaves (0.8 s + on close; blur alone lost
   notes), Title field, Save button, "Keep it on" Notes only / Home screen / folder.
 
 ## Done
-- Phase 3 part 2 (2026-10-09): DB v8 `boothMedia` (additive). Loop video
-  (≤60 MB, on device) plays muted in place of slides. Phone dock: 6 apps + Trash
-  (`Dock.tsx` PHONE_DOCK); rest via launcher. `check-booth-media.mjs` 9/9.
+- Phase 3 part 2 (2026-10-09): DB v8 `boothMedia` (additive). Loop video ≤350 MB,
+  muted, fades through dark at loop point. Phone dock: 6 apps + Trash
+  (`Dock.tsx`). Guest book: 3.5 s quiet → loop "(timed out)", no PIN; "Back to
+  the loop" in tab bar. Slides crossfade 1.5 s (`booth-slide-over`). Constants
+  in `booth.ts`. `check-booth-media.mjs` 12/12.
 - Phases 0–1: search box, tiling, hooks in `src/app/`, lazy tools
   (`app/lazyTools.tsx`), thumbnails backfilled by `useObjectUrls`.
 - Phase 2: v7 stores guests/notes/clients/contacts (`persistence/db.ts`).
@@ -31,7 +34,6 @@
 
 ## Decisions (keep)
 - `/v1/*`, `/assistant/*` never cached by `sw.js` (live sign-in data).
-- Clients/Notes/Assistant render in the window body, not the toolbar.
 - Note in a folder = `pin {kind:'project'}`; folder record holds no notes.
   Home screen = optional `onDesktop`. Old notes stay Notes-only. No DB bump.
 - System bar search is the launcher; actions only when runnable (rule 8).
@@ -43,16 +45,14 @@
   one-way. Payment due: invoiced commission drops out; totals per currency.
 - Emptying the Trash reloads BEFORE the entries leave the Trash, else the
   destroyed records flash back for a frame.
-- Direct `repo.save*` in App only where `data.reload()` follows.
-- A module shared by the entry and a lazy chunk lands whole in the entry:
-  split cheap helpers out (`photo/neutral.ts`, `invoice/mailto.ts`,
-  `lib/demoSeeded.ts`, `os/mock/names.ts`) — do not re-export them back.
+- Shared modules: split cheap helpers out of the entry chunk; don't re-export.
 - Clients/Notes wiring lives in lazy `app/PeopleTools.tsx`; the shell only
   reads profiles (follow-ups, search) and notes. Keep `buildPeople` out of
   the entry chunk. Person id = first identity key; resolve via `personFor`.
 - Thumb mode never shows an original while its thumb is missing (200 full
   decodes = the stall). Blank tile until the backfill reaches it.
 - Booth on-flag persists: a reload must land back in the booth, not the studio.
+- Guest book quiet timeout (3.5 s) returns to the loop with no PIN.
 - Website panel only after the artist ticks "I can see my site" (no detection
   possible); otherwise the QR panel covers it.
 - Booth pieces = today's show pieceIds ∪ inCurrentShow, minus hidden.
@@ -63,7 +63,7 @@
 ## Next (numbered)
 0. Booth likes with a real show piece: set "Hanging right now" on a piece,
    open booth mode, check the "Pieces you like" boxes show and save. NOT tested yet.
-   Draft actions `commission_draft` / `invoice_draft` still need a live check with owner.
+   Draft actions need a live check. Owner: is 3.5 s too short on a real tablet?
 1. Phase 3 part 2 (done 2026-10-09, see Done): owner to try the video and the
    phone dock on the tablet and phone.
 2. Then Phase 4 — Visualizer scope settled: true size + perspective + lighting
@@ -79,11 +79,10 @@
 ## Verify (tested / NOT tested)
 - Tested: unit 701; `check-booth` 22/22; `check-booth-media` 9/9 (v7→v8 with
   old tab open, video in loop + reload, phone dock 7 vs tablet 14).
-  NOT: likes with a real piece, the blocked-tab path (v7 build cooperates),
-  video playback with a real clip, real photos in loop, idle timing, iPad.
-- Earlier phases: all `scripts/check-*` pass. NOT tested: real mic, real
-  vCard, device camera, merge UI by hand, dark sheets, real Mac/iPad keys,
-  deployed URL (proxy 403), 861–1000px, iOS print.
+  NOT: likes, blocked-tab path, crossfade with 2+ pieces, video fade by eye,
+  350 MB on a real tablet, iPad.
+- Earlier phases: `scripts/check-*` pass. NOT: real mic, vCard, camera, dark
+  sheets, iPad keys, deployed URL (proxy 403), 861–1000px, iOS print.
 
 ## Resume
 - Read `CLAUDE.md`, then only the Phase 3 section of `BUILD_PLAN.md`.

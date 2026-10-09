@@ -88,6 +88,15 @@ await win.getByRole('button', { name: 'Set PIN' }).click(); await wait(500);
 await win.getByRole('button', { name: 'Start booth mode' }).click(); await wait(1500);
 const loopVideo = fresh.locator('.booth-loop video.booth-slide');
 ok('the loop plays the video, muted, looping', (await loopVideo.count()) === 1 && (await loopVideo.evaluate((v) => v.muted && v.loop && v.src.startsWith('blob:'))));
+// Guest book: 3.5 s with no touch goes back to the loop, with no PIN, and says so.
+await fresh.locator('.booth-loop').click(); await wait(300);
+ok('guest book is up after a tap', (await fresh.locator('.booth-tabs').count()) === 1);
+await wait(4500);
+ok('quiet for 3.5 s: back to the loop, "(timed out)" shown', (await fresh.locator('.booth-loop').count()) === 1 && (await fresh.locator('.booth-timeout').innerText()).includes('(timed out)'));
+// The same return by hand, from the tab bar, with no timeout note.
+await fresh.locator('.booth-loop').click(); await wait(300);
+await fresh.getByRole('button', { name: 'Back to the loop' }).click(); await wait(400);
+ok('"Back to the loop" returns without a note', (await fresh.locator('.booth-loop').count()) === 1 && (await fresh.locator('.booth-timeout').count()) === 0);
 await fresh.locator('.booth-loop').click(); await wait(400);
 await fresh.getByRole('button', { name: /Artist/ }).click();
 for (const d of '4821') await fresh.locator('.booth-keys button', { hasText: d }).first().click();

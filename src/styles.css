@@ -4280,7 +4280,12 @@ fieldset.section > legend {
 .booth-loop { cursor: pointer; justify-content: flex-end; background: #171614; }
 .booth-slide { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; animation: booth-fade 1.2s ease; }
 @keyframes booth-fade { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .booth-slide { animation: none; } }
+/* The slide before stays under; the new one fades over it across the crossfade. */
+.booth-slide-over { animation: booth-fade 1.5s ease; }
+.booth-timeout { font-size: 18px; opacity: 0.8; margin: 0 0 8px; }
+.booth-loop-back { margin-left: auto; }
+.booth-tabs .booth-loop-back + .booth-artist { margin-left: 0; }
+@media (prefers-reduced-motion: reduce) { .booth-slide, .booth-slide-over { animation: none; } }
 .booth-loop-caption {
   position: relative; padding: 28px 32px 40px;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.72)); color: #f4f1ea;

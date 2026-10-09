@@ -1,6 +1,8 @@
 import QRCode from 'qrcode';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  CROSSFADE_MS,
+  GUEST_QUIET_MS,
   PANEL_LABELS,
   boothPanels,
   boothPieces,
@@ -49,25 +51,39 @@ export function BoothMode(props: Props) {
   const [now, setNow] = useState(() => Date.now());
   const lastTouch = useRef(Date.now());
   const loopStart = useRef(Date.now());
+  /** The loop came back because the guest book sat quiet, so it says so. */
+  const [timedOut, setTimedOut] = useState(false);
   /** Bumped when the loop returns, so a half-typed entry is wiped for the next visitor. */
   const [visit, setVisit] = useState(0);
+
+  /** Back to the loop, with no PIN. The guest book's next visitor starts fresh. */
+  const backToLoop = (timeout: boolean) => {
+    setAwake(false);
+    setTimedOut(timeout);
+    loopStart.current = Date.now();
+    setVisit((v) => v + 1);
+    setPinOpen(false);
+    setPanel('guestbook');
+  };
+  const awakeRef = useRef(awake);
+  awakeRef.current = awake;
+  const panelRef = useRef(panel);
+  panelRef.current = panel;
 
   useEffect(() => {
     const tick = window.setInterval(() => {
       const t = Date.now();
       setNow(t);
-      if (isIdle(lastTouch.current, t, settings.idleSeconds)) {
-        setAwake((was) => {
-          if (was) {
-            loopStart.current = t;
-            setVisit((v) => v + 1);
-            setPinOpen(false);
-            setPanel('guestbook');
-          }
-          return false;
-        });
+      if (!awakeRef.current) return;
+      // The guest book goes back to the loop after a short quiet (rule: a
+      // visitor who walked off does not leave the panel up); other panels keep
+      // the artist's own idle time.
+      if (panelRef.current === 'guestbook' && t - lastTouch.current >= GUEST_QUIET_MS) {
+        backToLoop(true);
+      } else if (isIdle(lastTouch.current, t, settings.idleSeconds)) {
+        backToLoop(false);
       }
-    }, 1000);
+    }, 500);
     return () => window.clearInterval(tick);
   }, [settings.idleSeconds]);
 
@@ -85,6 +101,7 @@ export function BoothMode(props: Props) {
 
   const touched = () => {
     lastTouch.current = Date.now();
+    setTimedOut(false);
   };
 
   if (!awake) {
@@ -103,13 +120,20 @@ export function BoothMode(props: Props) {
         }}
       >
         {props.profileVideoUrl ? (
-          <video className="booth-slide" src={props.profileVideoUrl} autoPlay muted loop playsInline />
+          <LoopVideo src={props.profileVideoUrl} />
         ) : (
-          url && <img key={piece?.id} className="booth-slide" src={url} alt="" />
+          <>
+            {/* The slide before stays under the new one, so the new one fades over it. */}
+            {pieces.length > 1 && index >= 0 && props.imageUrls[pieces[(index - 1 + pieces.length) % pieces.length]!.imageId] && (
+              <img className="booth-slide" src={props.imageUrls[pieces[(index - 1 + pieces.length) % pieces.length]!.imageId]} alt="" />
+            )}
+            {url && <img key={piece?.id} className="booth-slide booth-slide-over" src={url} alt="" />}
+          </>
         )}
         <div className="booth-loop-caption">
           <h1>{props.studio.name || 'Welcome'}</h1>
           {piece && <p>{piece.title} · {boothPriceLine(piece)}</p>}
+          {timedOut && <p className="booth-timeout">(timed out)</p>}
           <p className="booth-tap">Tap anywhere to sign the book and see the work</p>
         </div>
       </div>
@@ -131,6 +155,9 @@ export function BoothMode(props: Props) {
             {PANEL_LABELS[id]}
           </button>
         ))}
+        <button type="button" className="btn booth-loop-back" data-variant="quiet" onClick={() => backToLoop(false)}>
+          Back to the loop
+        </button>
         <button type="button" className="btn booth-artist" data-variant="quiet" onClick={() => setPinOpen(true)} aria-label="Artist: leave booth mode">
           Artist
         </button>
@@ -162,6 +189,32 @@ export function BoothMode(props: Props) {
       </main>
       {pinOpen && <PinPad onCancel={() => setPinOpen(false)} check={(pin) => pinMatches(settings, pin)} onExit={props.onExit} />}
     </div>
+  );
+}
+
+/**
+ * The artist's clip, muted and looping. It fades through dark at the loop point
+ * over CROSSFADE_MS, since one video cannot be cross-faded with itself.
+ */
+function LoopVideo({ src }: { src: string }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const fade = CROSSFADE_MS / 1000;
+  return (
+    <video
+      ref={ref}
+      className="booth-slide"
+      src={src}
+      autoPlay
+      muted
+      loop
+      playsInline
+      onTimeUpdate={() => {
+        const v = ref.current;
+        if (!v || !Number.isFinite(v.duration)) return;
+        const edge = Math.min(v.currentTime, v.duration - v.currentTime);
+        v.style.opacity = String(Math.max(0, Math.min(1, edge / fade)));
+      }}
+    />
   );
 }
 

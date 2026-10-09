@@ -28,7 +28,7 @@ interface Props {
 }
 
 /** The largest attract-loop video kept on the device, in megabytes. */
-export const MAX_VIDEO_MB = 60;
+export const MAX_VIDEO_MB = 350;
 
 /** Where the artist gets the booth ready: PIN, statement, website, timings. */
 export function BoothSetup({ siteUrl, photos, showPieceIds, onStart, onMessage, profileVideoUrl, onProfileVideo }: Props) {
@@ -125,7 +125,8 @@ export function BoothSetup({ siteUrl, photos, showPieceIds, onStart, onMessage, 
         <h3>Attract loop video</h3>
         <p className="hint">
           Optional. A short clip of your work plays muted, looping, in place of the slideshow. MP4 or WebM, up to{' '}
-          {MAX_VIDEO_MB} MB. It stays on this device.
+          {MAX_VIDEO_MB} MB, kept on this device. For a smooth loop, 1080p at about 40 MB a minute is plenty: a
+          1–2 minute clip is 40–80 MB. Bigger files save slowly and can stutter on an older tablet.
         </p>
         {profileVideoUrl && <video className="booth-setup-video" src={profileVideoUrl} muted loop playsInline controls />}
         <div className="booth-setup-row">
