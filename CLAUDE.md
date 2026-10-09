@@ -104,8 +104,11 @@ phone and dark. Known issues sit in `qa/audit-baseline.json` and
    must both pass.
 5. Anything near saved records: also check an existing database with a
    second tab open.
-6. Land on `main` (deploys) only on the owner's word; then audit the live
-   site: `SITE_QA_URL=https://fineartos.bobdylan2000.workers.dev/ npm --prefix qa test`.
+6. Before asking to land, audit the branch's Cloudflare preview (its PR's
+   Cloudflare comment names it):
+   `SITE_QA_URL=<preview URL> npm --prefix qa test`.
+7. Land on `main` (deploys) only on the owner's word; then audit the live
+   site: `npm --prefix qa run test:live`.
    (Cloud sessions need that host under Allowed domains in the environment's
    network settings; until then the live check is blocked, say so.)
 
