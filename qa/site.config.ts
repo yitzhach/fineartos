@@ -15,6 +15,8 @@ const config: SiteConfig = {
     readyURL: "http://127.0.0.1:4173/",
   },
   baseURL: "http://127.0.0.1:4173/",
+  // npm --prefix qa run test:live, after a change lands on main.
+  liveURL: "https://fineartos.bobdylan2000.workers.dev/",
 
   // CHECK: every page worth auditing, relative to baseURL. Pages the site
   // links to but this list misses show up as unlistedPages in results.

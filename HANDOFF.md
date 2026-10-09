@@ -14,6 +14,8 @@
 - Entry diet: `os/goKeys.ts` in entry; `os/launcher.ts` lazy 4.6 KB chunk
   (idle ≤2 s or box opens); `useLauncher` loading / failed / ready.
 - Phases 0–6: see `BUILD_PLAN.md`. Studio sign-in + assistant: `src/studio/`.
+- site-qa → d11edf9: link check works behind cloud proxy; `test:live`
+  (`liveURL`); step 6 audits the Cloudflare preview before landing.
 ## Decisions (keep)
 - Calendar maths runs in the lazy chunk: App only gathers `calendarInput`.
 - Board stage is derived, never stored; a draft is Quoting whatever it holds.
