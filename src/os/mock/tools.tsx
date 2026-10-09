@@ -146,22 +146,6 @@ function Connect() {
   );
 }
 
-function Visualizer() {
-  return (
-    <MockTool
-      name="Visualizer"
-      purpose="Put a piece on a client's wall to scale, so they can see it before they commit."
-      needs="It needs a room photo, the piece's real dimensions, and a scale reference."
-    >
-      <div className="mock-viz" aria-hidden="true">
-        <div className="viz-room">
-          <div className="viz-art" />
-        </div>
-      </div>
-    </MockTool>
-  );
-}
-
 /** Mock tools by id, matching the dock. */
 export const MOCK_TOOLS: Record<string, () => JSX.Element> = {
   calendar: Calendar,
@@ -172,7 +156,6 @@ export const MOCK_TOOLS: Record<string, () => JSX.Element> = {
   artwork: Artwork,
   finance: Finance,
   connect: Connect,
-  visualizer: Visualizer,
 };
 
 export { MOCK_TOOL_NAMES } from './names';

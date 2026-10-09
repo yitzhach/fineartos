@@ -76,6 +76,9 @@ export const ProjectWindow = lazyTool('The commission', () => import('../commiss
 export const AssistantTool = lazyTool('The assistant', () => import('../studio/ui/AssistantTool').then((m) => m.AssistantTool));
 export const NotesTool = lazyTool('Notes', () => import('./PeopleTools').then((m) => m.NotesTool));
 export const QuickCapture = lazyTool('Quick capture', () => import('./QuickCapture').then((m) => m.QuickCapture));
+export const VisualizerWindow = lazyTool('The Visualizer', () =>
+  import('../visualizer/ui/VisualizerWindow').then((m) => m.VisualizerWindow),
+);
 export const BoothMode = lazyTool('Booth mode', () => import('../booth/ui/BoothMode').then((m) => m.BoothMode));
 export const MockToolWindow = lazyTool('The preview', () => import('../os/mock/tools').then((m) => m.MockToolWindow));
 

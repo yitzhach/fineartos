@@ -1114,19 +1114,6 @@ body {
 }
 .mock-figures .k { font-size: 10.5px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-faint); }
 
-.mock-viz { display: grid; place-items: center; padding: 20px; }
-.viz-room {
-  width: 100%;
-  max-width: 420px;
-  aspect-ratio: 4 / 3;
-  border-radius: 10px;
-  background: linear-gradient(168deg, var(--stone-700), var(--stone-800));
-  border: 1px solid var(--line);
-  display: grid;
-  place-items: center;
-}
-.viz-art { width: 46%; aspect-ratio: 4 / 3; border-radius: 3px; background: var(--raised-hover); }
-
 /* --- Controls ----------------------------------------------------------- */
 
 button, input, select, textarea {
@@ -4351,3 +4338,41 @@ fieldset.section > legend {
 .as-form { display: flex; gap: 8px; align-items: flex-end; }
 .as-form textarea { flex: 1; min-width: 0; font: inherit; resize: vertical; }
 .as-foot { margin: 0; font-size: 12px; }
+
+/* --- Visualizer ---------------------------------------------------------- */
+
+.viz { display: grid; grid-template-columns: minmax(220px, 280px) 1fr; gap: 16px; padding: 16px; min-height: 100%; }
+.viz-steps { display: flex; flex-direction: column; gap: 16px; }
+.viz-step { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.viz-step h3 { margin: 0; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); }
+.viz-step select { width: 100%; }
+.viz-small { margin: 0; font-size: 12.5px; }
+.viz-problem { margin: 0; color: var(--danger); font-size: 12.5px; }
+.viz-modes { display: flex; gap: 6px; flex-wrap: wrap; }
+.viz-fields { display: flex; gap: 8px; flex-wrap: wrap; }
+.viz-fields label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-faint); }
+.viz-fields input { width: 110px; }
+.viz-slider { display: flex; flex-direction: column; gap: 4px; width: 100%; font-size: 12.5px; }
+.viz-slider input { accent-color: var(--accent); }
+.viz-check input { accent-color: var(--accent); }
+.viz-check { display: flex; gap: 6px; align-items: center; font-size: 12.5px; }
+.viz-view { min-width: 0; }
+.viz-empty { padding: 40px 12px; text-align: center; }
+.viz-stage { position: relative; width: 100%; overflow: hidden; border-radius: 8px; border: 1px solid var(--line); user-select: none; -webkit-user-select: none; }
+.viz-stage[data-marking] { cursor: crosshair; touch-action: none; }
+.viz-stage > img { display: block; width: 100%; height: auto; pointer-events: none; }
+.viz-piece { position: absolute; left: 0; top: 0; transform-origin: 0 0; cursor: grab; touch-action: none; background: var(--raised); }
+.viz-piece:active { cursor: grabbing; }
+.viz-piece img { display: block; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
+.viz-noimage { display: grid; place-items: center; height: 100%; font-size: 40px; color: var(--ink-faint); }
+.viz-marks { position: absolute; inset: 0; pointer-events: none; }
+.viz-marks polygon, .viz-marks polyline { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 6 4; }
+.viz-mark {
+  position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; padding: 0;
+  border-radius: 50%; border: 2px solid var(--accent); background: rgba(0, 0, 0, 0.35);
+  cursor: move; touch-action: none;
+}
+@media (max-width: 860px) {
+  .viz { grid-template-columns: 1fr; }
+  .viz-view { order: -1; }
+}

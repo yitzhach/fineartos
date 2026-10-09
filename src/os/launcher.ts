@@ -60,6 +60,7 @@ export const GO_KEYS: Record<string, string> = {
   b: 'finance',
   l: 'clients',
   n: 'notes',
+  v: 'visualizer',
   t: 'trash',
   h: 'home',
 };
@@ -140,6 +141,12 @@ const TOOL_SPECS: ToolSpec[] = [
     title: 'Notes',
     hint: 'Quick notes and checklists, pinned to anything',
     keywords: ['note', 'notes', 'checklist', 'todo', 'to do', 'list', 'memo', 'jot', 'reminder', 'dictate'],
+  },
+  {
+    id: 'visualizer',
+    title: 'Visualizer',
+    hint: "A piece on a room's wall at its real size",
+    keywords: ['room', 'wall', 'mockup', 'mock up', 'preview', 'scale', 'size', 'see it on the wall', 'try it', 'in situ', 'interior'],
   },
   {
     id: 'trash',

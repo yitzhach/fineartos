@@ -143,6 +143,7 @@ import {
   UpdatesPane,
   WallpaperSlides,
   BoothMode,
+  VisualizerWindow,
   FinanceWindow,
   ImageEditor,
   InvoiceEditor,
@@ -188,6 +189,7 @@ registerModule({ id: 'shows', name: 'Shows', icon: 'shows', available: true, gro
 registerModule({ id: 'finance', name: 'Finance', icon: 'finance', available: true, group: 'tool' });
 registerModule({ id: 'clients', name: 'Clients', icon: 'clients', available: true, group: 'tool' });
 registerModule({ id: 'notes', name: 'Notes', icon: 'notes', available: true, group: 'tool' });
+registerModule({ id: 'visualizer', name: 'Visualizer', icon: 'visualizer', available: true, group: 'tool' });
 registerModule({ id: 'assistant', name: 'Assistant', icon: 'assistant', available: true, group: 'tool' });
 // Last in the dock, the way the Trash is always last.
 registerModule({ id: 'trash', name: 'Trash', icon: 'trash', available: true, group: 'trash' });
@@ -1477,6 +1479,8 @@ export default function App() {
         return { kind: { type: 'tool', tool: 'clients' }, title: 'Clients', subtitle: 'Everyone, from every record' };
       case 'notes':
         return { kind: { type: 'tool', tool: 'notes' }, title: 'Notes', subtitle: 'Notes and checklists' };
+      case 'visualizer':
+        return { kind: { type: 'tool', tool: 'visualizer' }, title: 'Visualizer', subtitle: 'A piece on a wall, at true size' };
       case 'assistant':
         return { kind: { type: 'tool', tool: 'assistant' }, title: 'Assistant', subtitle: 'Ask your studio' };
       default:
@@ -1934,7 +1938,7 @@ export default function App() {
     }
 
     // Built tools that draw their own bar have none here.
-    if (kind.type === 'tool' && ['clients', 'notes', 'assistant'].includes(kind.tool)) return null;
+    if (kind.type === 'tool' && ['clients', 'notes', 'assistant', 'visualizer'].includes(kind.tool)) return null;
 
     // Only the mock tools carry this. A built tool saying it saves nothing
     // would be a lie about the Finder, which files things for real.
@@ -2360,6 +2364,10 @@ export default function App() {
           }}
         />
       );
+    }
+
+    if (kind.type === 'tool' && kind.tool === 'visualizer') {
+      return <VisualizerWindow photos={photos} imageUrls={imageUrls} />;
     }
 
     if (kind.type === 'tool') {

@@ -184,7 +184,7 @@ mentions a plan until billing exists.
 - Done when: a full show day runs offline on a tablet — loop, a sign-up, a
   QR scan, the PIN out — checked at tablet and phone widths.
 
-### Phase 4 — Selling at the booth, and the Visualizer · Planned · Free
+### Phase 4 — Selling at the booth, and the Visualizer · Visualizer done · Free
 
 - Sold in two taps: status and location on the piece, an income row in the
   books, a receipt handed to the device's mail or messages app, and a
@@ -195,6 +195,8 @@ mentions a plan until billing exists.
   marked on it, the piece placed at true size; plus perspective (four wall
   corners → the piece follows the wall's angle) and lighting (match the
   room's brightness and warmth, a soft shadow). Maths DOM-free and tested.
+  Built 9 Oct 2026 (`src/visualizer/`). The room photo is held for the
+  window only, never stored.
 - Done when: a sale at a show changes Artwork, Finance and the show's tally
   together, and the Trash can undo it cleanly.
 

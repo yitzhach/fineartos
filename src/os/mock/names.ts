@@ -9,5 +9,4 @@ export const MOCK_TOOL_NAMES: Record<string, string> = {
   artwork: 'Artwork',
   finance: 'Finance',
   connect: 'Connect',
-  visualizer: 'Visualizer',
 };

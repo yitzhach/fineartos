@@ -23,6 +23,7 @@ const ICONS: Record<string, IconName> = {
   'tool:artwork': 'artwork',
   'tool:shows': 'shows',
   'tool:finance': 'finance',
+  'tool:visualizer': 'visualizer',
   'tool:trash': 'trash',
   'tool:home': 'home',
   'action:new-commission': 'new',
