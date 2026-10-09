@@ -4393,3 +4393,16 @@ fieldset.section > legend {
 .sh-payqr { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px; border-radius: 8px; background: #fff; color: #23201b; }
 .sh-payqr canvas { max-width: 100%; height: auto !important; }
 .sh-payqr .faint { font-size: 12px; word-break: break-all; color: #5c554b; }
+
+/* --- Mailing list ---------------------------------------------------------- */
+
+.ml { display: flex; flex-direction: column; gap: 12px; }
+.ml-pickers { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.ml-pickers .field { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-faint); }
+.ml-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.ml-people { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+.ml-people li { display: flex; justify-content: space-between; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--line); font-size: 13px; flex-wrap: wrap; }
+.ml-people li:last-child { border-bottom: 0; }
+.ml-compose { display: flex; flex-direction: column; gap: 8px; }
+.ml-compose h4 { margin: 4px 0 0; font-family: var(--serif); font-weight: 400; font-size: 15px; }
+.ml-compose .field { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-faint); }

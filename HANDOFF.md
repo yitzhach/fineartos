@@ -3,11 +3,15 @@
 - Artist OS: desktop-OS business suite for one artist. Browser-only, no server.
 - Build `BUILD_PLAN.md` phase by phase.
 ## Now
-- Tree green, 743 tests, IndexedDB v8 (no bump). Phase 4 built (2026-10-09):
-  Visualizer, selling, pay QR, consignment, prints.
-- First-load JS ~98.8 KB gzip (budget 100). ArtworkInspector now lazy. Next
+- Tree green, 752 tests, IndexedDB v8 (no bump). Phases 4 + 5 built 2026-10-09.
+- First-load JS 98.9 KB gzip (budget 100). ArtworkInspector now lazy. Next
   win if needed: defer `os/launcher.ts` tables (12 KB raw) until search opens.
 ## Done
+- Phase 5 mailing list: `connect/mailing.ts` (built, never stored: consenting
+  guests w/ email + clients `mayEmail: true`; latest guest answer wins; a
+  client No removes; segments show/liked/tag; Kit-style CSV; BCC mailto ≤30;
+  `showLink` adds utm_* show name). Connect → Mailing list tab; Show → Export
+  sign-ups (one tap, the gate); QR "For a show"; Clients → May email.
 - Phase 4 selling pt 1: `shows/selling.ts` (sell, tally, receipt, trash/put
   back/drop sale; tested). Shows window → Selling: Sold → Record sale (price
   prefilled from asking), tally line, receipt via mailto/sms, Take the sale
@@ -18,12 +22,8 @@
   (blank line if no studio name) printed via hidden iframe (`ui/printSheet`).
 - Phase 4 Visualizer: `visualizer/placement.ts` (tested) + lazy window;
   corners+wall size or known length; unsized pieces left out. G V.
-- Phase 3 pt 2: DB v8 `boothMedia`; loop video ≤350 MB straight loop; phone
-  dock 6 + Trash; guest book 5 s quiet → loop; slides crossfade 1.5 s.
-- Phase 2: v7 guests/notes/clients/contacts; Clients joined by email/phone
-  only; Notes pin to anything; vCard/CSV import; Quick capture.
-- Phase 3 pt 1: `booth/` (PIN, panels, idle); BoothMode replaces the shell
-  while on and captures shell keys/undo.
+- Phases 0–3: see `BUILD_PLAN.md` (DB v8 `boothMedia`; v7 guests/notes/
+  clients/contacts; booth PIN/panels/loop video).
 
 ## Decisions (keep)
 - `/v1/*`, `/assistant/*` never cached by `sw.js` (live sign-in data).
@@ -62,8 +62,9 @@
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 
 ## Next (numbered)
-1. Phase 5 — Mailing list (`BUILD_PLAN.md`). Read only that section first.
-2. Owner checks, NOT tested: real print output (labels cut size, COA on
+1. Phase 6 — Calendar and tasks (`BUILD_PLAN.md`). Read only that section.
+2. Owner checks, NOT tested: CSV import into Mailchimp/Kit/Buttondown; BCC
+   draft in iOS Mail; scanning the show QR; real print output (labels cut size, COA on
    Letter/A4, iOS print); pay QR scanned by a phone; selling on a tablet; receipt
    opening Mail/Messages on iOS/Android; Visualizer w/ a real room photo on iPad/phone; booth likes w/ real "Hanging right now" piece;
    5 s guest-book timeout on tablet; loop video + phone dock on devices.
@@ -75,8 +76,9 @@
 - `scripts/check-booth.mjs` — Phase 3; 22 checks, tablet + phone, offline.
 - `scripts/check-visualizer.mjs` — 30 checks, desktop + phone touch; `ROOM=` a photo.
 - `scripts/check-selling.mjs` — Phase 4 gate; 42 checks, desktop + phone.
+- `scripts/check-mailing.mjs` — Phase 5 gate; 24 checks, desktop + phone.
 ## Verify (tested / NOT tested)
-- Tested: unit 743; `check-selling` 42/42 (take %, pay QR, 3 print sheets'
+- Tested: `check-mailing` 24/24, `check-booth` 22/22. unit 752; `check-selling` 42/42 (take %, pay QR, 3 print sheets'
   HTML, sell → Artwork, Finance $ net, tally; Trash round-trip; 2nd tab); `check-visualizer` 30/30;
   `check-shows-trash`, `check-lazy-thumbs` pass. NOT: real devices, iOS
   mail/sms hand-off, real room photo, lighting by eye.
@@ -86,5 +88,5 @@
   iPad keys, deployed URL (proxy 403), 861–1000px, iOS print.
 
 ## Resume
-- Read `CLAUDE.md`, then only the Phase 5 section of `BUILD_PLAN.md`.
+- Read `CLAUDE.md`, then only the Phase 6 section of `BUILD_PLAN.md`.
 - Push to `main` (deploys). Browser checks: see `TESTING.md`.

@@ -203,7 +203,7 @@ mentions a plan until billing exists.
 - Done when: a sale at a show changes Artwork, Finance and the show's tally
   together, and the Trash can undo it cleanly.
 
-### Phase 5 — Mailing list · Planned · Free
+### Phase 5 — Mailing list · **Done** · Free
 
 - The list: consenting guest-book entries and clients (consent never
   defaults to yes), segments by show, liked pieces and tag.
@@ -212,6 +212,8 @@ mentions a plan until billing exists.
   newsletter tool — the app never says it sent anything.
 - QR codes that carry the show's name so a visit can be traced to a fair.
 - Done when: a show's sign-ups become a segment exported in one step.
+- Built 9 Oct 2026: the list is derived, never stored (`connect/mailing.ts`);
+  clients join only when marked "may email" in Clients.
 
 ### Phase 6 — Calendar and tasks · Planned · Free
 

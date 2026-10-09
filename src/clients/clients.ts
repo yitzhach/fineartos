@@ -33,6 +33,11 @@ export interface ClientProfile {
   /** yyyy-mm-dd, shown in Coming up. Null: no follow-up planned. */
   followUp: string | null;
   note: string | null;
+  /**
+   * Whether this person said the studio may email them. Absent or null =
+   * not said, which keeps them off the mailing list: consent is never assumed.
+   */
+  mayEmail?: boolean | null;
   /** Keys the artist said are NOT this person, so they are not offered again. */
   notSame: string[];
   createdAt: string;

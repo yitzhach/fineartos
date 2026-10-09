@@ -2202,6 +2202,7 @@ export default function App() {
           imageUrls={imageUrls}
           imageBlob={async (imageId) => (await repo.getImage(imageId))?.blob ?? null}
           guests={guests}
+          profiles={data.profiles}
           showNames={pickableShows(shows, localToday()).map((show) => show.name)}
           currentShowName={shows.find((show) => whenIs(show, localToday()) === 'on' && show.status !== 'declined')?.name ?? null}
           onGuests={(next) => void setGuests(next)}
@@ -2239,6 +2240,7 @@ export default function App() {
           photos={photos}
           imageUrls={imageUrls}
           guests={guests}
+          profiles={data.profiles}
           currency={invoices[0]?.quote.currency ?? photos[0]?.currency ?? 'USD'}
           onSave={(show) => void saveShowRecord(show)}
           onTrash={(show) => void handleTrash(show.id)}

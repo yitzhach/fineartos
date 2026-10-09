@@ -162,6 +162,17 @@ function PersonDetail({ person, onSaveProfile, onOpenSource, onNote, noteCounts 
         />
       </label>
       <label className="field">
+        <span>May the studio email them?</span>
+        <select
+          value={profile?.mayEmail == null ? '' : profile.mayEmail ? 'yes' : 'no'}
+          onChange={(e) => save({ mayEmail: e.target.value === '' ? null : e.target.value === 'yes' })}
+        >
+          <option value="">Not said — not on the mailing list</option>
+          <option value="yes">Yes, they said so</option>
+          <option value="no">No</option>
+        </select>
+      </label>
+      <label className="field">
         <span>Tags, separated by commas</span>
         <input
           type="text"

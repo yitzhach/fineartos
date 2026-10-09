@@ -14,6 +14,9 @@ import {
 import { filterCounts, pickedPhotos, picksFor, type PickFilter } from '../picker';
 import { missingFromCard, normaliseUrl, vcardFor } from '../contact';
 import { countPhrase } from '../../os/trash';
+import type { ClientProfile } from '../../clients/clients';
+import { showLink, slugify } from '../mailing';
+import { MailingList } from './MailingList';
 import { Icon } from '../../os/icons';
 import { SignatureMark, SignaturePad } from './SignaturePad';
 import {
@@ -35,7 +38,7 @@ import {
   type GuestEntry,
 } from '../guestbook';
 
-export type ConnectTab = 'guestbook' | 'send' | 'qr' | 'booth';
+export type ConnectTab = 'guestbook' | 'list' | 'send' | 'qr' | 'booth';
 
 interface Props {
   tab: ConnectTab;
@@ -46,6 +49,8 @@ interface Props {
   /** Blob for the picture being sent, so it can go as a real attachment. */
   imageBlob: (imageId: string) => Promise<Blob | null>;
   guests: GuestEntry[];
+  /** Client profiles: tags, and whether each said the studio may email them. */
+  profiles: ClientProfile[];
   /** Shows a guest can sign in at, from the Shows tool, running one first. */
   showNames: string[];
   /** The show running today, if one is: a new entry starts on it. */
@@ -88,12 +93,16 @@ export function Connect(props: Props) {
     <div className="connect">
       <div className="chip-row connect-tabs">
         <Tab id="guestbook" current={props.tab} onTab={props.onTab}>Guest book</Tab>
+        <Tab id="list" current={props.tab} onTab={props.onTab}>Mailing list</Tab>
         <Tab id="send" current={props.tab} onTab={props.onTab}>Send a picture</Tab>
         <Tab id="qr" current={props.tab} onTab={props.onTab}>QR &amp; contact card</Tab>
         <Tab id="booth" current={props.tab} onTab={props.onTab}>Booth mode</Tab>
       </div>
 
       {props.tab === 'guestbook' && <GuestBook {...props} />}
+      {props.tab === 'list' && (
+        <MailingList guests={props.guests} profiles={props.profiles} photos={props.photos} onMessage={props.onMessage} />
+      )}
       {props.tab === 'send' && <SendPicture {...props} />}
       {props.tab === 'qr' && <QrPanel {...props} />}
       {props.tab === 'booth' && (
@@ -848,12 +857,15 @@ function SendPicture({
 
 // --- QR and contact card --------------------------------------------------
 
-function QrPanel({ studio, siteUrl, onSiteUrl, onMessage }: Props) {
+function QrPanel({ studio, siteUrl, onSiteUrl, onMessage, showNames, currentShowName }: Props) {
   const [mode, setMode] = useState<'card' | 'link'>('card');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
+  // The show this sign is for: its name rides on the link, so the site's own
+  // visitor counts can say which fair a visit came from.
+  const [forShow, setForShow] = useState<string>(currentShowName ?? '');
 
-  const link = normaliseUrl(siteUrl);
+  const link = showLink(siteUrl, forShow || null) ?? normaliseUrl(siteUrl);
   const payload = mode === 'card' ? vcardFor(studio, link) : link;
   const missing = missingFromCard(studio);
 
@@ -903,6 +915,21 @@ function QrPanel({ studio, siteUrl, onSiteUrl, onMessage }: Props) {
           <span className="hint">Used on the contact card, and on its own in Web address mode.</span>
         </div>
 
+        {showNames.length > 0 && (
+          <div className="field">
+            <label htmlFor="qr-show">For a show</label>
+            <select id="qr-show" value={forShow} onChange={(e) => setForShow(e.target.value)}>
+              <option value="">No show — the plain address</option>
+              {showNames.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+            <span className="hint">
+              Adds the show's name to the link, so your site's own visitor counts can say which fair a visit came from. The app itself sees nothing.
+            </span>
+          </div>
+        )}
+
         {mode === 'card' && missing.length > 0 && (
           <p className="notice">
             The card is missing {missing.join(' and ')}. Fill that in under Settings before you
@@ -932,7 +959,7 @@ function QrPanel({ studio, siteUrl, onSiteUrl, onMessage }: Props) {
             onClick={() => {
               const canvas = canvasRef.current;
               if (!canvas) return;
-              downloadUrl(canvas.toDataURL('image/png'), 'qr-code.png');
+              downloadUrl(canvas.toDataURL('image/png'), forShow ? `qr-${slugify(forShow)}.png` : 'qr-code.png');
               onMessage('QR code saved. Print it as large as you like — it stays sharp.');
             }}
           >

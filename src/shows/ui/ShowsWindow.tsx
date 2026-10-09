@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { certificateHtml, priceListHtml, wallLabelsHtml, type PrintStudio } from '../prints';
 import { printSheet } from './printSheet';
+import type { ClientProfile } from '../../clients/clients';
+import { EVERYONE, buildList, csvName, listCsv, segmentOf, type Subscriber } from '../../connect/mailing';
+import { downloadCsv } from '../../connect/ui/MailingList';
 import { formatMoney, parseMoney } from '../../commission/calc';
 import { mailtoLink, smsLink, type GuestEntry } from '../../connect/guestbook';
 import { describePrice, type Photo } from '../../photo/photo';
@@ -27,6 +30,8 @@ interface Props {
   photos: Photo[];
   imageUrls: Record<string, string>;
   guests: GuestEntry[];
+  /** For the mailing list: client tags and who may be emailed. */
+  profiles: ClientProfile[];
   currency: string;
   onSave: (show: Show) => void;
   onTrash: (show: Show) => void;
@@ -55,7 +60,7 @@ const WHEN_LABEL = { upcoming: 'Upcoming', on: 'On now', past: 'Past', undated: 
  * lives on the piece, in Artwork. A booth fee lands in the books once the
  * artist is accepted — the books row is written by the app, not here.
  */
-export function ShowsWindow({ shows, photos, imageUrls, guests, currency, onSave, onTrash, onTogglePiece, onSell, onTrashSale, studio, studioPayLink, onExport, onImport, focus }: Props) {
+export function ShowsWindow({ shows, photos, imageUrls, guests, profiles, currency, onSave, onTrash, onTogglePiece, onSell, onTrashSale, studio, studioPayLink, onExport, onImport, focus }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const today = localToday();
   const [selectedId, setSelectedId] = useState<string | null>(shows[0]?.id ?? null);
@@ -64,6 +69,7 @@ export function ShowsWindow({ shows, photos, imageUrls, guests, currency, onSave
   useEffect(() => {
     if (focus) setSelectedId(focus.id);
   }, [focus]);
+  const mailing = useMemo(() => buildList(guests, profiles), [guests, profiles]);
   const fees = boothFees(shows.filter((show) => show.status === 'accepted' || show.status === 'done'));
   const ahead = deadlinesAhead(shows, today);
 
@@ -145,6 +151,7 @@ export function ShowsWindow({ shows, photos, imageUrls, guests, currency, onSave
             photos={photos}
             imageUrls={imageUrls}
             guests={guestsAt(selected, guests)}
+            mailing={mailing}
             currency={currency}
             onSave={onSave}
             onTrash={(show) => {
@@ -170,6 +177,7 @@ function ShowDetail({
   photos,
   imageUrls,
   guests,
+  mailing,
   currency,
   onSave,
   onTrash,
@@ -183,6 +191,7 @@ function ShowDetail({
   photos: Photo[];
   imageUrls: Record<string, string>;
   guests: GuestEntry[];
+  mailing: Subscriber[];
   currency: string;
   onSave: (show: Show) => void;
   onTrash: (show: Show) => void;
@@ -192,6 +201,9 @@ function ShowDetail({
   studio: PrintStudio;
   studioPayLink: string | null;
 }) {
+  // The show's sign-ups who said yes: one tap out as a CSV (Phase 5 gate).
+  const signUps = segmentOf(mailing, { ...EVERYONE, show: show.name });
+  const [exported, setExported] = useState<string | null>(null);
   // A local copy, so a half-typed date or a backwards range is shown with
   // its problem instead of being saved.
   const [draft, setDraft] = useState(show);
@@ -335,6 +347,23 @@ function ShowDetail({
       )}
 
       <h4>Guest book ({guests.length})</h4>
+      {guests.length > 0 && (
+        <div className="chip-row">
+          <button
+            className="btn"
+            disabled={signUps.length === 0}
+            onClick={() => {
+              downloadCsv(listCsv(signUps), csvName({ ...EVERYONE, show: show.name }, () => ''));
+              setExported(`Saved ${signUps.length} ${signUps.length === 1 ? 'address' : 'addresses'} for your newsletter tool.`);
+            }}
+          >
+            Export sign-ups ({signUps.length})
+          </button>
+          <span className="hint" aria-live="polite">
+            {exported ?? (signUps.length < guests.length ? `${guests.length - signUps.length} did not say yes or gave no email — left out.` : '')}
+          </span>
+        </div>
+      )}
       {guests.length === 0 ? (
         <p className="hint">Nobody signed in at this show yet.</p>
       ) : (
