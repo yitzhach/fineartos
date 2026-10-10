@@ -3,7 +3,7 @@
 - Artist OS: desktop-OS business suite for one artist. Browser-only, local-first.
 - Build `BUILD_PLAN.md` phase by phase. Phases 0–6 done (2026-10-09).
 ## Now
-- `main`: viewing links landed 2026-10-09 (777 unit, 53 qa local).
+- `main` live at 1282cb5: viewing links + link list (778 unit, 53 qa live).
 - First-load JS 95.5 KB gzip of a 100 KB budget (was 99.3): launcher tables
   now load lazily. Keep new shell code out of the entry chunk.
 - Viewing links (owner asked 2026-10-09): Connect › Send a picture › "Add a
@@ -52,7 +52,8 @@
 - `pkill -f "vite preview"` kills the shell (exit 144): run it alone.
 ## Next (numbered)
 1. Owner tests viewing link live: sign in (Assistant), Connect › Send a
-   picture › Add a viewing link › Email; open link on a phone. Then Next #2.
+   picture › Add a viewing link › Email; open link on a phone; Remove from
+   "Your viewing links". Then Next #2.
 2. Phase 7 plan only: write `docs/phase-7.md` (records → studio-api sync,
    conflicts shown never overwritten, Trash sync per `FUTURE_BUILD.md`).
    Owner questions first: billing/plans (CLAUDE.md: nothing may imply it
@@ -70,14 +71,14 @@
 - `src/App.tsx` — wiring, `renderContent`, `openDated`, `calendarInput`.
 - `src/app/lazyTools.tsx` — every lazy window; add new tools here.
 - `src/share/viewLink.ts` (rules + client page), `src/share/upload.ts`,
-  `worker/share.ts`; `scripts/check-share.mjs` (14, wrangler dev + fake api).
+  `worker/share.ts`; `scripts/check-share.mjs` (16, wrangler dev + fake api).
 - `src/calendar/`, `src/commission/tasks.ts` — Phase 6.
 - `src/connect/`, `src/shows/selling.ts`, `src/visualizer/` — Phases 4–5.
 - `scripts/check-calendar.mjs` (34), `check-mailing.mjs` (24),
   `check-selling.mjs` (42), `check-visualizer.mjs` (30, `ROOM=` a photo),
   `check-booth.mjs` (22), `check-shows-trash.mjs`, `check-lazy-thumbs.mjs`.
 ## Verify (tested / NOT tested)
-- Tested 2026-10-09 viewing links: unit 777; qa 53 local+live; check-share 16.
+- Tested 2026-10-10 viewing links + list: unit 778; qa 53 local+live; check-share 16.
   NOT tested: live upload with real studio-api session; phone mail apps.
 - Tested 2026-10-09 (site-qa + 4 fixes, live 63908ce): unit 763; qa 41 local
   + live; startup.spec fails 3/3 on old build; check-calendar 34/34; CI green.
