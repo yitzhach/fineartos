@@ -4443,3 +4443,10 @@ fieldset.section > legend {
   .ca-chip { font-size: 0; height: 4px; padding: 0; border-left-width: 0; background: var(--k, var(--ink-faint)); }
   .ca-board { grid-template-columns: 1fr; overflow-x: visible; }
 }
+
+/* Connect › Send a picture: the studio's own viewing links. */
+.share-links h4 { margin: 12px 0 6px; font-size: 0.9rem; }
+.share-link-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.share-link-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--line, rgba(127,127,127,.25)); border-radius: 8px; }
+.share-link-list li > span:first-child { display: grid; min-width: 0; }
+.share-link-list strong { overflow-wrap: anywhere; }

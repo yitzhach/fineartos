@@ -19,8 +19,8 @@ import { showLink, slugify } from '../mailing';
 import { MailingList } from './MailingList';
 import { Icon } from '../../os/icons';
 import { readStudioSession } from '../../studio/session';
-import { linkEndDate, withViewingLink, type ShareCreated } from '../../share/viewLink';
-import { createViewLink, removeViewLink, viewLinksAvailable } from '../../share/upload';
+import { linkEndDate, withViewingLink, type ShareCreated, type ShareListed } from '../../share/viewLink';
+import { createViewLink, listViewLinks, removeViewLink, viewLinksAvailable } from '../../share/upload';
 import { SignatureMark, SignaturePad } from './SignaturePad';
 import {
   csvOf,
@@ -713,10 +713,19 @@ function SendPicture({
   const [linksOn, setLinksOn] = useState(false);
   const [links, setLinks] = useState<Record<string, ShareCreated>>({});
   const [linkBusy, setLinkBusy] = useState(false);
+  // Every link this studio has made, from any device: null while loading,
+  // a sentence when it could not be read (rule 5).
+  const [allLinks, setAllLinks] = useState<ShareListed[] | string | null>(null);
+  const refreshLinks = () =>
+    listViewLinks().then(setAllLinks, (cause: Error) => setAllLinks(cause.message));
   useEffect(() => {
     if (!signedIn) return;
     let live = true;
-    void viewLinksAvailable().then((on) => live && setLinksOn(on));
+    void viewLinksAvailable().then((on) => {
+      if (!live) return;
+      setLinksOn(on);
+      if (on) void refreshLinks();
+    });
     return () => {
       live = false;
     };
@@ -745,6 +754,7 @@ function SendPicture({
       if (!blob) throw new Error('This picture’s image could not be read from this device.');
       const made = await createViewLink(blob, photo.title || 'Artwork', plain);
       setLinks((all) => ({ ...all, [photo.id]: made }));
+      void refreshLinks();
       onMessage(`Viewing link added to the message. It works until ${linkEndDate(made.expiresAt)}.`);
     } catch (cause) {
       onMessage(`No link was made. ${(cause as Error).message}`);
@@ -753,12 +763,13 @@ function SendPicture({
     }
   };
 
-  const dropLink = async () => {
-    if (!photo || !link || linkBusy) return;
+  const dropLink = async (id: string) => {
+    if (linkBusy) return;
     setLinkBusy(true);
     try {
-      await removeViewLink(link.id);
-      setLinks(({ [photo.id]: _gone, ...rest }) => rest);
+      await removeViewLink(id);
+      setLinks((all) => Object.fromEntries(Object.entries(all).filter(([, made]) => made.id !== id)));
+      void refreshLinks();
       onMessage('Link removed. Anyone who opens it now sees that it’s no longer available.');
     } catch (cause) {
       onMessage(`The link wasn’t removed. ${(cause as Error).message}`);
@@ -862,7 +873,7 @@ function SendPicture({
                     <span className="hint">
                       Link added: anyone with it can see this picture until {linkEndDate(link.expiresAt)}.
                     </span>
-                    <button className="btn" data-variant="quiet" disabled={linkBusy} onClick={() => void dropLink()}>
+                    <button className="btn" data-variant="quiet" disabled={linkBusy} onClick={() => void dropLink(link.id)}>
                       {linkBusy ? 'Removing…' : 'Remove link'}
                     </button>
                   </>
@@ -915,6 +926,55 @@ function SendPicture({
                 Save picture
               </button>
             </div>
+
+            {linksOn && (
+              <section className="share-links" aria-label="Your viewing links">
+                <h4>Your viewing links</h4>
+                {allLinks === null ? (
+                  <p className="hint">Loading your links…</p>
+                ) : typeof allLinks === 'string' ? (
+                  <p className="hint">
+                    {allLinks}{' '}
+                    <button className="btn" data-variant="quiet" onClick={() => void refreshLinks()}>
+                      Try again
+                    </button>
+                  </p>
+                ) : allLinks.length === 0 ? (
+                  <p className="hint">None yet. Links you add show here, from any device you sign in on.</p>
+                ) : (
+                  <ul className="share-link-list">
+                    {allLinks.map((item) => (
+                      <li key={item.id}>
+                        <span>
+                          <strong>{item.title}</strong>
+                          <span className="hint">
+                            {item.expired
+                              ? `Stopped working ${linkEndDate(item.expiresAt)}`
+                              : `Works until ${linkEndDate(item.expiresAt)}`}
+                          </span>
+                        </span>
+                        <span className="chip-row">
+                          {!item.expired && (
+                            <a className="btn" data-variant="quiet" href={item.url} target="_blank" rel="noopener noreferrer">
+                              Open
+                            </a>
+                          )}
+                          <button
+                            className="btn"
+                            data-variant="quiet"
+                            disabled={linkBusy}
+                            aria-label={`Remove link for ${item.title}`}
+                            onClick={() => void dropLink(item.id)}
+                          >
+                            Remove
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            )}
 
             <p className="hint">
               Email and Text hand off to your own mail and messages apps. An email link cannot carry

@@ -19,6 +19,9 @@ function memoryBucket() {
     async put(key, value, options) {
       items.set(key, { value, type: (options as { httpMetadata?: { contentType?: string } })?.httpMetadata?.contentType });
     },
+    async list({ prefix }) {
+      return { objects: [...items.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key })), truncated: false };
+    },
     async delete(keys) {
       for (const key of Array.isArray(keys) ? keys : [keys]) items.delete(key);
     },
@@ -119,9 +122,27 @@ describe('viewing link worker', () => {
     const remove = (cookie: string) =>
       handleShare(new Request(`${ORIGIN}/share/pictures/${data.id}`, { method: 'DELETE', headers: { Cookie: cookie } }), env, clock);
     expect((await remove('sid=b')).status).toBe(403);
-    expect(items.size).toBe(2);
+    expect(items.size).toBe(3);
     expect((await remove('sid=a')).status).toBe(200);
     expect(items.size).toBe(0);
     expect((await handleShare(new Request(data.url), env, clock)).status).toBe(404);
+  });
+
+  it('lists only the signed-in studio’s own links, expired ones marked', async () => {
+    now = new Date('2026-10-09T12:00:00Z');
+    let n = 0;
+    const counting: ShareClock = { now: () => now, randomBytes: (k) => new Uint8Array(k).fill(++n) };
+    const { bucket } = memoryBucket();
+    const env = { SHARES: bucket, API: api({ 'sid=a': 'artist', 'sid=b': 'someone' }) };
+    await handleShare(upload('sid=a', { title: 'First', details: '', picture: picture() }), env, counting);
+    now = new Date('2026-10-10T12:00:00Z');
+    await handleShare(upload('sid=a', { title: 'Second', details: '', picture: picture() }), env, counting);
+    await handleShare(upload('sid=b', { title: 'Not mine', details: '', picture: picture() }), env, counting);
+    const list = (cookie: string | null) =>
+      handleShare(new Request(`${ORIGIN}/share/pictures`, { headers: cookie ? { Cookie: cookie } : {} }), env, counting);
+    expect((await list(null)).status).toBe(401);
+    now = new Date('2027-01-08T00:00:00Z');
+    const { data } = (await (await list('sid=a')).json()) as { data: { title: string; expired: boolean }[] };
+    expect(data.map((l) => [l.title, l.expired])).toEqual([['Second', false], ['First', true]]);
   });
 });

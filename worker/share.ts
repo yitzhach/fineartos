@@ -18,6 +18,7 @@ import {
  *
  *   GET    /share/status          { available }  — the app hides the button without it
  *   POST   /share/pictures        multipart: picture, title, details → { id, url, expiresAt }
+ *   GET    /share/pictures        the signed-in studio's own links, newest first
  *   DELETE /share/pictures/:id    the studio that made it removes it
  *   GET    /p/:id                 the client's page (or a plain "no longer available")
  *   GET    /p/:id/picture         the picture itself
@@ -38,6 +39,7 @@ export interface ShareBucket {
   get(key: string): Promise<StoredObject | null>;
   put(key: string, value: ArrayBuffer | string, options?: unknown): Promise<unknown>;
   delete(keys: string | string[]): Promise<unknown>;
+  list(options: { prefix: string; cursor?: string }): Promise<{ objects: { key: string }[]; truncated: boolean; cursor?: string }>;
 }
 export interface ShareEnv {
   API?: Fetcher;
@@ -71,6 +73,8 @@ const html = (body: string, status: number) =>
 
 const pictureKey = (id: string) => `shares/${id}/picture`;
 const cardKey = (id: string) => `shares/${id}/card.json`;
+/** One empty marker per link under its owner, so a studio can list its own. */
+const ownerPrefix = (owner: string) => `owners/${encodeURIComponent(owner)}/`;
 
 export function isSharePath(pathname: string): boolean {
   return pathname.startsWith('/share/') || pathname.startsWith('/p/');
@@ -162,10 +166,38 @@ export async function handleShare(request: Request, env: ShareEnv, clock: ShareC
     try {
       await bucket.put(pictureKey(newId), bytes, { httpMetadata: { contentType: type } });
       await bucket.put(cardKey(newId), JSON.stringify(stored), { httpMetadata: { contentType: 'application/json' } });
+      await bucket.put(ownerPrefix(owner) + newId, '');
     } catch {
       return problem(502, 'The picture could not be stored just now. Nothing was shared.');
     }
     return json({ data: { id: newId, url: new URL(`/p/${newId}`, request.url).href, expiresAt: stored.expiresAt } }, 201);
+  }
+
+  if (request.method === 'GET' && !id) {
+    const prefix = ownerPrefix(owner);
+    const ids: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await bucket.list({ prefix, cursor });
+      for (const object of page.objects) ids.push(object.key.slice(prefix.length));
+      cursor = page.truncated ? page.cursor : undefined;
+    } while (cursor);
+    const now = clock.now();
+    const links = [];
+    for (const linkId of ids) {
+      const card = isShareId(linkId) ? await readCard(bucket, linkId) : null;
+      if (!card) continue;
+      links.push({
+        id: linkId,
+        url: new URL(`/p/${linkId}`, request.url).href,
+        title: card.title,
+        createdAt: card.createdAt,
+        expiresAt: card.expiresAt,
+        expired: isExpired(card, now),
+      });
+    }
+    links.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return json({ data: links });
   }
 
   if (request.method === 'DELETE' && id) {
@@ -174,7 +206,7 @@ export async function handleShare(request: Request, env: ShareEnv, clock: ShareC
     if (!card) return problem(404, 'That link doesn’t exist, or was already removed.');
     if (card.owner !== owner) return problem(403, 'Only the studio that made this link can remove it.');
     try {
-      await bucket.delete([pictureKey(id), cardKey(id)]);
+      await bucket.delete([pictureKey(id), cardKey(id), ownerPrefix(owner) + id]);
     } catch {
       return problem(502, 'The link could not be removed just now. It still works.');
     }

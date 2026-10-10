@@ -68,6 +68,8 @@ const link = message.match(/See the picture here: (\S+)/)?.[1];
 ok(`message carries the link (${link})`, Boolean(link && link.startsWith(`${URL}p/`)));
 await win.getByLabel('Send to').fill('client@example.com');
 ok('Email body carries the link', decodeURIComponent((await email.getAttribute('href')) ?? '').includes(link ?? 'none'));
+const listed = win.locator('.share-link-list li');
+ok('link shows in Your viewing links', (await listed.count()) === 1);
 await page.screenshot({ path: `${OUT}/share-app.png` });
 
 const client = await (await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] })).newPage({ viewport: { width: 390, height: 844 } });
@@ -77,7 +79,8 @@ ok('client page draws the picture', await client.locator('img').evaluate((img) =
 ok('client page says when it ends', /stops working on/.test(await client.locator('body').innerText()));
 await client.screenshot({ path: `${OUT}/share-client.png`, fullPage: true });
 
-await win.getByRole('button', { name: 'Remove link' }).click(); await wait(1500);
+await listed.first().getByRole('button', { name: /^Remove link for/ }).click(); await wait(1500);
+ok('list empties after removing', (await listed.count()) === 0);
 ok('message drops the link', !(await win.locator('.send-message').innerText()).includes('See the picture here'));
 const gone = await client.goto(link); await wait(300);
 ok('removed link says gone', gone?.status() === 404 && /no longer available/.test(await client.locator('body').innerText()));

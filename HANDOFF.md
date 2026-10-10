@@ -40,9 +40,9 @@
   is server HTML with strict CSP, no app shell; sw.js skips `/share/`, `/p/`.
   Expired / removed / made-up ids all answer the same 404 page.
 - Uploads are re-drawn as JPEG ≤2400px client-side: strips GPS metadata.
-- Links are not listed anywhere after the session; only removable while the
-  photo's link is on screen. Expiry tidies the page; R2 objects stay (add an
-  R2 lifecycle rule `shares/` 90 d if storage ever matters).
+- "Your viewing links" list (Send a picture) reads `owners/<owner>/<id>`
+  markers; links made before 2026-10-10 have none and never list. Expired R2
+  objects stay (add lifecycle rule on `shares/` if storage ever matters).
 ## Dead ends (do not retry)
 - tabs.spec: `waitForLoadState('networkidle')` after a Finance tab click hangs
   60 s though the tab makes 0 requests. Use a fixed wait.
@@ -77,7 +77,7 @@
   `check-selling.mjs` (42), `check-visualizer.mjs` (30, `ROOM=` a photo),
   `check-booth.mjs` (22), `check-shows-trash.mjs`, `check-lazy-thumbs.mjs`.
 ## Verify (tested / NOT tested)
-- Tested 2026-10-09 viewing links: unit 777; qa 53 local+live; check-share 14.
+- Tested 2026-10-09 viewing links: unit 777; qa 53 local+live; check-share 16.
   NOT tested: live upload with real studio-api session; phone mail apps.
 - Tested 2026-10-09 (site-qa + 4 fixes, live 63908ce): unit 763; qa 41 local
   + live; startup.spec fails 3/3 on old build; check-calendar 34/34; CI green.

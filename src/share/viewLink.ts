@@ -26,6 +26,16 @@ export interface ShareCard {
   expiresAt: string;
 }
 
+/** One of the studio's own links, as the list shows it. */
+export interface ShareListed {
+  id: string;
+  url: string;
+  title: string;
+  createdAt: string;
+  expiresAt: string;
+  expired: boolean;
+}
+
 export interface ShareCreated {
   id: string;
   url: string;

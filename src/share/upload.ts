@@ -1,4 +1,4 @@
-import { fitWithin, type ShareCreated } from './viewLink';
+import { fitWithin, type ShareCreated, type ShareListed } from './viewLink';
 
 /**
  * The app's side of viewing links: ask whether they are on, upload one
@@ -66,4 +66,14 @@ export async function removeViewLink(id: string): Promise<void> {
     throw new Error('Couldn’t reach the studio. The link still works.');
   }
   await answer(res);
+}
+
+export async function listViewLinks(): Promise<ShareListed[]> {
+  let res: Response;
+  try {
+    res = await fetch('/share/pictures', { credentials: 'same-origin' });
+  } catch {
+    throw new Error('Couldn’t reach the studio to list your links.');
+  }
+  return answer<ShareListed[]>(res);
 }
