@@ -6,10 +6,9 @@
 - `main` live at 1282cb5: viewing links + link list (778 unit, 53 qa live).
 - First-load JS 95.5 KB gzip of a 100 KB budget (was 99.3): launcher tables
   now load lazily. Keep new shell code out of the entry chunk.
-- Viewing links (owner asked 2026-10-09): Connect › Send a picture › "Add a
-  viewing link" (signed in only) uploads to R2 `fineartos-shares` via
-  `worker/share.ts`; client opens `/p/<id>`. 90 days. All mailto buttons open
-  in a new tab (webmail used to replace the app tab).
+- Viewing links: Send a picture › "Add a viewing link" (signed in) → R2
+  `fineartos-shares` via `worker/share.ts`; client opens `/p/<id>`, 90 days.
+  All mailto buttons open in a new tab (webmail used to replace the app).
 - Phase 7 (sync through studio-api, billing) needs owner calls; not started.
 - Every change follows CLAUDE.md "Site QA workflow".
 ## Done
